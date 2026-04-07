@@ -3,8 +3,16 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Index from "./pages/Index.tsx";
-import NotFound from "./pages/NotFound.tsx";
+import AdminLayout from "@/components/admin/AdminLayout";
+import Index from "./pages/Index";
+import UsersPage from "./pages/UsersPage";
+import SubscriptionsPage from "./pages/SubscriptionsPage";
+import PresetsPage from "./pages/PresetsPage";
+import ActivationsPage from "./pages/ActivationsPage";
+import SecurityPage from "./pages/SecurityPage";
+import AnnouncementsPage from "./pages/AnnouncementsPage";
+import SettingsPage from "./pages/SettingsPage";
+import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
@@ -15,8 +23,16 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route element={<AdminLayout />}>
+            <Route path="/" element={<Index />} />
+            <Route path="/users" element={<UsersPage />} />
+            <Route path="/subscriptions" element={<SubscriptionsPage />} />
+            <Route path="/presets" element={<PresetsPage />} />
+            <Route path="/activations" element={<ActivationsPage />} />
+            <Route path="/security" element={<SecurityPage />} />
+            <Route path="/announcements" element={<AnnouncementsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
