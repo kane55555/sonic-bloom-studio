@@ -1,0 +1,163 @@
+{
+  "presetVersion": "1.0.0",
+  "author": "DIDITAGAIN",
+  "engineMode": "fm2op",
+  "playMode": "poly",
+  "masterGain": -3,
+  "polyphony": 8,
+  "glideTime": 0,
+  "uiSkinRef": "default",
+  "tuningRef": "12tet-440",
+  "signature": "",
+  "presetName": "Dream Bell",
+  "category": "Keys",
+  "tags": [
+    "bell",
+    "ethereal",
+    "soft"
+  ],
+  "description": "Soft FM bell with long tail",
+  "oscA": {
+    "waveform": "sine",
+    "level": 0.7,
+    "detuneCents": 0,
+    "octave": 0,
+    "semitone": 0,
+    "pulseWidth": 0.5,
+    "unisonVoices": 1,
+    "unisonDetune": 0.2,
+    "unisonSpread": 0.5
+  },
+  "oscB": {
+    "waveform": "sine",
+    "level": 0.5,
+    "detuneCents": 0,
+    "octave": 0,
+    "semitone": 7,
+    "pulseWidth": 0.5,
+    "unisonVoices": 1,
+    "unisonDetune": 0.2,
+    "unisonSpread": 0.5
+  },
+  "subOsc": {
+    "enabled": false,
+    "level": 0.5,
+    "octave": -1
+  },
+  "noise": {
+    "type": "white",
+    "level": 0
+  },
+  "filter1": {
+    "type": "LP24",
+    "cutoff": 8000,
+    "resonance": 0.2,
+    "drive": 0,
+    "envAmount": 0,
+    "keyTrack": 0
+  },
+  "filter2": {
+    "type": "HP12",
+    "cutoff": 80,
+    "resonance": 0,
+    "drive": 0,
+    "envAmount": 0,
+    "keyTrack": 0
+  },
+  "env1": {
+    "attack": 0.001,
+    "decay": 2.0,
+    "sustain": 0,
+    "release": 3.0
+  },
+  "env2": {
+    "attack": 0.01,
+    "decay": 0.5,
+    "sustain": 0.3,
+    "release": 0.5
+  },
+  "env3": {
+    "attack": 0.01,
+    "decay": 0.8,
+    "sustain": 0,
+    "release": 0.3
+  },
+  "lfo1": {
+    "rate": 1.0,
+    "shape": "sine",
+    "sync": false,
+    "depth": 0.5
+  },
+  "lfo2": {
+    "rate": 0.5,
+    "shape": "triangle",
+    "sync": false,
+    "depth": 0.5
+  },
+  "modMatrix": [],
+  "fxChain": {
+    "chorusMix": 0,
+    "chorusRate": 1.0,
+    "chorusDepth": 0.3,
+    "delayMix": 0,
+    "delayTime": 0.3,
+    "delayFeedback": 0.4,
+    "delaySync": false,
+    "reverbMix": 0.4,
+    "reverbSize": 0.7,
+    "reverbDamping": 0.5,
+    "phaserMix": 0,
+    "phaserRate": 0.5,
+    "distortionAmount": 0,
+    "distortionType": "soft",
+    "compressorThreshold": -10,
+    "compressorRatio": 4,
+    "eqLow": 0,
+    "eqMid": 0,
+    "eqHigh": 0,
+    "limiterCeiling": -0.3
+  },
+  "macroKnobs": [
+    {
+      "label": "Brightness",
+      "value": 0.5,
+      "mappings": []
+    },
+    {
+      "label": "Movement",
+      "value": 0.5,
+      "mappings": []
+    },
+    {
+      "label": "Space",
+      "value": 0.5,
+      "mappings": []
+    },
+    {
+      "label": "Dirt",
+      "value": 0,
+      "mappings": []
+    },
+    {
+      "label": "Attack",
+      "value": 0.5,
+      "mappings": []
+    },
+    {
+      "label": "Width",
+      "value": 0.5,
+      "mappings": []
+    },
+    {
+      "label": "Tone",
+      "value": 0.5,
+      "mappings": []
+    },
+    {
+      "label": "Mix",
+      "value": 0.5,
+      "mappings": []
+    }
+  ],
+  "checksum": "4f00de176d4130f8"
+}
