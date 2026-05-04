@@ -207,11 +207,88 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 {
     juce::ScopedNoDenormals noDenormals;
     buffer.clear();
-    synthEngine.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
 
-    // Apply master gain
-    float masterGainDb = apvts.getRawParameterValue("masterGain")->load();
-    float gain = juce::Decibels::decibelsToGain(masterGainDb);
+    // ---- Push current parameter snapshot to the engine ----
+    auto getF = [this](const char* id) { return apvts.getRawParameterValue(id)->load(); };
+
+    const auto engineMode = static_cast<SynthVoice::EngineMode>(
+        static_cast<int>(getF("engineMode")));
+    const float fmAmount = getF("fmAmount");
+    const float fmRatio  = getF("fmRatio");
+    const float oscALevel = getF("oscALevel");
+    const float oscBLevel = getF("oscBLevel");
+    const float subLevel  = getF("subOscEnabled") > 0.5f ? getF("subOscLevel") : 0.0f;
+    const float noiseLvl  = getF("noiseLevel");
+    const float glide     = getF("glideTime");
+    const float cutoff    = getF("filter1Cutoff");
+    const float reso      = getF("filter1Resonance");
+    const auto  filterType = static_cast<FilterBlock::Type>(static_cast<int>(getF("filter1Type")));
+    const float fDrive    = getF("filter1Drive");
+    const float fEnvAmt   = getF("filter1EnvAmount");
+    const float keyTrk    = getF("filter1KeyTrack");
+
+    // Envelopes
+    const float ampA = getF("env1Attack"),  ampD = getF("env1Decay"),
+                ampS = getF("env1Sustain"), ampR = getF("env1Release");
+    const float fA = getF("env2Attack"),  fD = getF("env2Decay"),
+                fS = getF("env2Sustain"), fR = getF("env2Release");
+    const float mA = getF("env3Attack"),  mD = getF("env3Decay"),
+                mS = getF("env3Sustain"), mR = getF("env3Release");
+
+    synthEngine.forEachSynthVoice([&](SynthVoice& v)
+    {
+        v.setEngineMode(engineMode);
+        v.setOscALevel(oscALevel);
+        v.setOscBLevel(oscBLevel);
+        v.setSubLevel(subLevel);
+        v.setNoiseLevel(noiseLvl);
+        v.setFmAmount(fmAmount);
+        v.setFmRatio(fmRatio);
+        v.setGlideSeconds(glide);
+        v.setBaseCutoff(cutoff);
+        v.setFilterEnvAmount(fEnvAmt);
+        v.setFilterKeyTrack(keyTrk);
+
+        auto& f = v.getFilter();
+        f.setType(filterType);
+        f.setResonance(reso);
+        f.setDrive(fDrive);
+
+        v.getOscA().setWaveform(static_cast<Oscillator::Waveform>(static_cast<int>(getF("oscAWaveform"))));
+        v.getOscB().setWaveform(static_cast<Oscillator::Waveform>(static_cast<int>(getF("oscBWaveform"))));
+        v.getOscA().setDetuneCents(getF("oscADetune"));
+        v.getOscB().setDetuneCents(getF("oscBDetune"));
+        v.getOscA().setPulseWidth(getF("oscAPulseWidth"));
+
+        v.getAmpEnv().setAttack(ampA);    v.getAmpEnv().setDecay(ampD);
+        v.getAmpEnv().setSustain(ampS);   v.getAmpEnv().setRelease(ampR);
+        v.getFilterEnv().setAttack(fA);   v.getFilterEnv().setDecay(fD);
+        v.getFilterEnv().setSustain(fS);  v.getFilterEnv().setRelease(fR);
+        v.getModEnv().setAttack(mA);      v.getModEnv().setDecay(mD);
+        v.getModEnv().setSustain(mS);     v.getModEnv().setRelease(mR);
+    });
+
+    // Mono / poly
+    const bool mono = getF("monoMode") > 0.5f;
+    static bool lastMono = false;
+    if (mono != lastMono) { synthEngine.setMonoMode(mono); lastMono = mono; }
+
+    // ---- FX parameters ----
+    auto& fx = synthEngine.getFx();
+    fx.setSaturationDrive(getF("fxDistortionAmount"));
+    fx.setSaturationMix  (getF("fxDistortionAmount") > 0.0001f ? 1.0f : 0.0f);
+    fx.setChorusMix(getF("fxChorusMix"));
+    fx.setDelayMix(getF("fxDelayMix"));
+    fx.setDelayTime(getF("fxDelayTime"));
+    fx.setDelayFeedback(getF("fxDelayFeedback"));
+    fx.setReverbMix(getF("fxReverbMix"));
+    fx.setReverbSize(getF("fxReverbSize"));
+
+    // ---- Render voices + FX ----
+    synthEngine.renderBlockWithFx(buffer, midiMessages, 0, buffer.getNumSamples());
+
+    // ---- Master gain ----
+    const float gain = juce::Decibels::decibelsToGain(getF("masterGain"));
     buffer.applyGain(gain);
 }
 
