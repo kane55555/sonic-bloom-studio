@@ -22,6 +22,21 @@ juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createP
         juce::ParameterID{"masterGain", 1}, "Master Gain",
         juce::NormalisableRange<float>(-60.0f, 12.0f, 0.1f), 0.0f));
 
+    // Engine
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{"engineMode", 1}, "Engine Mode",
+        juce::StringArray{"Subtractive", "FM2", "FM4", "Wavetable", "Layered"}, 0));
+    params.push_back(std::make_unique<juce::AudioParameterInt>(
+        juce::ParameterID{"polyphony", 1}, "Polyphony", 1, 16, 8));
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{"monoMode", 1}, "Mono Mode", false));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"fmAmount", 1}, "FM Amount",
+        juce::NormalisableRange<float>(0.0f, 12.0f, 0.01f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"fmRatio", 1}, "FM Ratio",
+        juce::NormalisableRange<float>(0.25f, 16.0f, 0.01f, 0.4f), 1.0f));
+
     // Oscillator A
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{"oscAWaveform", 1}, "Osc A Waveform",
