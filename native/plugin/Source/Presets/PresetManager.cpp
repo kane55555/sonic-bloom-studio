@@ -1,7 +1,15 @@
 #include "PresetManager.h"
+#include "PresetSchema.h"
+#include "FactoryPresets.h"
 
 PresetManager::PresetManager(juce::AudioProcessor& proc) : processor(proc)
 {
+    // Ensure factory directory contains the embedded presets the very first
+    // time the plugin runs on this machine.
+    auto factoryDir = getFactoryPresetDirectory();
+    if (! factoryDir.exists()) factoryDir.createDirectory();
+    dida::factory::extractMissing(factoryDir);
+
     scanPresetDirectory();
 }
 
@@ -10,6 +18,24 @@ void PresetManager::scanPresetDirectory()
     presets.clear();
     loadFactoryPresets();
     loadUserPresets();
+}
+
+static void readPresetInfoFromJson(const juce::var& json,
+                                   const juce::File& file,
+                                   bool isFactory,
+                                   PresetInfo& info)
+{
+    info.name        = json.getProperty(dida::preset::key::presetName, "Untitled").toString();
+    info.author      = json.getProperty(dida::preset::key::author, "DIDITAGAIN").toString();
+    info.category    = json.getProperty(dida::preset::key::category, "Init").toString();
+    info.description = json.getProperty(dida::preset::key::description, "").toString();
+    info.filePath    = file.getFullPathName();
+    info.isFactory   = isFactory;
+
+    auto tagsVar = json.getProperty(dida::preset::key::tags, juce::var());
+    if (auto* tagsArray = tagsVar.getArray())
+        for (auto& t : *tagsArray)
+            info.tags.add(t.toString());
 }
 
 void PresetManager::loadFactoryPresets()
@@ -21,23 +47,10 @@ void PresetManager::loadFactoryPresets()
     for (auto& file : files)
     {
         auto json = juce::JSON::parse(file);
-        if (json.isObject())
-        {
-            PresetInfo info;
-            info.name = json.getProperty("presetName", "Untitled").toString();
-            info.author = json.getProperty("author", "DIDITAGAIN").toString();
-            info.category = json.getProperty("category", "Init").toString();
-            info.description = json.getProperty("description", "").toString();
-            info.filePath = file.getFullPathName();
-            info.isFactory = true;
-
-            auto tagsVar = json.getProperty("tags", juce::var());
-            if (auto* tagsArray = tagsVar.getArray())
-                for (auto& t : *tagsArray)
-                    info.tags.add(t.toString());
-
-            presets.push_back(info);
-        }
+        if (! json.isObject()) continue;
+        PresetInfo info;
+        readPresetInfoFromJson(json, file, /*isFactory*/true, info);
+        presets.push_back(info);
     }
 }
 
@@ -50,24 +63,95 @@ void PresetManager::loadUserPresets()
     for (auto& file : files)
     {
         auto json = juce::JSON::parse(file);
-        if (json.isObject())
+        if (! json.isObject()) continue;
+        PresetInfo info;
+        readPresetInfoFromJson(json, file, /*isFactory*/false, info);
+        presets.push_back(info);
+    }
+}
+
+// Helper: set an APVTS parameter from a juce::var, normalising the value.
+static void setParam(juce::AudioProcessor& proc, const char* id, const juce::var& v)
+{
+    if (auto* apvts = dynamic_cast<juce::AudioProcessorValueTreeState*>(nullptr))
+    {
+        (void)apvts;
+    }
+    // The processor exposes its APVTS via a known interface; we cast through it.
+    // To keep PresetManager loosely coupled we use the parameter system directly.
+    if (auto* p = proc.getParameters()[0])
+    {
+        (void)p; // suppress unused — fallback path
+    }
+
+    // Walk parameters by ID via the host-style API.
+    for (auto* param : proc.getParameters())
+    {
+        if (auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
         {
-            PresetInfo info;
-            info.name = json.getProperty("presetName", "Untitled").toString();
-            info.author = json.getProperty("author", "User").toString();
-            info.category = json.getProperty("category", "User").toString();
-            info.filePath = file.getFullPathName();
-            info.isFactory = false;
-            presets.push_back(info);
+            if (withId->paramID == id)
+            {
+                if (v.isBool())
+                {
+                    withId->setValueNotifyingHost(v ? 1.0f : 0.0f);
+                }
+                else if (v.isString())
+                {
+                    // Choice parameter — try to map by text.
+                    if (auto* choice = dynamic_cast<juce::AudioParameterChoice*>(withId))
+                    {
+                        const int idx = choice->choices.indexOf(v.toString(), true);
+                        if (idx >= 0)
+                            choice->setValueNotifyingHost(choice->convertTo0to1(static_cast<float>(idx)));
+                    }
+                }
+                else if (v.isDouble() || v.isInt())
+                {
+                    const float fv = static_cast<float>((double) v);
+                    if (auto* fp = dynamic_cast<juce::RangedAudioParameter*>(withId))
+                        fp->setValueNotifyingHost(fp->convertTo0to1(fv));
+                }
+                return;
+            }
         }
     }
+}
+
+static void applyOscBlock(juce::AudioProcessor& proc, const juce::var& obj,
+                          const char* wfId, const char* lvlId, const char* detId,
+                          const char* octId, const char* semiId, const char* pwId = nullptr)
+{
+    if (! obj.isObject()) return;
+    if (obj.hasProperty("waveform"))
+    {
+        const int wf = dida::preset::waveformFromString(obj.getProperty("waveform","").toString());
+        // choice parameters use index; convert to normalised
+        for (auto* p : proc.getParameters())
+            if (auto* c = dynamic_cast<juce::AudioParameterChoice*>(p))
+                if (c->paramID == wfId)
+                    c->setValueNotifyingHost(c->convertTo0to1(static_cast<float>(wf)));
+    }
+    if (obj.hasProperty("level"))       setParam(proc, lvlId,  obj.getProperty("level", 0.0));
+    if (obj.hasProperty("detuneCents")) setParam(proc, detId,  obj.getProperty("detuneCents", 0.0));
+    if (obj.hasProperty("octave"))      setParam(proc, octId,  obj.getProperty("octave", 0));
+    if (obj.hasProperty("semitone"))    setParam(proc, semiId, obj.getProperty("semitone", 0));
+    if (pwId && obj.hasProperty("pulseWidth")) setParam(proc, pwId, obj.getProperty("pulseWidth", 0.5));
+}
+
+static void applyEnv(juce::AudioProcessor& proc, const juce::var& obj, const char* prefix)
+{
+    if (! obj.isObject()) return;
+    juce::String pfx(prefix);
+    setParam(proc, (pfx + "Attack").toRawUTF8(),  obj.getProperty("attack",  0.01));
+    setParam(proc, (pfx + "Decay").toRawUTF8(),   obj.getProperty("decay",   0.3));
+    setParam(proc, (pfx + "Sustain").toRawUTF8(), obj.getProperty("sustain", 0.7));
+    setParam(proc, (pfx + "Release").toRawUTF8(), obj.getProperty("release", 0.5));
 }
 
 void PresetManager::loadPreset(int index)
 {
     if (index < 0 || index >= static_cast<int>(presets.size())) return;
     currentIndex = index;
-
     juce::File file(presets[index].filePath);
     loadPresetFromFile(file);
 }
@@ -77,10 +161,79 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
     if (!validatePresetFile(file)) return;
 
     auto json = juce::JSON::parse(file);
-    if (!json.isObject()) return;
+    if (! json.isObject()) return;
 
-    // TODO: Apply all parameter values from JSON to AudioProcessorValueTreeState
-    // This maps each JSON key to the corresponding APVTS parameter
+    using namespace dida::preset;
+
+    // Engine
+    if (json.hasProperty(key::engineMode))
+    {
+        const int idx = engineModeFromString(json.getProperty(key::engineMode, "Subtractive").toString());
+        for (auto* p : processor.getParameters())
+            if (auto* c = dynamic_cast<juce::AudioParameterChoice*>(p))
+                if (c->paramID == "engineMode")
+                    c->setValueNotifyingHost(c->convertTo0to1(static_cast<float>(idx)));
+    }
+    if (json.hasProperty(key::masterGain)) setParam(processor, "masterGain", json.getProperty(key::masterGain, 0.0));
+    if (json.hasProperty(key::polyphony))  setParam(processor, "polyphony",  json.getProperty(key::polyphony, 8));
+    if (json.hasProperty(key::mono))       setParam(processor, "monoMode",   json.getProperty(key::mono, false));
+    if (json.hasProperty(key::glideMs))
+    {
+        const double ms = (double) json.getProperty(key::glideMs, 0.0);
+        setParam(processor, "glideTime", ms / 1000.0);
+    }
+
+    // Oscillators
+    applyOscBlock(processor, json.getProperty(key::oscA, juce::var()),
+                  "oscAWaveform","oscALevel","oscADetune","oscAOctave","oscASemi","oscAPulseWidth");
+    applyOscBlock(processor, json.getProperty(key::oscB, juce::var()),
+                  "oscBWaveform","oscBLevel","oscBDetune","oscBOctave","oscBSemi");
+
+    auto sub = json.getProperty(key::subOsc, juce::var());
+    if (sub.isObject())
+    {
+        if (sub.hasProperty("enabled")) setParam(processor, "subOscEnabled", sub.getProperty("enabled", false));
+        if (sub.hasProperty("level"))   setParam(processor, "subOscLevel",   sub.getProperty("level", 0.0));
+    }
+    auto noise = json.getProperty(key::noise, juce::var());
+    if (noise.isObject() && noise.hasProperty("level"))
+        setParam(processor, "noiseLevel", noise.getProperty("level", 0.0));
+
+    // Filter 1
+    auto f1 = json.getProperty(key::filter1, juce::var());
+    if (f1.isObject())
+    {
+        if (f1.hasProperty("type"))
+        {
+            const int t = filterTypeFromString(f1.getProperty("type","LP24").toString());
+            for (auto* p : processor.getParameters())
+                if (auto* c = dynamic_cast<juce::AudioParameterChoice*>(p))
+                    if (c->paramID == "filter1Type")
+                        c->setValueNotifyingHost(c->convertTo0to1(static_cast<float>(t)));
+        }
+        setParam(processor, "filter1Cutoff",     f1.getProperty("cutoff",     8000.0));
+        setParam(processor, "filter1Resonance",  f1.getProperty("resonance",  0.2));
+        setParam(processor, "filter1Drive",      f1.getProperty("drive",      0.0));
+        setParam(processor, "filter1EnvAmount",  f1.getProperty("envAmount",  0.0));
+        setParam(processor, "filter1KeyTrack",   f1.getProperty("keyTrack",   0.0));
+    }
+
+    applyEnv(processor, json.getProperty(key::env1, juce::var()), "env1");
+    applyEnv(processor, json.getProperty(key::env2, juce::var()), "env2");
+    applyEnv(processor, json.getProperty(key::env3, juce::var()), "env3");
+
+    // FX chain
+    auto fx = json.getProperty(key::fxChain, juce::var());
+    if (fx.isObject())
+    {
+        setParam(processor, "fxChorusMix",        fx.getProperty("chorusMix", 0.0));
+        setParam(processor, "fxDelayMix",         fx.getProperty("delayMix",  0.0));
+        setParam(processor, "fxDelayTime",        fx.getProperty("delayTime", 0.3));
+        setParam(processor, "fxDelayFeedback",    fx.getProperty("delayFeedback", 0.4));
+        setParam(processor, "fxReverbMix",        fx.getProperty("reverbMix", 0.0));
+        setParam(processor, "fxReverbSize",       fx.getProperty("reverbSize", 0.5));
+        setParam(processor, "fxDistortionAmount", fx.getProperty("distortionAmount", 0.0));
+    }
 }
 
 void PresetManager::saveCurrentPreset(const juce::String& name, const juce::String& category)
@@ -90,15 +243,21 @@ void PresetManager::saveCurrentPreset(const juce::String& name, const juce::Stri
     auto file = dir.getChildFile(name + ".didasynthpreset");
 
     juce::DynamicObject::Ptr obj = new juce::DynamicObject();
-    obj->setProperty("presetVersion", "1.0.0");
-    obj->setProperty("presetName", name);
-    obj->setProperty("author", "User");
-    obj->setProperty("category", category);
-    obj->setProperty("tags", juce::var());
-    // TODO: Serialize all parameter values from APVTS
+    obj->setProperty(dida::preset::key::presetVersion, dida::preset::kSchemaVersion);
+    obj->setProperty(dida::preset::key::presetName, name);
+    obj->setProperty(dida::preset::key::author, "User");
+    obj->setProperty(dida::preset::key::category, category);
+    obj->setProperty(dida::preset::key::tags, juce::var());
+
+    // Snapshot every parameter.
+    juce::DynamicObject::Ptr params = new juce::DynamicObject();
+    for (auto* p : processor.getParameters())
+        if (auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*>(p))
+            params->setProperty(withId->paramID, withId->getValue());
+    obj->setProperty("parameters", juce::var(params.get()));
 
     auto jsonStr = juce::JSON::toString(juce::var(obj.get()));
-    obj->setProperty("checksum", computeChecksum(jsonStr));
+    obj->setProperty(dida::preset::key::checksum, computeChecksum(jsonStr));
 
     file.replaceWithText(juce::JSON::toString(juce::var(obj.get())));
     scanPresetDirectory();
@@ -146,19 +305,16 @@ std::vector<int> PresetManager::searchByName(const juce::String& query) const
 
 juce::File PresetManager::getFactoryPresetDirectory() const
 {
-#if JUCE_WINDOWS
     return juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory)
-        .getChildFile("DIDITAGAIN").getChildFile("DIDITAGAIN STUDIO").getChildFile("Presets").getChildFile("Factory");
-#else
-    return juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory)
-        .getChildFile("DIDITAGAIN").getChildFile("DIDITAGAIN STUDIO").getChildFile("Presets").getChildFile("Factory");
-#endif
+        .getChildFile("DIDITAGAIN").getChildFile("DIDITAGAIN STUDIO")
+        .getChildFile("Presets").getChildFile("Factory");
 }
 
 juce::File PresetManager::getUserPresetDirectory() const
 {
     return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-        .getChildFile("DIDITAGAIN").getChildFile("DIDITAGAIN STUDIO").getChildFile("Presets").getChildFile("User");
+        .getChildFile("DIDITAGAIN").getChildFile("DIDITAGAIN STUDIO")
+        .getChildFile("Presets").getChildFile("User");
 }
 
 bool PresetManager::validatePresetFile(const juce::File& file)
@@ -166,8 +322,8 @@ bool PresetManager::validatePresetFile(const juce::File& file)
     if (!file.existsAsFile()) return false;
     auto json = juce::JSON::parse(file);
     if (!json.isObject()) return false;
-    if (!json.hasProperty("presetVersion")) return false;
-    if (!json.hasProperty("presetName")) return false;
+    if (!json.hasProperty(dida::preset::key::presetVersion)) return false;
+    if (!json.hasProperty(dida::preset::key::presetName))    return false;
     return true;
 }
 
