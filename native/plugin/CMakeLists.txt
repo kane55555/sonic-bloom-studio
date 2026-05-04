@@ -43,11 +43,20 @@ target_sources(DIDITAGAIN_STUDIO PRIVATE
     Source/DSP/LFO.cpp
     Source/DSP/ModMatrix.cpp
     Source/DSP/FxChain.cpp
+    Source/DSP/Saturation.cpp
+    Source/DSP/ChorusBlock.cpp
+    Source/DSP/DelayBlock.cpp
+    Source/DSP/ReverbBlock.cpp
+    Source/DSP/UtilityDSP.cpp
     Source/Presets/PresetManager.cpp
+    Source/Presets/FactoryPresets.cpp
     Source/Licensing/LicenseClient.cpp
     Source/Licensing/AccountState.cpp
     Source/UI/Theme.cpp
     Source/UI/BrowserComponent.cpp
+    Source/UI/KnobLookAndFeel.cpp
+    Source/UI/MainSynthPanel.cpp
+    Source/UI/PresetBrowser.cpp
 )
 
 target_include_directories(DIDITAGAIN_STUDIO PRIVATE Source)
