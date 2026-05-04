@@ -1,56 +1,84 @@
 #pragma once
+//==============================================================================
+//  FxChain.h — Master post-voice effects chain.
+//
+//  Order: Saturation -> Chorus -> Delay -> Reverb -> safety limiter.
+//  Every block is bypassed when its mix/amount is effectively zero so an
+//  inactive chain costs almost nothing per sample.
+//==============================================================================
 #include <JuceHeader.h>
+#include "Saturation.h"
+#include "ChorusBlock.h"
+#include "DelayBlock.h"
+#include "ReverbBlock.h"
+#include "UtilityDSP.h"
 
 class FxChain
 {
 public:
-    FxChain() = default;
-
     void prepare(double sampleRate, int samplesPerBlock)
     {
-        juce::dsp::ProcessSpec spec;
-        spec.sampleRate = sampleRate;
-        spec.maximumBlockSize = static_cast<uint32_t>(samplesPerBlock);
-        spec.numChannels = 2;
-
-        chorus.prepare(spec);
-        chorus.setRate(1.0f);
-        chorus.setDepth(0.25f);
-        chorus.setMix(0.0f);
-
-        reverb.prepare(spec);
+        sat.prepare(sampleRate);
+        chorus.prepare(sampleRate, samplesPerBlock);
+        delay.prepare(sampleRate, samplesPerBlock);
+        reverb.prepare(sampleRate, samplesPerBlock);
     }
 
     void process(juce::AudioBuffer<float>& buffer)
     {
-        juce::dsp::AudioBlock<float> block(buffer);
-        juce::dsp::ProcessContextReplacing<float> context(block);
+        // 1) Saturation (per-sample)
+        if (saturationActive)
+        {
+            const int n = buffer.getNumSamples();
+            for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+            {
+                auto* d = buffer.getWritePointer(ch);
+                for (int i = 0; i < n; ++i) d[i] = sat.processSample(d[i]);
+            }
+        }
 
-        chorus.process(context);
+        // 2) Chorus / 3) Delay / 4) Reverb (block based, internally bypass on 0 mix)
+        chorus.process(buffer);
+        delay.process(buffer);
+        reverb.process(buffer);
 
-        // Reverb
-        juce::Reverb::Parameters reverbParams;
-        reverbParams.roomSize = reverbSize;
-        reverbParams.wetLevel = reverbMix;
-        reverbParams.dryLevel = 1.0f - reverbMix;
-        reverb.setParameters(reverbParams);
-        reverb.processStereo(buffer.getWritePointer(0), buffer.getWritePointer(1), buffer.getNumSamples());
+        // 5) Safety limiter — soft clip the master bus so we never deliver
+        //    > 0 dBFS even with extreme preset settings.
+        const int n = buffer.getNumSamples();
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        {
+            auto* d = buffer.getWritePointer(ch);
+            for (int i = 0; i < n; ++i) d[i] = dida::softClip(d[i]);
+        }
     }
 
-    void setChorusMix(float mix) { chorus.setMix(mix); }
-    void setReverbMix(float mix) { reverbMix = mix; }
-    void setReverbSize(float size) { reverbSize = size; }
+    // ---- Setters used by PluginProcessor ----
+    void setSaturationDrive(float d) { sat.setDrive(d); saturationActive = d > 0.001f; }
+    void setSaturationMix  (float m) { sat.setMix(m);   if (m <= 0.001f) saturationActive = false; }
+
+    void setChorusMix(float m) { chorus.setMix(m); }
+    void setChorusRate(float r) { chorus.setRate(r); }
+    void setChorusDepth(float d) { chorus.setDepth(d); }
+
+    void setDelayMix(float m) { delay.setMix(m); }
+    void setDelayTime(float s) { delay.setTimeSeconds(s); }
+    void setDelayFeedback(float f) { delay.setFeedback(f); }
+
+    void setReverbMix(float m) { reverb.setMix(m); }
+    void setReverbSize(float s) { reverb.setSize(s); }
+    void setReverbDamping(float d) { reverb.setDamping(d); }
 
     void reset()
     {
         chorus.reset();
+        delay.reset();
         reverb.reset();
     }
 
 private:
-    juce::dsp::Chorus<float> chorus;
-    juce::Reverb reverb;
-
-    float reverbMix = 0.0f;
-    float reverbSize = 0.5f;
+    Saturation   sat;
+    ChorusBlock  chorus;
+    DelayBlock   delay;
+    ReverbBlock  reverb;
+    bool         saturationActive = false;
 };
