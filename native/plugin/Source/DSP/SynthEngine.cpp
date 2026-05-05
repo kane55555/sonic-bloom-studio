@@ -166,7 +166,8 @@ bool SynthEngine::setMaxPolyphony(int n)
 
 bool SynthEngine::setMonoMode(bool mono)
 {
-    if (mono == monoMode && getNumVoices() == (mono ? 1 : MAX_POLYPHONY))
+    const int targetVoices = mono ? 1 : getNumVoices();
+    if (mono == monoMode && getNumVoices() == targetVoices)
         return true;
 
     if (! canSafelyResetVoices())
@@ -174,7 +175,7 @@ bool SynthEngine::setMonoMode(bool mono)
 
     monoMode = mono;
     setNoteStealingEnabled(true);
-    if (! setMaxPolyphony(mono ? 1 : MAX_POLYPHONY))
+    if (mono && ! setMaxPolyphony(1))
         return false;
 
     return true;
