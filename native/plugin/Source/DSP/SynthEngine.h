@@ -30,6 +30,9 @@ public:
                            int startSample, int numSamples);
 
     void resetForPresetChange();
+    bool hasHeldNotes() const noexcept;
+    bool hasActiveVoices() const noexcept;
+    bool canSafelyResetVoices() const noexcept;
     void setMaxPolyphony(int n);
     void setMonoMode(bool mono);
 
