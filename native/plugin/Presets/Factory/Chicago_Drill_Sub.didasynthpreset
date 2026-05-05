@@ -3,24 +3,24 @@
   "author": "DIDITAGAIN",
   "engineMode": "subtractive",
   "playMode": "mono",
-  "masterGain": -3,
+  "masterGain": -4.0,
   "polyphony": 1,
-  "glideTime": 0.05,
+  "glideTime": 0.092,
   "uiSkinRef": "default",
   "tuningRef": "12tet-440",
   "signature": "",
-  "presetName": "Chicago Drill Sub",
+  "presetName": "Chicago Velvet Sub",
   "category": "Bass",
   "tags": [
     "drill",
     "sub",
     "808",
-    "dark"
+    "mono"
   ],
-  "description": "Deep 808-style sub bass with analog warmth",
+  "description": "Clean deep sub with controlled glide and soft saturation.",
   "oscA": {
     "waveform": "sine",
-    "level": 0.9,
+    "level": 0.95,
     "detuneCents": 0,
     "octave": -1,
     "semitone": 0,
@@ -30,10 +30,10 @@
     "unisonSpread": 0.5
   },
   "oscB": {
-    "waveform": "saw",
-    "level": 0.15,
+    "waveform": "triangle",
+    "level": 0.1,
     "detuneCents": 0,
-    "octave": -1,
+    "octave": 0,
     "semitone": 0,
     "pulseWidth": 0.5,
     "unisonVoices": 1,
@@ -42,24 +42,24 @@
   },
   "subOsc": {
     "enabled": true,
-    "level": 0.7,
+    "level": 0.55,
     "octave": -1
   },
   "noise": {
     "type": "white",
-    "level": 0
+    "level": 0.0
   },
   "filter1": {
     "type": "LP24",
-    "cutoff": 200,
-    "resonance": 0.3,
-    "drive": 0.2,
-    "envAmount": 0.3,
-    "keyTrack": 0
+    "cutoff": 180,
+    "resonance": 0.25,
+    "drive": 0.18,
+    "envAmount": 0.2,
+    "keyTrack": 0.0
   },
   "filter2": {
     "type": "HP12",
-    "cutoff": 80,
+    "cutoff": 30,
     "resonance": 0,
     "drive": 0,
     "envAmount": 0,
@@ -67,60 +67,60 @@
   },
   "env1": {
     "attack": 0.001,
-    "decay": 0.8,
-    "sustain": 0.4,
-    "release": 0.4
+    "decay": 0.6,
+    "sustain": 0.55,
+    "release": 0.45
   },
   "env2": {
-    "attack": 0.01,
-    "decay": 0.5,
-    "sustain": 0.3,
-    "release": 0.5
+    "attack": 0.005,
+    "decay": 0.4,
+    "sustain": 0.0,
+    "release": 0.3
   },
   "env3": {
     "attack": 0.01,
-    "decay": 0.8,
-    "sustain": 0,
+    "decay": 0.3,
+    "sustain": 0.0,
     "release": 0.3
   },
   "lfo1": {
     "rate": 1.0,
     "shape": "sine",
     "sync": false,
-    "depth": 0.5
+    "depth": 0.0
   },
   "lfo2": {
     "rate": 0.5,
     "shape": "triangle",
     "sync": false,
-    "depth": 0.5
+    "depth": 0.0
   },
   "modMatrix": [],
   "fxChain": {
-    "chorusMix": 0,
+    "chorusMix": 0.0,
     "chorusRate": 1.0,
     "chorusDepth": 0.3,
-    "delayMix": 0,
+    "delayMix": 0.0,
     "delayTime": 0.3,
-    "delayFeedback": 0.4,
+    "delayFeedback": 0.35,
     "delaySync": false,
-    "reverbMix": 0,
+    "reverbMix": 0.0,
     "reverbSize": 0.5,
     "reverbDamping": 0.5,
     "phaserMix": 0,
     "phaserRate": 0.5,
-    "distortionAmount": 0,
+    "distortionAmount": 0.15,
     "distortionType": "soft",
     "compressorThreshold": -10,
     "compressorRatio": 4,
-    "eqLow": 0,
-    "eqMid": 0,
-    "eqHigh": 0,
-    "limiterCeiling": -0.3
+    "eqLow": 0.0,
+    "eqMid": 0.0,
+    "eqHigh": -2,
+    "limiterCeiling": -0.5
   },
   "macroKnobs": [
     {
-      "label": "Brightness",
+      "label": "Tone",
       "value": 0.5,
       "mappings": []
     },
@@ -136,11 +136,16 @@
     },
     {
       "label": "Dirt",
-      "value": 0,
+      "value": 0.5,
       "mappings": []
     },
     {
       "label": "Attack",
+      "value": 0.5,
+      "mappings": []
+    },
+    {
+      "label": "Release",
       "value": 0.5,
       "mappings": []
     },
@@ -150,15 +155,10 @@
       "mappings": []
     },
     {
-      "label": "Tone",
-      "value": 0.5,
-      "mappings": []
-    },
-    {
-      "label": "Mix",
+      "label": "Character",
       "value": 0.5,
       "mappings": []
     }
   ],
-  "checksum": "0737e741bd05237e"
+  "checksum": "b83efb05b5deb7b3"
 }

@@ -3,23 +3,24 @@
   "author": "DIDITAGAIN",
   "engineMode": "fm2op",
   "playMode": "poly",
-  "masterGain": -3,
+  "masterGain": -6.0,
   "polyphony": 8,
-  "glideTime": 0,
+  "glideTime": 0.0,
   "uiSkinRef": "default",
   "tuningRef": "12tet-440",
   "signature": "",
-  "presetName": "Dream Bell",
-  "category": "Keys",
+  "presetName": "Dream Glass Bell",
+  "category": "Bells",
   "tags": [
     "bell",
-    "ethereal",
-    "soft"
+    "fm",
+    "dream",
+    "sparkle"
   ],
-  "description": "Soft FM bell with long tail",
+  "description": "FM bell with glassy sparkle, plate reverb and a touch of delay.",
   "oscA": {
     "waveform": "sine",
-    "level": 0.7,
+    "level": 0.85,
     "detuneCents": 0,
     "octave": 0,
     "semitone": 0,
@@ -30,10 +31,10 @@
   },
   "oscB": {
     "waveform": "sine",
-    "level": 0.5,
+    "level": 0.0,
     "detuneCents": 0,
     "octave": 0,
-    "semitone": 7,
+    "semitone": 0,
     "pulseWidth": 0.5,
     "unisonVoices": 1,
     "unisonDetune": 0.2,
@@ -41,85 +42,85 @@
   },
   "subOsc": {
     "enabled": false,
-    "level": 0.5,
+    "level": 0.0,
     "octave": -1
   },
   "noise": {
     "type": "white",
-    "level": 0
+    "level": 0.0
   },
   "filter1": {
-    "type": "LP24",
-    "cutoff": 8000,
-    "resonance": 0.2,
-    "drive": 0,
-    "envAmount": 0,
-    "keyTrack": 0
+    "type": "HP12",
+    "cutoff": 150,
+    "resonance": 0.0,
+    "drive": 0.0,
+    "envAmount": 0.0,
+    "keyTrack": 0.0
   },
   "filter2": {
     "type": "HP12",
-    "cutoff": 80,
+    "cutoff": 30,
     "resonance": 0,
     "drive": 0,
     "envAmount": 0,
     "keyTrack": 0
   },
   "env1": {
-    "attack": 0.001,
-    "decay": 2.0,
-    "sustain": 0,
-    "release": 3.0
+    "attack": 0.002,
+    "decay": 1.4,
+    "sustain": 0.0,
+    "release": 1.2
   },
   "env2": {
-    "attack": 0.01,
-    "decay": 0.5,
-    "sustain": 0.3,
+    "attack": 0.001,
+    "decay": 0.6,
+    "sustain": 0.0,
     "release": 0.5
   },
   "env3": {
     "attack": 0.01,
-    "decay": 0.8,
-    "sustain": 0,
+    "decay": 0.3,
+    "sustain": 0.0,
     "release": 0.3
   },
   "lfo1": {
     "rate": 1.0,
     "shape": "sine",
     "sync": false,
-    "depth": 0.5
+    "depth": 0.0
   },
   "lfo2": {
     "rate": 0.5,
     "shape": "triangle",
     "sync": false,
-    "depth": 0.5
+    "depth": 0.0
   },
   "modMatrix": [],
   "fxChain": {
-    "chorusMix": 0,
+    "chorusMix": 0.08,
     "chorusRate": 1.0,
     "chorusDepth": 0.3,
-    "delayMix": 0,
-    "delayTime": 0.3,
-    "delayFeedback": 0.4,
+    "delayMix": 0.18,
+    "delayTime": 0.32,
+    "delayFeedback": 0.28,
     "delaySync": false,
-    "reverbMix": 0.4,
+    "reverbMix": 0.35,
     "reverbSize": 0.7,
-    "reverbDamping": 0.5,
+    "reverbDamping": 0.4,
     "phaserMix": 0,
     "phaserRate": 0.5,
-    "distortionAmount": 0,
+    "distortionAmount": 0.0,
     "distortionType": "soft",
     "compressorThreshold": -10,
     "compressorRatio": 4,
-    "eqLow": 0,
-    "eqMid": 0,
-    "eqHigh": 0,
-    "limiterCeiling": -0.3
+    "eqLow": 0.0,
+    "eqMid": 0.0,
+    "eqHigh": 2,
+    "limiterCeiling": -0.5
   },
   "macroKnobs": [
     {
-      "label": "Brightness",
+      "label": "Tone",
       "value": 0.5,
       "mappings": []
     },
@@ -135,11 +136,16 @@
     },
     {
       "label": "Dirt",
-      "value": 0,
+      "value": 0.5,
       "mappings": []
     },
     {
       "label": "Attack",
+      "value": 0.5,
+      "mappings": []
+    },
+    {
+      "label": "Release",
       "value": 0.5,
       "mappings": []
     },
@@ -149,15 +155,10 @@
       "mappings": []
     },
     {
-      "label": "Tone",
-      "value": 0.5,
-      "mappings": []
-    },
-    {
-      "label": "Mix",
+      "label": "Character",
       "value": 0.5,
       "mappings": []
     }
   ],
-  "checksum": "4f00de176d4130f8"
+  "checksum": "a13d6b38586892c9"
 }

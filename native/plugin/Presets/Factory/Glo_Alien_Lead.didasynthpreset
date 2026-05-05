@@ -3,123 +3,124 @@
   "author": "DIDITAGAIN",
   "engineMode": "subtractive",
   "playMode": "mono",
-  "masterGain": -3,
-  "polyphony": 8,
-  "glideTime": 0.03,
+  "masterGain": -5.0,
+  "polyphony": 1,
+  "glideTime": 0.1,
   "uiSkinRef": "default",
   "tuningRef": "12tet-440",
   "signature": "",
-  "presetName": "Glo Alien Lead",
+  "presetName": "Alien Square Lead",
   "category": "Lead",
   "tags": [
-    "alien",
-    "glowing",
-    "bright"
+    "lead",
+    "mono",
+    "square",
+    "glide"
   ],
-  "description": "Bright otherworldly lead",
+  "description": "Square/pulse mono lead with vibrato, delay and reverb.",
   "oscA": {
-    "waveform": "supersaw",
-    "level": 0.7,
+    "waveform": "square",
+    "level": 0.75,
     "detuneCents": 0,
     "octave": 0,
-    "semitone": 0,
-    "pulseWidth": 0.5,
-    "unisonVoices": 4,
-    "unisonDetune": 0.3,
-    "unisonSpread": 0.5
-  },
-  "oscB": {
-    "waveform": "sine",
-    "level": 0.3,
-    "detuneCents": 0,
-    "octave": 1,
     "semitone": 0,
     "pulseWidth": 0.5,
     "unisonVoices": 1,
     "unisonDetune": 0.2,
     "unisonSpread": 0.5
   },
+  "oscB": {
+    "waveform": "pulse",
+    "level": 0.4,
+    "detuneCents": 7,
+    "octave": 0,
+    "semitone": 0,
+    "pulseWidth": 0.35,
+    "unisonVoices": 1,
+    "unisonDetune": 0.2,
+    "unisonSpread": 0.5
+  },
   "subOsc": {
     "enabled": false,
-    "level": 0.5,
+    "level": 0.0,
     "octave": -1
   },
   "noise": {
     "type": "white",
-    "level": 0
+    "level": 0.0
   },
   "filter1": {
     "type": "LP24",
-    "cutoff": 6000,
-    "resonance": 0.4,
-    "drive": 0,
-    "envAmount": 0.3,
-    "keyTrack": 0
+    "cutoff": 3500,
+    "resonance": 0.3,
+    "drive": 0.1,
+    "envAmount": 0.2,
+    "keyTrack": 0.3
   },
   "filter2": {
     "type": "HP12",
-    "cutoff": 80,
+    "cutoff": 30,
     "resonance": 0,
     "drive": 0,
     "envAmount": 0,
     "keyTrack": 0
   },
   "env1": {
-    "attack": 0.01,
-    "decay": 0.3,
-    "sustain": 0.8,
-    "release": 0.5
+    "attack": 0.003,
+    "decay": 0.25,
+    "sustain": 0.85,
+    "release": 0.35
   },
   "env2": {
     "attack": 0.01,
-    "decay": 0.5,
-    "sustain": 0.3,
-    "release": 0.5
+    "decay": 0.3,
+    "sustain": 0.5,
+    "release": 0.4
   },
   "env3": {
     "attack": 0.01,
-    "decay": 0.8,
-    "sustain": 0,
+    "decay": 0.3,
+    "sustain": 0.0,
     "release": 0.3
   },
   "lfo1": {
-    "rate": 1.0,
+    "rate": 5.5,
     "shape": "sine",
     "sync": false,
-    "depth": 0.5
+    "depth": 0.15
   },
   "lfo2": {
     "rate": 0.5,
     "shape": "triangle",
     "sync": false,
-    "depth": 0.5
+    "depth": 0.0
   },
   "modMatrix": [],
   "fxChain": {
-    "chorusMix": 0.3,
+    "chorusMix": 0.0,
     "chorusRate": 1.0,
     "chorusDepth": 0.3,
-    "delayMix": 0.2,
-    "delayTime": 0.3,
-    "delayFeedback": 0.4,
+    "delayMix": 0.22,
+    "delayTime": 0.28,
+    "delayFeedback": 0.32,
     "delaySync": false,
     "reverbMix": 0.2,
-    "reverbSize": 0.5,
+    "reverbSize": 0.6,
     "reverbDamping": 0.5,
     "phaserMix": 0,
     "phaserRate": 0.5,
-    "distortionAmount": 0,
+    "distortionAmount": 0.0,
     "distortionType": "soft",
     "compressorThreshold": -10,
     "compressorRatio": 4,
-    "eqLow": 0,
-    "eqMid": 0,
-    "eqHigh": 0,
-    "limiterCeiling": -0.3
+    "eqLow": 0.0,
+    "eqMid": 0.0,
+    "eqHigh": 0.0,
+    "limiterCeiling": -0.5
   },
   "macroKnobs": [
     {
-      "label": "Brightness",
+      "label": "Tone",
       "value": 0.5,
       "mappings": []
     },
@@ -135,11 +136,16 @@
     },
     {
       "label": "Dirt",
-      "value": 0,
+      "value": 0.5,
       "mappings": []
     },
     {
       "label": "Attack",
+      "value": 0.5,
+      "mappings": []
+    },
+    {
+      "label": "Release",
       "value": 0.5,
       "mappings": []
     },
@@ -149,15 +155,10 @@
       "mappings": []
     },
     {
-      "label": "Tone",
-      "value": 0.5,
-      "mappings": []
-    },
-    {
-      "label": "Mix",
+      "label": "Character",
       "value": 0.5,
       "mappings": []
     }
   ],
-  "checksum": "6d3c05c35e025ed6"
+  "checksum": "e389822c86ab307e"
 }
