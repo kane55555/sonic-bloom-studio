@@ -3,6 +3,7 @@
 #include "PluginProcessor.h"
 #include "UI/MainSynthPanel.h"
 #include "UI/PresetBrowser.h"
+#include "Debug/PresetCycleTester.h"
 
 class DiditagainEditor : public juce::AudioProcessorEditor
 {
