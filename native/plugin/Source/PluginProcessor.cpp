@@ -11,7 +11,7 @@ DiditagainProcessor::DiditagainProcessor()
 {
     presetManager.onPresetLoaded = [this]()
     {
-        presetResetPending.store(true);
+        presetLoadRequested.store(true, std::memory_order_release);
     };
 }
 
@@ -243,17 +243,50 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     const float mA = getF("env3Attack"),  mD = getF("env3Decay"),
                 mS = getF("env3Sustain"), mR = getF("env3Release");
 
-    const bool canResizeVoices = synthEngine.canSafelyResetVoices();
-
-    // Apply mono/poly changes only when idle. Resizing JUCE's voice list while
-    // FL Studio is holding piano-roll notes can leave the synth silent after
-    // rapid preset stepping, so active playback keeps the current voice pool.
     const bool mono     = getF("monoMode") > 0.5f;
     const int  polyWant = juce::jlimit(1, 16, static_cast<int>(getF("polyphony")));
-    if (canResizeVoices)
+
+    if (presetLoadRequested.exchange(false, std::memory_order_acq_rel)
+        || mono != appliedMonoMode
+        || (! mono && polyWant != appliedPolyphony))
     {
-        if (mono != lastMonoMode) { synthEngine.setMonoMode(mono); lastMonoMode = mono; lastPolyphony = -1; }
-        if (!mono && polyWant != lastPolyphony) { synthEngine.setMaxPolyphony(polyWant); lastPolyphony = polyWant; }
+        deferredPresetChange.queued = true;
+        deferredPresetChange.resetState = true;
+        deferredPresetChange.monoMode = mono;
+        deferredPresetChange.polyphony = polyWant;
+    }
+
+    // Preset stepping may change mono/poly and requested polyphony every click.
+    // Keep the latest request queued, but only touch JUCE's voice pool once the
+    // host has stopped sending note events and all voices have fully released.
+    if (deferredPresetChange.queued && synthEngine.canSafelyMutateVoices(midiMessages))
+    {
+        bool applied = true;
+
+        if (deferredPresetChange.monoMode != appliedMonoMode)
+        {
+            applied = synthEngine.setMonoMode(deferredPresetChange.monoMode);
+            if (applied)
+            {
+                appliedMonoMode = deferredPresetChange.monoMode;
+                appliedPolyphony = appliedMonoMode ? 1 : SynthEngine::MAX_POLYPHONY;
+            }
+        }
+
+        if (applied && ! deferredPresetChange.monoMode && deferredPresetChange.polyphony != appliedPolyphony)
+        {
+            applied = synthEngine.setMaxPolyphony(deferredPresetChange.polyphony);
+            if (applied)
+                appliedPolyphony = deferredPresetChange.polyphony;
+        }
+
+        if (applied)
+        {
+            if (deferredPresetChange.resetState)
+                synthEngine.resetForPresetChange();
+
+            deferredPresetChange = {};
+        }
     }
 
     synthEngine.forEachSynthVoice([&](SynthVoice& v)
@@ -290,12 +323,6 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         v.getModEnv().setAttack(mA);      v.getModEnv().setDecay(mD);
         v.getModEnv().setSustain(mS);     v.getModEnv().setRelease(mR);
     });
-
-    if (presetResetPending.load() && canResizeVoices)
-    {
-        presetResetPending.store(false);
-        synthEngine.resetForPresetChange();
-    }
 
     // ---- FX parameters ----
     auto& fx = synthEngine.getFx();
