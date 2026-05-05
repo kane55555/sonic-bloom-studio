@@ -33,8 +33,9 @@ public:
     bool hasHeldNotes() const noexcept;
     bool hasActiveVoices() const noexcept;
     bool canSafelyResetVoices() const noexcept;
-    void setMaxPolyphony(int n);
-    void setMonoMode(bool mono);
+    bool canSafelyMutateVoices(const juce::MidiBuffer& upcomingMidi) const noexcept;
+    bool setMaxPolyphony(int n);
+    bool setMonoMode(bool mono);
 
     FxChain&  getFx()   noexcept { return fx; }
 
@@ -56,6 +57,7 @@ private:
         float velocity = 0.0f;
     };
 
+    static bool midiBufferHasPhraseActivity(const juce::MidiBuffer& midi) noexcept;
     void updateHeldNotes(const juce::MidiBuffer& midi);
 
     FxChain fx;
