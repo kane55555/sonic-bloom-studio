@@ -204,7 +204,7 @@ void DiditagainEditor::resized()
     nextPreset.setBounds(pw - 110, 56, 30, 28);
     savePreset.setBounds(pw - 75, 56, 60, 28);
 
-    cycleTestButton.setBounds(15, 56, 100, 28);
+    cycleTestButton.setBounds(pw - 470, 56, 110, 28);
 
     int tabX = 280;
     for (auto* btn : { &tabBrowser, &tabSynth, &tabMod, &tabFX, &tabSettings, &tabAccount })
