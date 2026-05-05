@@ -30,6 +30,7 @@ void SynthEngine::renderBlockWithFx(juce::AudioBuffer<float>& buffer,
 
 void SynthEngine::resetForPresetChange()
 {
+    const juce::ScopedLock lock(getLock());
     allNotesOff(0, false);
     const auto sampleRate = getSampleRate();
     forEachSynthVoice([](SynthVoice& v)
