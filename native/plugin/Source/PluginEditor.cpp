@@ -3,14 +3,52 @@
 DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     : AudioProcessorEditor(&p), processor(p)
 {
-    setSize(1100, 700);
+    setSize(1200, 760);
     setResizable(true, true);
-    setResizeLimits(900, 600, 1920, 1080);
+    setResizeLimits(960, 640, 1920, 1200);
+
+    // --- Build content panels ---
+    synthPanel = std::make_unique<MainSynthPanel>(processor.getAPVTS());
+    addAndMakeVisible(*synthPanel);
+
+    presetBrowserPanel = std::make_unique<PresetBrowser>();
+    addChildComponent(*presetBrowserPanel);
+
+    {
+        auto& pm = processor.getPresetManager();
+        juce::StringArray names, cats;
+        for (int i = 0; i < pm.getNumPresets(); ++i)
+        {
+            names.add(pm.getPresetName(i));
+            cats.add("All"); // category info not exposed via API; show all
+        }
+        presetBrowserPanel->setPresets(names, cats);
+        presetBrowserPanel->onPresetSelected = [this](int idx) {
+            processor.getPresetManager().loadPreset(idx);
+            presetSelector.setSelectedId(idx + 1, juce::dontSendNotification);
+        };
+    }
+
+    addChildComponent(placeholderPanel);
+    placeholderLabel.setText("Coming soon", juce::dontSendNotification);
+    placeholderLabel.setJustificationType(juce::Justification::centred);
+    placeholderLabel.setColour(juce::Label::textColourId, juce::Colour(0xff7D8596));
+    placeholderPanel.addAndMakeVisible(placeholderLabel);
 
     setupTabs();
+    switchTab(Tab::Synth);
 }
 
 DiditagainEditor::~DiditagainEditor() {}
+
+void DiditagainEditor::refreshPresetCombo()
+{
+    presetSelector.clear(juce::dontSendNotification);
+    auto& pm = processor.getPresetManager();
+    for (int i = 0; i < pm.getNumPresets(); ++i)
+        presetSelector.addItem(pm.getPresetName(i), i + 1);
+    presetSelector.setSelectedId(pm.getCurrentPresetIndex() + 1, juce::dontSendNotification);
+}
 
 void DiditagainEditor::setupTabs()
 {
@@ -28,18 +66,13 @@ void DiditagainEditor::setupTabs()
     setupTab(tabSettings, Tab::Settings);
     setupTab(tabAccount, Tab::Account);
 
-    // Preset bar
     addAndMakeVisible(presetSelector);
     addAndMakeVisible(prevPreset);
     addAndMakeVisible(nextPreset);
     addAndMakeVisible(savePreset);
 
-    auto& pm = processor.getPresetManager();
-    for (int i = 0; i < pm.getNumPresets(); ++i)
-        presetSelector.addItem(pm.getPresetName(i), i + 1);
-    presetSelector.setSelectedId(pm.getCurrentPresetIndex() + 1, juce::dontSendNotification);
+    refreshPresetCombo();
 
-    // Load preset whenever the dropdown selection changes.
     presetSelector.onChange = [this]() {
         const int idx = presetSelector.getSelectedId() - 1;
         if (idx >= 0)
@@ -61,76 +94,75 @@ void DiditagainEditor::setupTabs()
 void DiditagainEditor::switchTab(Tab tab)
 {
     currentTab = tab;
+    if (synthPanel)         synthPanel->setVisible(tab == Tab::Synth);
+    if (presetBrowserPanel) presetBrowserPanel->setVisible(tab == Tab::Browser);
+
+    const bool ph = (tab != Tab::Synth && tab != Tab::Browser);
+    placeholderPanel.setVisible(ph);
+    if (ph)
+    {
+        juce::String name;
+        switch (tab) {
+            case Tab::Mod:      name = "Modulation Matrix — coming soon"; break;
+            case Tab::FX:       name = "Effects Chain — use SYNTH tab FX section for now"; break;
+            case Tab::Settings: name = "Settings — coming soon"; break;
+            case Tab::Account:  name = "Account — coming soon"; break;
+            default: break;
+        }
+        placeholderLabel.setText(name, juce::dontSendNotification);
+    }
     repaint();
 }
 
 void DiditagainEditor::paint(juce::Graphics& g)
 {
-    // Background gradient
-    g.fillAll(juce::Colour(0xff0f1118));
+    g.fillAll(juce::Colour(0xff0B0D10));
 
-    // Header bar
-    g.setColour(juce::Colour(0xff181a24));
+    // Header
+    g.setColour(juce::Colour(0xff151922));
     g.fillRect(0, 0, getWidth(), 50);
-
-    // Brand
     g.setColour(juce::Colour(0xff8b5cf6));
     g.setFont(juce::Font(18.0f).boldened());
     g.drawText("DIDITAGAIN STUDIO", 15, 0, 250, 50, juce::Justification::centredLeft);
 
-    // Tab indicator
+    // Active tab pill
     auto tabBounds = [this](Tab t) -> juce::Rectangle<int> {
         int idx = static_cast<int>(t);
-        return { 280 + idx * 90, 15, 80, 22 };
+        return { 280 + idx * 90, 12, 82, 26 };
     };
-
     for (int i = 0; i < 6; ++i)
     {
         Tab t = static_cast<Tab>(i);
-        auto bounds = tabBounds(t);
         if (t == currentTab)
         {
-            g.setColour(juce::Colour(0xff8b5cf6).withAlpha(0.2f));
-            g.fillRoundedRectangle(bounds.toFloat(), 4.0f);
+            g.setColour(juce::Colour(0xff8b5cf6).withAlpha(0.22f));
+            g.fillRoundedRectangle(tabBounds(t).toFloat(), 4.0f);
         }
     }
 
-    // Content area placeholder
-    g.setColour(juce::Colour(0xff2a2a3a));
-    g.fillRoundedRectangle(10.0f, 95.0f, (float)getWidth() - 20.0f, (float)getHeight() - 105.0f, 8.0f);
-
-    g.setColour(juce::Colour(0xff666680));
-    g.setFont(14.0f);
-
-    juce::String tabName;
-    switch (currentTab) {
-        case Tab::Browser: tabName = "Preset Browser"; break;
-        case Tab::Synth: tabName = "Synth Engine — Oscillators, Filters, Envelopes"; break;
-        case Tab::Mod: tabName = "Modulation Matrix — LFOs, Envelopes, Routings"; break;
-        case Tab::FX: tabName = "Effects Chain — Chorus, Delay, Reverb, Distortion"; break;
-        case Tab::Settings: tabName = "Settings — Audio, MIDI, Oversampling"; break;
-        case Tab::Account: tabName = "Account — License, Subscription, Devices"; break;
-    }
-    g.drawText(tabName, 0, getHeight() / 2 - 15, getWidth(), 30, juce::Justification::centred);
+    // Sub-bar background
+    g.setColour(juce::Colour(0xff0F1118));
+    g.fillRect(0, 50, getWidth(), 40);
 }
 
 void DiditagainEditor::resized()
 {
-    auto area = getLocalBounds();
-
-    // Preset bar (below header)
-    auto presetBar = area.removeFromTop(50).removeFromTop(0).translated(0, 52);
     int pw = getWidth();
-    prevPreset.setBounds(pw - 350, 55, 30, 28);
-    presetSelector.setBounds(pw - 315, 55, 200, 28);
-    nextPreset.setBounds(pw - 110, 55, 30, 28);
-    savePreset.setBounds(pw - 75, 55, 60, 28);
+    prevPreset.setBounds(pw - 350, 56, 30, 28);
+    presetSelector.setBounds(pw - 315, 56, 200, 28);
+    nextPreset.setBounds(pw - 110, 56, 30, 28);
+    savePreset.setBounds(pw - 75, 56, 60, 28);
 
-    // Tab buttons
     int tabX = 280;
     for (auto* btn : { &tabBrowser, &tabSynth, &tabMod, &tabFX, &tabSettings, &tabAccount })
     {
         btn->setBounds(tabX, 12, 82, 26);
         tabX += 90;
     }
+
+    auto content = juce::Rectangle<int>(8, 96, getWidth() - 16, getHeight() - 104);
+    if (synthPanel)         synthPanel->setBounds(content);
+    if (presetBrowserPanel) presetBrowserPanel->setBounds(content);
+    placeholderPanel.setBounds(content);
+    placeholderLabel.setBounds(placeholderPanel.getLocalBounds());
 }

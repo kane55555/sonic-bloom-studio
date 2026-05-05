@@ -1,6 +1,8 @@
 #pragma once
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
+#include "UI/MainSynthPanel.h"
+#include "UI/PresetBrowser.h"
 
 class DiditagainEditor : public juce::AudioProcessorEditor
 {
@@ -14,7 +16,6 @@ public:
 private:
     DiditagainProcessor& processor;
 
-    // Tab navigation
     enum class Tab { Browser, Synth, Mod, FX, Settings, Account };
     Tab currentTab = Tab::Synth;
 
@@ -25,14 +26,20 @@ private:
     juce::TextButton tabSettings{"SETTINGS"};
     juce::TextButton tabAccount{"ACCOUNT"};
 
-    // Preset browser bar
     juce::ComboBox presetSelector;
     juce::TextButton prevPreset{"<"};
     juce::TextButton nextPreset{">"};
     juce::TextButton savePreset{"SAVE"};
 
+    // Real content panels.
+    std::unique_ptr<MainSynthPanel> synthPanel;
+    std::unique_ptr<PresetBrowser>  presetBrowserPanel;
+    juce::Component                  placeholderPanel; // for Mod/FX/Settings/Account fallback
+    juce::Label                      placeholderLabel;
+
     void setupTabs();
     void switchTab(Tab tab);
+    void refreshPresetCombo();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(DiditagainEditor)
 };

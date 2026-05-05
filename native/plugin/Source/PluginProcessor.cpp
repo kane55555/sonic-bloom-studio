@@ -217,6 +217,10 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     const float fmRatio  = getF("fmRatio");
     const float oscALevel = getF("oscALevel");
     const float oscBLevel = getF("oscBLevel");
+    const int   oscAOct   = static_cast<int>(getF("oscAOctave"));
+    const int   oscASemi  = static_cast<int>(getF("oscASemi"));
+    const int   oscBOct   = static_cast<int>(getF("oscBOctave"));
+    const int   oscBSemi  = static_cast<int>(getF("oscBSemi"));
     const float subLevel  = getF("subOscEnabled") > 0.5f ? getF("subOscLevel") : 0.0f;
     const float noiseLvl  = getF("noiseLevel");
     const float glide     = getF("glideTime");
@@ -259,6 +263,8 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         v.getOscA().setDetuneCents(getF("oscADetune"));
         v.getOscB().setDetuneCents(getF("oscBDetune"));
         v.getOscA().setPulseWidth(getF("oscAPulseWidth"));
+        v.setOscAPitchOffset(oscAOct * 12 + oscASemi);
+        v.setOscBPitchOffset(oscBOct * 12 + oscBSemi);
 
         v.getAmpEnv().setAttack(ampA);    v.getAmpEnv().setDecay(ampD);
         v.getAmpEnv().setSustain(ampS);   v.getAmpEnv().setRelease(ampR);
@@ -268,10 +274,14 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         v.getModEnv().setSustain(mS);     v.getModEnv().setRelease(mR);
     });
 
-    // Mono / poly
-    const bool mono = getF("monoMode") > 0.5f;
+    // Mono / poly + polyphony — apply each block, but only call into the
+    // engine when the value actually changes (cheap & avoids reallocations).
+    const bool mono     = getF("monoMode") > 0.5f;
+    const int  polyWant = juce::jlimit(1, 16, static_cast<int>(getF("polyphony")));
     static bool lastMono = false;
-    if (mono != lastMono) { synthEngine.setMonoMode(mono); lastMono = mono; }
+    static int  lastPoly = -1;
+    if (mono != lastMono) { synthEngine.setMonoMode(mono); lastMono = mono; lastPoly = -1; }
+    if (!mono && polyWant != lastPoly) { synthEngine.setMaxPolyphony(polyWant); lastPoly = polyWant; }
 
     // ---- FX parameters ----
     auto& fx = synthEngine.getFx();

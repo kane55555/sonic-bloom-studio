@@ -44,6 +44,8 @@ void SynthEngine::setMonoMode(bool mono)
 {
     monoMode = mono;
     setNoteStealingEnabled(true);
-    // In mono mode we cap voices to 1 to enforce monophonic behaviour.
-    if (mono) setMaxPolyphony(1);
+    if (mono)
+        setMaxPolyphony(1);
+    else
+        setMaxPolyphony(MAX_POLYPHONY); // restore full polyphony when leaving mono
 }

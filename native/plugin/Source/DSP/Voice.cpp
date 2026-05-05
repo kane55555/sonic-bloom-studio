@@ -75,15 +75,17 @@ float SynthVoice::renderSample()
 
     currentFrequency = dida::midiToHz(currentMidiNote);
 
-    // ---- Update oscillator pitches ----
-    oscA.setFrequency(currentFrequency);
+    // ---- Update oscillator pitches (with per-osc octave/semi offsets) ----
+    const float fA = dida::midiToHz(currentMidiNote + (float) oscAPitchSemis);
+    const float fB = dida::midiToHz(currentMidiNote + (float) oscBPitchSemis);
+    oscA.setFrequency(fA);
 
     if (engineMode == EngineMode::FM2)
-        oscB.setFrequency(currentFrequency * fmRatio);
+        oscB.setFrequency(fA * fmRatio);
     else
-        oscB.setFrequency(currentFrequency);
+        oscB.setFrequency(fB);
 
-    subOsc.setFrequency(currentFrequency * 0.5f); // -1 octave
+    subOsc.setFrequency(currentFrequency * 0.5f); // -1 octave from played note
 
     // ---- Generate sources ----
     float oscBSample = oscB.getNextSample();
