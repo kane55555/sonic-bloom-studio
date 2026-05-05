@@ -70,6 +70,55 @@ void DiditagainEditor::setupTabs()
     addAndMakeVisible(prevPreset);
     addAndMakeVisible(nextPreset);
     addAndMakeVisible(savePreset);
+    addAndMakeVisible(cycleTestButton);
+    addAndMakeVisible(cycleTestLog);
+
+    cycleTestLog.setMultiLine(true);
+    cycleTestLog.setReadOnly(true);
+    cycleTestLog.setScrollbarsShown(true);
+    cycleTestLog.setCaretVisible(false);
+    cycleTestLog.setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xff0F1118));
+    cycleTestLog.setColour(juce::TextEditor::textColourId,       juce::Colour(0xffB8C0D0));
+    cycleTestLog.setFont(juce::Font(juce::Font::getDefaultMonospacedFontName(), 11.0f, juce::Font::plain));
+    cycleTestLog.setVisible(false);
+
+    cycleTester = std::make_unique<PresetCycleTester>(processor);
+    cycleTester->onLog = [this](const juce::String& line)
+    {
+        juce::MessageManager::callAsync([this, line]
+        {
+            cycleTestLog.moveCaretToEnd();
+            cycleTestLog.insertTextAtCaret(line + "\n");
+        });
+    };
+    cycleTester->onFinished = [this](int p, int f, int total)
+    {
+        juce::MessageManager::callAsync([this, p, f, total]
+        {
+            cycleTestButton.setButtonText("CYCLE TEST");
+            const auto summary = juce::String("Done: ") + juce::String(p) + "/"
+                + juce::String(total) + " passed, " + juce::String(f) + " mismatches";
+            cycleTestLog.moveCaretToEnd();
+            cycleTestLog.insertTextAtCaret(summary + "\n");
+        });
+    };
+
+    cycleTestButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff8b5cf6));
+    cycleTestButton.onClick = [this]()
+    {
+        if (! cycleTester) return;
+        if (cycleTester->isRunning())
+        {
+            cycleTester->stop();
+            cycleTestButton.setButtonText("CYCLE TEST");
+            return;
+        }
+        cycleTestLog.clear();
+        cycleTestLog.setVisible(true);
+        cycleTestButton.setButtonText("STOP TEST");
+        cycleTester->start(/*passes*/ 2, /*intervalMs*/ 350, /*maxWaitMs*/ 1500);
+        resized();
+    };
 
     refreshPresetCombo();
 
