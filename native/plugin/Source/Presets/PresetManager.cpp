@@ -3,7 +3,7 @@
 #include "FactoryPresets.h"
 
 #define DIDA_PRESET_MANAGER_LOG(message) \
-    juce::Logger::outputDebugString(juce::String("[DIDITAGAIN preset-manager] ") + (juce::String() << message))
+    juce::Logger::writeToLog(juce::String("[DIDITAGAIN preset-manager] ") + (juce::String() << message))
 
 PresetManager::PresetManager(juce::AudioProcessor& proc) : processor(proc)
 {
