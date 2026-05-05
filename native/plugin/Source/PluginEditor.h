@@ -31,6 +31,9 @@ private:
     juce::TextButton prevPreset{"<"};
     juce::TextButton nextPreset{">"};
     juce::TextButton savePreset{"SAVE"};
+    juce::TextButton cycleTestButton{"CYCLE TEST"};
+    juce::TextEditor cycleTestLog;
+    std::unique_ptr<PresetCycleTester> cycleTester;
 
     // Real content panels.
     std::unique_ptr<MainSynthPanel> synthPanel;
