@@ -38,6 +38,13 @@ public:
     PresetManager& getPresetManager() { return presetManager; }
     LicenseClient& getLicenseClient() { return licenseClient; }
 
+    // --- Debug introspection (used by PresetCycleTester) ---
+    bool   getAppliedMonoMode() const noexcept   { return appliedMonoMode; }
+    int    getAppliedPolyphony() const noexcept  { return appliedPolyphony; }
+    bool   isPresetChangeQueued() const noexcept { return deferredPresetChange.queued; }
+    int    getObservedPresetSerial() const noexcept { return observedPresetLoadSerial; }
+    int    getRequestedPresetSerial() const noexcept { return presetLoadSerial.load(std::memory_order_acquire); }
+
 private:
     juce::AudioProcessorValueTreeState apvts;
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
