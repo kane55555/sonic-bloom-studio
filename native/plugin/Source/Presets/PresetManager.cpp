@@ -73,17 +73,6 @@ void PresetManager::loadUserPresets()
 // Helper: set an APVTS parameter from a juce::var, normalising the value.
 static void setParam(juce::AudioProcessor& proc, const char* id, const juce::var& v)
 {
-    if (auto* apvts = dynamic_cast<juce::AudioProcessorValueTreeState*>(nullptr))
-    {
-        (void)apvts;
-    }
-    // The processor exposes its APVTS via a known interface; we cast through it.
-    // To keep PresetManager loosely coupled we use the parameter system directly.
-    if (auto* p = proc.getParameters()[0])
-    {
-        (void)p; // suppress unused — fallback path
-    }
-
     // Walk parameters by ID via the host-style API.
     for (auto* param : proc.getParameters())
     {
@@ -329,5 +318,5 @@ bool PresetManager::validatePresetFile(const juce::File& file)
 
 juce::String PresetManager::computeChecksum(const juce::String& jsonContent)
 {
-    return juce::SHA256(jsonContent.toUTF8()).toHexString();
+    return juce::String::toHexString((juce::int64) jsonContent.hashCode64());
 }

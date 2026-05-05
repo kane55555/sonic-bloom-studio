@@ -46,8 +46,11 @@ public:
                        juce::Justification::centredLeft);
         };
 
-        for (auto& gp : groups)
+        for (auto& gpRef : groups)
+        {
+            auto& gp = gpRef.get();
             drawPanel(gp.bounds, gp.label);
+        }
     }
 
     void resized() override
