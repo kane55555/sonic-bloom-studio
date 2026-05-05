@@ -39,14 +39,22 @@ void DiditagainEditor::setupTabs()
         presetSelector.addItem(pm.getPresetName(i), i + 1);
     presetSelector.setSelectedId(pm.getCurrentPresetIndex() + 1, juce::dontSendNotification);
 
+    // Load preset whenever the dropdown selection changes.
+    presetSelector.onChange = [this]() {
+        const int idx = presetSelector.getSelectedId() - 1;
+        if (idx >= 0)
+            processor.getPresetManager().loadPreset(idx);
+    };
+
     prevPreset.onClick = [this]() {
-        int idx = processor.getPresetManager().getCurrentPresetIndex();
-        if (idx > 0) { processor.getPresetManager().loadPreset(idx - 1); presetSelector.setSelectedId(idx, juce::dontSendNotification); }
+        auto& pm2 = processor.getPresetManager();
+        int idx = pm2.getCurrentPresetIndex();
+        if (idx > 0) { pm2.loadPreset(idx - 1); presetSelector.setSelectedId(idx, juce::dontSendNotification); }
     };
     nextPreset.onClick = [this]() {
-        auto& pm = processor.getPresetManager();
-        int idx = pm.getCurrentPresetIndex();
-        if (idx < pm.getNumPresets() - 1) { pm.loadPreset(idx + 1); presetSelector.setSelectedId(idx + 2, juce::dontSendNotification); }
+        auto& pm2 = processor.getPresetManager();
+        int idx = pm2.getCurrentPresetIndex();
+        if (idx < pm2.getNumPresets() - 1) { pm2.loadPreset(idx + 1); presetSelector.setSelectedId(idx + 2, juce::dontSendNotification); }
     };
 }
 
