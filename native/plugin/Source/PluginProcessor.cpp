@@ -9,6 +9,10 @@ DiditagainProcessor::DiditagainProcessor()
       presetManager(*this),
       licenseClient()
 {
+    presetManager.onPresetLoaded = [this]()
+    {
+        synthEngine.resetForPresetChange();
+    };
 }
 
 DiditagainProcessor::~DiditagainProcessor() {}

@@ -27,6 +27,16 @@ void SynthEngine::renderBlockWithFx(juce::AudioBuffer<float>& buffer,
     fx.process(buffer);
 }
 
+void SynthEngine::resetForPresetChange()
+{
+    allNotesOff(0, false);
+    forEachSynthVoice([](SynthVoice& v)
+    {
+        v.clearCurrentNote();
+        v.prepare(v.getSampleRate(), 0);
+    });
+}
+
 void SynthEngine::setMaxPolyphony(int n)
 {
     n = juce::jlimit(1, MAX_POLYPHONY, n);

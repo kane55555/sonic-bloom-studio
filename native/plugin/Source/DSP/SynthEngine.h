@@ -28,6 +28,7 @@ public:
                            const juce::MidiBuffer& midi,
                            int startSample, int numSamples);
 
+    void resetForPresetChange();
     void setMaxPolyphony(int n);
     void setMonoMode(bool mono);
 
