@@ -75,7 +75,6 @@ target_link_libraries(DIDITAGAIN_STUDIO
         juce::juce_audio_basics
         juce::juce_audio_devices
         juce::juce_audio_formats
-        juce::juce_audio_plugin_client
         juce::juce_audio_processors
         juce::juce_audio_utils
         juce::juce_core
