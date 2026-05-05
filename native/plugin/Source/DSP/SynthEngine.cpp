@@ -30,6 +30,15 @@ void SynthEngine::renderBlockWithFx(juce::AudioBuffer<float>& buffer,
 void SynthEngine::setMaxPolyphony(int n)
 {
     n = juce::jlimit(1, MAX_POLYPHONY, n);
+    if (n == getNumVoices()) return;
+
+    // Silence everything before mutating the voice list so we don't
+    // delete a voice that's currently rendering audio.
+    allNotesOff(0, false);
+    for (int i = 0; i < getNumVoices(); ++i)
+        if (auto* v = getVoice(i))
+            v->clearCurrentNote();
+
     while (getNumVoices() > n)
         removeVoice(getNumVoices() - 1);
     while (getNumVoices() < n)
@@ -42,10 +51,9 @@ void SynthEngine::setMaxPolyphony(int n)
 
 void SynthEngine::setMonoMode(bool mono)
 {
+    if (mono == monoMode && getNumVoices() == (mono ? 1 : MAX_POLYPHONY))
+        return;
     monoMode = mono;
     setNoteStealingEnabled(true);
-    if (mono)
-        setMaxPolyphony(1);
-    else
-        setMaxPolyphony(MAX_POLYPHONY); // restore full polyphony when leaving mono
+    setMaxPolyphony(mono ? 1 : MAX_POLYPHONY);
 }
