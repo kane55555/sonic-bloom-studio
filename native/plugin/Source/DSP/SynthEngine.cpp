@@ -31,10 +31,14 @@ void SynthEngine::renderBlockWithFx(juce::AudioBuffer<float>& buffer,
 void SynthEngine::resetForPresetChange()
 {
     allNotesOff(0, false);
+    const auto sampleRate = getSampleRate();
     forEachSynthVoice([](SynthVoice& v)
     {
         v.clearCurrentNote();
-        v.prepare(v.getSampleRate(), 0);
+    });
+    forEachSynthVoice([sampleRate](SynthVoice& v)
+    {
+        v.prepare(sampleRate, 0);
     });
     fx.reset();
 
