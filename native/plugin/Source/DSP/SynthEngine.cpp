@@ -54,22 +54,34 @@ void SynthEngine::resetForPresetChange()
 
 bool SynthEngine::hasHeldNotes() const noexcept
 {
-    for (const auto& channel : heldNotes)
-        for (const auto& note : channel)
-            if (note.active)
-                return true;
-
-    return false;
+    return getHeldNoteCount() > 0;
 }
 
 bool SynthEngine::hasActiveVoices() const noexcept
 {
+    return getActiveVoiceCount() > 0;
+}
+
+int SynthEngine::getHeldNoteCount() const noexcept
+{
+    int count = 0;
+    for (const auto& channel : heldNotes)
+        for (const auto& note : channel)
+            if (note.active)
+                ++count;
+
+    return count;
+}
+
+int SynthEngine::getActiveVoiceCount() const noexcept
+{
+    int count = 0;
     for (int i = 0; i < getNumVoices(); ++i)
         if (auto* voice = getVoice(i))
             if (voice->isVoiceActive())
-                return true;
+                ++count;
 
-    return false;
+    return count;
 }
 
 bool SynthEngine::canSafelyResetVoices() const noexcept

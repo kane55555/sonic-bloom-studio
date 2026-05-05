@@ -32,6 +32,8 @@ public:
     void resetForPresetChange();
     bool hasHeldNotes() const noexcept;
     bool hasActiveVoices() const noexcept;
+    int getHeldNoteCount() const noexcept;
+    int getActiveVoiceCount() const noexcept;
     bool canSafelyResetVoices() const noexcept;
     bool canSafelyMutateVoices(const juce::MidiBuffer& upcomingMidi) const noexcept;
     bool setMaxPolyphony(int n);

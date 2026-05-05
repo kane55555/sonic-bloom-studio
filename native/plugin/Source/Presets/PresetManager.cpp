@@ -2,6 +2,9 @@
 #include "PresetSchema.h"
 #include "FactoryPresets.h"
 
+#define DIDA_PRESET_MANAGER_LOG(message) \
+    juce::Logger::writeToLog(juce::String("[DIDITAGAIN preset-manager] ") + (juce::String() << message))
+
 PresetManager::PresetManager(juce::AudioProcessor& proc) : processor(proc)
 {
     // Ensure factory directory contains the embedded presets the very first
@@ -139,18 +142,32 @@ static void applyEnv(juce::AudioProcessor& proc, const juce::var& obj, const cha
 
 void PresetManager::loadPreset(int index)
 {
-    if (index < 0 || index >= static_cast<int>(presets.size())) return;
+    if (index < 0 || index >= static_cast<int>(presets.size()))
+    {
+        DIDA_PRESET_MANAGER_LOG("ignored invalid index=" << index << " count=" << static_cast<int>(presets.size()));
+        return;
+    }
+
     currentIndex = index;
+    DIDA_PRESET_MANAGER_LOG("load index=" << index << " name=" << presets[index].name << " file=" << presets[index].filePath);
     juce::File file(presets[index].filePath);
     loadPresetFromFile(file);
 }
 
 void PresetManager::loadPresetFromFile(const juce::File& file)
 {
-    if (!validatePresetFile(file)) return;
+    if (!validatePresetFile(file))
+    {
+        DIDA_PRESET_MANAGER_LOG("validation failed file=" << file.getFullPathName());
+        return;
+    }
 
     auto json = juce::JSON::parse(file);
-    if (! json.isObject()) return;
+    if (! json.isObject())
+    {
+        DIDA_PRESET_MANAGER_LOG("parse failed file=" << file.getFullPathName());
+        return;
+    }
 
     using namespace dida::preset;
 
@@ -233,6 +250,11 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
 
     if (onPresetLoaded)
         onPresetLoaded();
+
+    DIDA_PRESET_MANAGER_LOG("loaded file=" << file.getFileName()
+        << " playMode=" << json.getProperty(key::playMode, "<missing>").toString()
+        << " mono=" << json.getProperty(key::mono, "<missing>").toString()
+        << " polyphony=" << json.getProperty(key::polyphony, "<missing>").toString());
 }
 
 void PresetManager::saveCurrentPreset(const juce::String& name, const juce::String& category)

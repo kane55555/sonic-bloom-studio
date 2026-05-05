@@ -1,6 +1,9 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+#define DIDA_PRESET_LOG(message) \
+    juce::Logger::writeToLog(juce::String("[DIDITAGAIN preset] ") + (juce::String() << message))
+
 DiditagainProcessor::DiditagainProcessor()
     : AudioProcessor(BusesProperties()
           .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
@@ -12,6 +15,10 @@ DiditagainProcessor::DiditagainProcessor()
     presetManager.onPresetLoaded = [this]()
     {
         presetLoadRequested.store(true, std::memory_order_release);
+        presetLoadSerial.fetch_add(1, std::memory_order_acq_rel);
+        DIDA_PRESET_LOG("load requested serial=" << presetLoadSerial.load(std::memory_order_acquire)
+            << " index=" << presetManager.getCurrentPresetIndex()
+            << " name=" << presetManager.getPresetName(presetManager.getCurrentPresetIndex()));
     };
 }
 
@@ -246,46 +253,88 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     const bool mono     = getF("monoMode") > 0.5f;
     const int  polyWant = juce::jlimit(1, 16, static_cast<int>(getF("polyphony")));
 
-    if (presetLoadRequested.exchange(false, std::memory_order_acq_rel)
+    const int latestPresetSerial = presetLoadSerial.load(std::memory_order_acquire);
+    const bool newPresetLoaded = presetLoadRequested.exchange(false, std::memory_order_acq_rel)
+        || latestPresetSerial != observedPresetLoadSerial;
+
+    if (newPresetLoaded
+        || mono != deferredPresetChange.monoMode
+        || polyWant != deferredPresetChange.polyphony
         || mono != appliedMonoMode
         || (! mono && polyWant != appliedPolyphony))
     {
+        if (newPresetLoaded)
+            observedPresetLoadSerial = latestPresetSerial;
+
+        const auto previousAge = deferredPresetChange.queued ? deferredPresetChange.ageInBlocks : 0;
         deferredPresetChange.queued = true;
         deferredPresetChange.resetState = true;
         deferredPresetChange.monoMode = mono;
         deferredPresetChange.polyphony = polyWant;
+        deferredPresetChange.presetSerial = latestPresetSerial;
+        deferredPresetChange.ageInBlocks = previousAge;
+
+        DIDA_PRESET_LOG("queued serial=" << deferredPresetChange.presetSerial
+            << " mono=" << (deferredPresetChange.monoMode ? "true" : "false")
+            << " poly=" << deferredPresetChange.polyphony
+            << " appliedMono=" << (appliedMonoMode ? "true" : "false")
+            << " appliedPoly=" << appliedPolyphony
+            << " midiEvents=" << midiMessages.getNumEvents());
     }
 
     // Preset stepping may change mono/poly and requested polyphony every click.
     // Keep the latest request queued, but only touch JUCE's voice pool once the
     // host has stopped sending note events and all voices have fully released.
-    if (deferredPresetChange.queued && synthEngine.canSafelyMutateVoices(midiMessages))
+    if (deferredPresetChange.queued)
     {
-        bool applied = true;
+        ++deferredPresetChange.ageInBlocks;
+        const bool canApplyVoiceMutation = synthEngine.canSafelyMutateVoices(midiMessages);
+        const bool voicePoolNeedsMutation = deferredPresetChange.monoMode != appliedMonoMode
+            || (! deferredPresetChange.monoMode && deferredPresetChange.polyphony != appliedPolyphony);
+        const bool sameVoicePool = ! voicePoolNeedsMutation;
 
-        if (deferredPresetChange.monoMode != appliedMonoMode)
+        if (canApplyVoiceMutation || sameVoicePool)
         {
-            applied = synthEngine.setMonoMode(deferredPresetChange.monoMode);
+            bool applied = true;
+
+            if (voicePoolNeedsMutation && deferredPresetChange.monoMode != appliedMonoMode)
+            {
+                applied = synthEngine.setMonoMode(deferredPresetChange.monoMode);
+                if (applied)
+                {
+                    appliedMonoMode = deferredPresetChange.monoMode;
+                    appliedPolyphony = appliedMonoMode ? 1 : SynthEngine::MAX_POLYPHONY;
+                }
+            }
+
+            if (applied && voicePoolNeedsMutation && ! deferredPresetChange.monoMode && deferredPresetChange.polyphony != appliedPolyphony)
+            {
+                applied = synthEngine.setMaxPolyphony(deferredPresetChange.polyphony);
+                if (applied)
+                    appliedPolyphony = deferredPresetChange.polyphony;
+            }
+
             if (applied)
             {
-                appliedMonoMode = deferredPresetChange.monoMode;
-                appliedPolyphony = appliedMonoMode ? 1 : SynthEngine::MAX_POLYPHONY;
+                if (deferredPresetChange.resetState && canApplyVoiceMutation)
+                    synthEngine.resetForPresetChange();
+
+                DIDA_PRESET_LOG("applied serial=" << deferredPresetChange.presetSerial
+                    << " mono=" << (deferredPresetChange.monoMode ? "true" : "false")
+                    << " poly=" << deferredPresetChange.polyphony
+                    << " mutatedVoices=" << (voicePoolNeedsMutation ? "true" : "false")
+                    << " waitedBlocks=" << deferredPresetChange.ageInBlocks);
+
+                deferredPresetChange = {};
             }
         }
-
-        if (applied && ! deferredPresetChange.monoMode && deferredPresetChange.polyphony != appliedPolyphony)
+        else if ((++debugBlockCounter % 128) == 0)
         {
-            applied = synthEngine.setMaxPolyphony(deferredPresetChange.polyphony);
-            if (applied)
-                appliedPolyphony = deferredPresetChange.polyphony;
-        }
-
-        if (applied)
-        {
-            if (deferredPresetChange.resetState)
-                synthEngine.resetForPresetChange();
-
-            deferredPresetChange = {};
+            DIDA_PRESET_LOG("waiting serial=" << deferredPresetChange.presetSerial
+                << " blocks=" << deferredPresetChange.ageInBlocks
+                << " heldNotes=" << synthEngine.getHeldNoteCount()
+                << " activeVoices=" << synthEngine.getActiveVoiceCount()
+                << " midiEvents=" << midiMessages.getNumEvents());
         }
     }
 
