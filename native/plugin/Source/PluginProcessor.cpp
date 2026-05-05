@@ -257,11 +257,12 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     const bool newPresetLoaded = presetLoadRequested.exchange(false, std::memory_order_acq_rel)
         || latestPresetSerial != observedPresetLoadSerial;
 
-    if (newPresetLoaded
-        || mono != deferredPresetChange.monoMode
-        || polyWant != deferredPresetChange.polyphony
-        || mono != appliedMonoMode
-        || (! mono && polyWant != appliedPolyphony))
+    const bool queuedTargetChanged = deferredPresetChange.queued
+        && (mono != deferredPresetChange.monoMode || polyWant != deferredPresetChange.polyphony);
+    const bool appliedVoiceStateMismatch = mono != appliedMonoMode
+        || (! mono && polyWant != appliedPolyphony);
+
+    if (newPresetLoaded || queuedTargetChanged || appliedVoiceStateMismatch)
     {
         if (newPresetLoaded)
             observedPresetLoadSerial = latestPresetSerial;
