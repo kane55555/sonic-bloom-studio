@@ -16,12 +16,13 @@ public:
 
     float getNextSample()
     {
+        constexpr float twoPi = 6.28318530717958647692f;
         float sample = 0.0f;
 
         switch (shape)
         {
             case Shape::Sine:
-                sample = std::sin(phase * 2.0f * M_PI);
+                sample = std::sin(phase * twoPi);
                 break;
             case Shape::Triangle:
                 sample = 2.0f * std::abs(2.0f * (phase - std::floor(phase + 0.5f))) - 1.0f;
