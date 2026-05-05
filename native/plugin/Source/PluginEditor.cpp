@@ -104,6 +104,8 @@ void DiditagainEditor::setupTabs()
     };
 
     cycleTestButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff8b5cf6));
+    cycleTestButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
+    cycleTestButton.setColour(juce::TextButton::textColourOnId,  juce::Colours::white);
     cycleTestButton.onClick = [this]()
     {
         if (! cycleTester) return;
@@ -202,7 +204,7 @@ void DiditagainEditor::resized()
     nextPreset.setBounds(pw - 110, 56, 30, 28);
     savePreset.setBounds(pw - 75, 56, 60, 28);
 
-    cycleTestButton.setBounds(15, 56, 100, 28);
+    cycleTestButton.setBounds(pw - 470, 56, 110, 28);
 
     int tabX = 280;
     for (auto* btn : { &tabBrowser, &tabSynth, &tabMod, &tabFX, &tabSettings, &tabAccount })
