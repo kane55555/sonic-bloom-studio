@@ -259,8 +259,8 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
     const bool queuedTargetChanged = deferredPresetChange.queued
         && (mono != deferredPresetChange.monoMode || polyWant != deferredPresetChange.polyphony);
-    const bool appliedVoiceStateMismatch = mono != appliedMonoMode
-        || (! mono && polyWant != appliedPolyphony);
+    const bool appliedVoiceStateMismatch = ! deferredPresetChange.queued
+        && (mono != appliedMonoMode || (! mono && polyWant != appliedPolyphony));
 
     if (newPresetLoaded || queuedTargetChanged || appliedVoiceStateMismatch)
     {
