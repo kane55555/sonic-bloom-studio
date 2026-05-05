@@ -202,6 +202,8 @@ void DiditagainEditor::resized()
     nextPreset.setBounds(pw - 110, 56, 30, 28);
     savePreset.setBounds(pw - 75, 56, 60, 28);
 
+    cycleTestButton.setBounds(15, 56, 100, 28);
+
     int tabX = 280;
     for (auto* btn : { &tabBrowser, &tabSynth, &tabMod, &tabFX, &tabSettings, &tabAccount })
     {
@@ -210,6 +212,13 @@ void DiditagainEditor::resized()
     }
 
     auto content = juce::Rectangle<int>(8, 96, getWidth() - 16, getHeight() - 104);
+
+    if (cycleTestLog.isVisible())
+    {
+        const int logH = juce::jmin(180, content.getHeight() / 3);
+        cycleTestLog.setBounds(content.removeFromBottom(logH).reduced(2));
+    }
+
     if (synthPanel)         synthPanel->setBounds(content);
     if (presetBrowserPanel) presetBrowserPanel->setBounds(content);
     placeholderPanel.setBounds(content);
