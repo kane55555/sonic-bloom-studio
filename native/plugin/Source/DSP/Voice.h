@@ -48,6 +48,8 @@ public:
     void setFilterEnvAmount(float v)     noexcept { filterEnvAmount = juce::jlimit(-1.0f, 1.0f, v); }
     void setFilterKeyTrack(float v)      noexcept { filterKeyTrack = juce::jlimit(0.0f, 1.0f, v); }
     void setBaseCutoff(float hz)         noexcept { baseCutoff = juce::jlimit(20.0f, 20000.0f, hz); }
+    void setOscAPitchOffset(int semis)   noexcept { oscAPitchSemis = semis; }
+    void setOscBPitchOffset(int semis)   noexcept { oscBPitchSemis = semis; }
 
     Oscillator&   getOscA()      noexcept { return oscA; }
     Oscillator&   getOscB()      noexcept { return oscB; }
@@ -89,6 +91,8 @@ private:
     float filterEnvAmount      = 0.0f;
     float filterKeyTrack       = 0.0f;
     float baseCutoff           = 8000.0f;
+    int   oscAPitchSemis       = 0;
+    int   oscBPitchSemis       = 0;
 
     // ---- Noise generator state ----
     dida::PinkNoise noiseGen;
