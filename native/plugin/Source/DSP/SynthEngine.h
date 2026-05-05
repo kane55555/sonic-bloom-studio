@@ -6,6 +6,7 @@
 //  after voice rendering, and exposes mono/poly + voice-stealing controls.
 //==============================================================================
 #include <JuceHeader.h>
+#include <array>
 #include "Voice.h"
 #include "FxChain.h"
 
@@ -46,6 +47,15 @@ public:
     static constexpr int MAX_POLYPHONY = 16;
 
 private:
+    struct HeldNote
+    {
+        bool active = false;
+        float velocity = 0.0f;
+    };
+
+    void updateHeldNotes(const juce::MidiBuffer& midi);
+
     FxChain fx;
+    std::array<std::array<HeldNote, 128>, 16> heldNotes {};
     bool    monoMode = false;
 };
