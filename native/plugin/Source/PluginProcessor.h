@@ -46,6 +46,8 @@ private:
     PresetManager presetManager;
     LicenseClient licenseClient;
     std::atomic<bool> presetLoadRequested { false };
+    std::atomic<int> presetLoadSerial { 0 };
+    int observedPresetLoadSerial = 0;
 
     struct DeferredPresetChange
     {
@@ -53,11 +55,14 @@ private:
         bool resetState = false;
         bool monoMode = false;
         int polyphony = 8;
+        int presetSerial = 0;
+        int ageInBlocks = 0;
     };
 
     DeferredPresetChange deferredPresetChange;
     bool appliedMonoMode = false;
-    int appliedPolyphony = -1;
+    int appliedPolyphony = SynthEngine::MAX_POLYPHONY;
+    int debugBlockCounter = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(DiditagainProcessor)
 };
