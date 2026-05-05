@@ -77,6 +77,23 @@ bool SynthEngine::canSafelyResetVoices() const noexcept
     return ! hasHeldNotes() && ! hasActiveVoices();
 }
 
+bool SynthEngine::canSafelyMutateVoices(const juce::MidiBuffer& upcomingMidi) const noexcept
+{
+    return canSafelyResetVoices() && ! midiBufferHasPhraseActivity(upcomingMidi);
+}
+
+bool SynthEngine::midiBufferHasPhraseActivity(const juce::MidiBuffer& midi) noexcept
+{
+    for (const auto metadata : midi)
+    {
+        const auto msg = metadata.getMessage();
+        if (msg.isNoteOn() || msg.isNoteOff() || msg.isAllNotesOff() || msg.isAllSoundOff())
+            return true;
+    }
+
+    return false;
+}
+
 void SynthEngine::updateHeldNotes(const juce::MidiBuffer& midi)
 {
     for (const auto metadata : midi)
@@ -103,10 +120,13 @@ void SynthEngine::updateHeldNotes(const juce::MidiBuffer& midi)
     }
 }
 
-void SynthEngine::setMaxPolyphony(int n)
+bool SynthEngine::setMaxPolyphony(int n)
 {
     n = juce::jlimit(1, MAX_POLYPHONY, n);
-    if (n == getNumVoices()) return;
+    if (n == getNumVoices()) return true;
+
+    if (! canSafelyResetVoices())
+        return false;
 
     // Silence everything before mutating the voice list so we don't
     // delete a voice that's currently rendering audio.
@@ -128,13 +148,22 @@ void SynthEngine::setMaxPolyphony(int n)
         for (int note = 0; note < static_cast<int>(heldNotes[channel].size()); ++note)
             if (heldNotes[channel][note].active)
                 noteOn(channel + 1, note, heldNotes[channel][note].velocity);
+
+    return true;
 }
 
-void SynthEngine::setMonoMode(bool mono)
+bool SynthEngine::setMonoMode(bool mono)
 {
     if (mono == monoMode && getNumVoices() == (mono ? 1 : MAX_POLYPHONY))
-        return;
+        return true;
+
+    if (! canSafelyResetVoices())
+        return false;
+
     monoMode = mono;
     setNoteStealingEnabled(true);
-    setMaxPolyphony(mono ? 1 : MAX_POLYPHONY);
+    if (! setMaxPolyphony(mono ? 1 : MAX_POLYPHONY))
+        return false;
+
+    return true;
 }
