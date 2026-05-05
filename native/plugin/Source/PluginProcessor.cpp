@@ -304,7 +304,7 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                 if (applied)
                 {
                     appliedMonoMode = deferredPresetChange.monoMode;
-                    appliedPolyphony = appliedMonoMode ? 1 : SynthEngine::MAX_POLYPHONY;
+                    appliedPolyphony = synthEngine.getNumVoices();
                 }
             }
 
