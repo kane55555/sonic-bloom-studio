@@ -3,23 +3,24 @@
   "author": "DIDITAGAIN",
   "engineMode": "subtractive",
   "playMode": "poly",
-  "masterGain": -3,
+  "masterGain": -5.5,
   "polyphony": 8,
-  "glideTime": 0,
+  "glideTime": 0.0,
   "uiSkinRef": "default",
   "tuningRef": "12tet-440",
   "signature": "",
   "presetName": "Space Organ",
-  "category": "Keys",
+  "category": "Organ",
   "tags": [
     "organ",
-    "space",
-    "ethereal"
+    "drawbar",
+    "chorus",
+    "retro"
   ],
-  "description": "Ethereal space organ",
+  "description": "Sine+triangle+square blend with chorus and drive.",
   "oscA": {
     "waveform": "sine",
-    "level": 0.5,
+    "level": 0.6,
     "detuneCents": 0,
     "octave": 0,
     "semitone": 0,
@@ -29,10 +30,10 @@
     "unisonSpread": 0.5
   },
   "oscB": {
-    "waveform": "sine",
-    "level": 0.4,
-    "detuneCents": 0,
-    "octave": 1,
+    "waveform": "square",
+    "level": 0.35,
+    "detuneCents": 12,
+    "octave": 0,
     "semitone": 0,
     "pulseWidth": 0.5,
     "unisonVoices": 1,
@@ -40,93 +41,86 @@
     "unisonSpread": 0.5
   },
   "subOsc": {
-    "enabled": false,
-    "level": 0.5,
+    "enabled": true,
+    "level": 0.25,
     "octave": -1
   },
   "noise": {
     "type": "white",
-    "level": 0
+    "level": 0.0
   },
   "filter1": {
-    "type": "LP24",
+    "type": "LP12",
     "cutoff": 6000,
     "resonance": 0.1,
-    "drive": 0,
-    "envAmount": 0,
-    "keyTrack": 0
+    "drive": 0.05,
+    "envAmount": 0.0,
+    "keyTrack": 0.0
   },
   "filter2": {
     "type": "HP12",
-    "cutoff": 80,
+    "cutoff": 30,
     "resonance": 0,
     "drive": 0,
     "envAmount": 0,
     "keyTrack": 0
   },
   "env1": {
-    "attack": 0.1,
-    "decay": 0.3,
-    "sustain": 0.9,
-    "release": 1.0
+    "attack": 0.005,
+    "decay": 0.1,
+    "sustain": 1.0,
+    "release": 0.25
   },
   "env2": {
     "attack": 0.01,
-    "decay": 0.5,
-    "sustain": 0.3,
-    "release": 0.5
+    "decay": 0.3,
+    "sustain": 0.5,
+    "release": 0.4
   },
   "env3": {
     "attack": 0.01,
-    "decay": 0.8,
-    "sustain": 0,
+    "decay": 0.3,
+    "sustain": 0.0,
     "release": 0.3
   },
   "lfo1": {
-    "rate": 5.5,
+    "rate": 1.0,
     "shape": "sine",
     "sync": false,
-    "depth": 0.15
+    "depth": 0.0
   },
   "lfo2": {
     "rate": 0.5,
     "shape": "triangle",
     "sync": false,
-    "depth": 0.5
+    "depth": 0.0
   },
-  "modMatrix": [
-    {
-      "source": "lfo1",
-      "destination": "oscAPitch",
-      "amount": 0.02,
-      "bipolar": true
-    }
-  ],
+  "modMatrix": [],
   "fxChain": {
-    "chorusMix": 0.5,
-    "chorusRate": 1.0,
-    "chorusDepth": 0.3,
-    "delayMix": 0,
+    "chorusMix": 0.4,
+    "chorusRate": 4.5,
+    "chorusDepth": 0.45,
+    "delayMix": 0.0,
     "delayTime": 0.3,
-    "delayFeedback": 0.4,
+    "delayFeedback": 0.35,
     "delaySync": false,
-    "reverbMix": 0.5,
-    "reverbSize": 0.7,
+    "reverbMix": 0.18,
+    "reverbSize": 0.5,
     "reverbDamping": 0.5,
     "phaserMix": 0,
     "phaserRate": 0.5,
-    "distortionAmount": 0,
+    "distortionAmount": 0.1,
     "distortionType": "soft",
     "compressorThreshold": -10,
     "compressorRatio": 4,
-    "eqLow": 0,
-    "eqMid": 0,
-    "eqHigh": 0,
-    "limiterCeiling": -0.3
+    "eqLow": 0.0,
+    "eqMid": 0.0,
+    "eqHigh": 0.0,
+    "limiterCeiling": -0.5
   },
   "macroKnobs": [
     {
-      "label": "Brightness",
+      "label": "Tone",
       "value": 0.5,
       "mappings": []
     },
@@ -142,11 +136,16 @@
     },
     {
       "label": "Dirt",
-      "value": 0,
+      "value": 0.5,
       "mappings": []
     },
     {
       "label": "Attack",
+      "value": 0.5,
+      "mappings": []
+    },
+    {
+      "label": "Release",
       "value": 0.5,
       "mappings": []
     },
@@ -156,15 +155,10 @@
       "mappings": []
     },
     {
-      "label": "Tone",
-      "value": 0.5,
-      "mappings": []
-    },
-    {
-      "label": "Mix",
+      "label": "Character",
       "value": 0.5,
       "mappings": []
     }
   ],
-  "checksum": "bc965d9dca6842a1"
+  "checksum": "32a68bafe3d6b9ce"
 }

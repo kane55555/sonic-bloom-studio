@@ -2,36 +2,37 @@
   "presetVersion": "1.0.0",
   "author": "DIDITAGAIN",
   "engineMode": "subtractive",
-  "playMode": "mono",
-  "masterGain": -3,
-  "polyphony": 8,
-  "glideTime": 0.15,
+  "playMode": "poly",
+  "masterGain": -5.5,
+  "polyphony": 6,
+  "glideTime": 0.0,
   "uiSkinRef": "default",
   "tuningRef": "12tet-440",
   "signature": "",
-  "presetName": "Wide Portamento Lead",
+  "presetName": "Wide Saw Lead",
   "category": "Lead",
   "tags": [
-    "portamento",
+    "saw",
     "wide",
-    "smooth"
+    "unison",
+    "stack"
   ],
-  "description": "Smooth gliding lead with stereo width",
+  "description": "Unison saw stack with stereo spread and delay.",
   "oscA": {
-    "waveform": "saw",
-    "level": 0.7,
+    "waveform": "supersaw",
+    "level": 0.75,
     "detuneCents": 0,
     "octave": 0,
     "semitone": 0,
     "pulseWidth": 0.5,
-    "unisonVoices": 3,
-    "unisonDetune": 0.35,
-    "unisonSpread": 0.8
+    "unisonVoices": 5,
+    "unisonDetune": 0.22,
+    "unisonSpread": 0.85
   },
   "oscB": {
-    "waveform": "sine",
-    "level": 0,
-    "detuneCents": 0,
+    "waveform": "saw",
+    "level": 0.4,
+    "detuneCents": -12,
     "octave": 0,
     "semitone": 0,
     "pulseWidth": 0.5,
@@ -41,85 +42,85 @@
   },
   "subOsc": {
     "enabled": false,
-    "level": 0.5,
+    "level": 0.0,
     "octave": -1
   },
   "noise": {
     "type": "white",
-    "level": 0
+    "level": 0.0
   },
   "filter1": {
     "type": "LP24",
-    "cutoff": 5000,
-    "resonance": 0.3,
-    "drive": 0,
+    "cutoff": 4500,
+    "resonance": 0.2,
+    "drive": 0.1,
     "envAmount": 0.2,
-    "keyTrack": 0
+    "keyTrack": 0.4
   },
   "filter2": {
     "type": "HP12",
-    "cutoff": 80,
+    "cutoff": 30,
     "resonance": 0,
     "drive": 0,
     "envAmount": 0,
     "keyTrack": 0
   },
   "env1": {
-    "attack": 0.05,
+    "attack": 0.005,
     "decay": 0.3,
-    "sustain": 0.8,
-    "release": 0.6
+    "sustain": 0.85,
+    "release": 0.4
   },
   "env2": {
     "attack": 0.01,
-    "decay": 0.5,
-    "sustain": 0.3,
-    "release": 0.5
+    "decay": 0.3,
+    "sustain": 0.5,
+    "release": 0.4
   },
   "env3": {
     "attack": 0.01,
-    "decay": 0.8,
-    "sustain": 0,
+    "decay": 0.3,
+    "sustain": 0.0,
     "release": 0.3
   },
   "lfo1": {
     "rate": 1.0,
     "shape": "sine",
     "sync": false,
-    "depth": 0.5
+    "depth": 0.0
   },
   "lfo2": {
     "rate": 0.5,
     "shape": "triangle",
     "sync": false,
-    "depth": 0.5
+    "depth": 0.0
   },
   "modMatrix": [],
   "fxChain": {
-    "chorusMix": 0.4,
+    "chorusMix": 0.12,
     "chorusRate": 1.0,
     "chorusDepth": 0.3,
-    "delayMix": 0.15,
-    "delayTime": 0.3,
-    "delayFeedback": 0.4,
+    "delayMix": 0.18,
+    "delayTime": 0.26,
+    "delayFeedback": 0.35,
     "delaySync": false,
-    "reverbMix": 0,
+    "reverbMix": 0.18,
     "reverbSize": 0.5,
     "reverbDamping": 0.5,
     "phaserMix": 0,
     "phaserRate": 0.5,
-    "distortionAmount": 0,
+    "distortionAmount": 0.0,
     "distortionType": "soft",
     "compressorThreshold": -10,
     "compressorRatio": 4,
-    "eqLow": 0,
-    "eqMid": 0,
-    "eqHigh": 0,
-    "limiterCeiling": -0.3
+    "eqLow": 0.0,
+    "eqMid": 0.0,
+    "eqHigh": 0.0,
+    "limiterCeiling": -0.5
   },
   "macroKnobs": [
     {
-      "label": "Brightness",
+      "label": "Tone",
       "value": 0.5,
       "mappings": []
     },
@@ -135,11 +136,16 @@
     },
     {
       "label": "Dirt",
-      "value": 0,
+      "value": 0.5,
       "mappings": []
     },
     {
       "label": "Attack",
+      "value": 0.5,
+      "mappings": []
+    },
+    {
+      "label": "Release",
       "value": 0.5,
       "mappings": []
     },
@@ -149,15 +155,10 @@
       "mappings": []
     },
     {
-      "label": "Tone",
-      "value": 0.5,
-      "mappings": []
-    },
-    {
-      "label": "Mix",
+      "label": "Character",
       "value": 0.5,
       "mappings": []
     }
   ],
-  "checksum": "cce627b59da5796d"
+  "checksum": "f1d7a30007c3964f"
 }

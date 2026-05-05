@@ -3,9 +3,9 @@
   "author": "DIDITAGAIN",
   "engineMode": "subtractive",
   "playMode": "poly",
-  "masterGain": -3,
+  "masterGain": -7.0,
   "polyphony": 8,
-  "glideTime": 0,
+  "glideTime": 0.0,
   "uiSkinRef": "default",
   "tuningRef": "12tet-440",
   "signature": "",
@@ -13,13 +13,14 @@
   "category": "Pad",
   "tags": [
     "dark",
+    "pad",
     "air",
-    "ambient"
+    "slow"
   ],
-  "description": "Dark atmospheric pad with noise",
+  "description": "Noise air over a triangle/saw bed with slow attack.",
   "oscA": {
-    "waveform": "saw",
-    "level": 0.4,
+    "waveform": "triangle",
+    "level": 0.55,
     "detuneCents": 0,
     "octave": 0,
     "semitone": 0,
@@ -29,10 +30,10 @@
     "unisonSpread": 0.5
   },
   "oscB": {
-    "waveform": "triangle",
-    "level": 0.3,
-    "detuneCents": 0,
-    "octave": 1,
+    "waveform": "saw",
+    "level": 0.35,
+    "detuneCents": -5,
+    "octave": 0,
     "semitone": 0,
     "pulseWidth": 0.5,
     "unisonVoices": 1,
@@ -41,85 +42,85 @@
   },
   "subOsc": {
     "enabled": false,
-    "level": 0.5,
+    "level": 0.0,
     "octave": -1
   },
   "noise": {
-    "type": "white",
-    "level": 0.15
+    "type": "pink",
+    "level": 0.12
   },
   "filter1": {
     "type": "LP24",
-    "cutoff": 1500,
+    "cutoff": 1400,
     "resonance": 0.2,
-    "drive": 0,
-    "envAmount": 0,
-    "keyTrack": 0
+    "drive": 0.0,
+    "envAmount": 0.25,
+    "keyTrack": 0.4
   },
   "filter2": {
     "type": "HP12",
-    "cutoff": 80,
+    "cutoff": 30,
     "resonance": 0,
     "drive": 0,
     "envAmount": 0,
     "keyTrack": 0
   },
   "env1": {
-    "attack": 1.5,
-    "decay": 2.0,
-    "sustain": 0.6,
-    "release": 4.0
+    "attack": 0.9,
+    "decay": 1.5,
+    "sustain": 0.75,
+    "release": 2.2
   },
   "env2": {
     "attack": 0.01,
-    "decay": 0.5,
-    "sustain": 0.3,
-    "release": 0.5
+    "decay": 0.3,
+    "sustain": 0.5,
+    "release": 0.4
   },
   "env3": {
     "attack": 0.01,
-    "decay": 0.8,
-    "sustain": 0,
+    "decay": 0.3,
+    "sustain": 0.0,
     "release": 0.3
   },
   "lfo1": {
-    "rate": 1.0,
-    "shape": "sine",
+    "rate": 0.12,
+    "shape": "triangle",
     "sync": false,
-    "depth": 0.5
+    "depth": 0.2
   },
   "lfo2": {
     "rate": 0.5,
     "shape": "triangle",
     "sync": false,
-    "depth": 0.5
+    "depth": 0.0
   },
   "modMatrix": [],
   "fxChain": {
-    "chorusMix": 0,
+    "chorusMix": 0.0,
     "chorusRate": 1.0,
     "chorusDepth": 0.3,
-    "delayMix": 0,
+    "delayMix": 0.0,
     "delayTime": 0.3,
-    "delayFeedback": 0.4,
+    "delayFeedback": 0.35,
     "delaySync": false,
-    "reverbMix": 0.7,
+    "reverbMix": 0.55,
     "reverbSize": 0.9,
-    "reverbDamping": 0.5,
+    "reverbDamping": 0.7,
     "phaserMix": 0,
     "phaserRate": 0.5,
-    "distortionAmount": 0,
+    "distortionAmount": 0.0,
     "distortionType": "soft",
     "compressorThreshold": -10,
     "compressorRatio": 4,
-    "eqLow": 0,
-    "eqMid": 0,
-    "eqHigh": 0,
-    "limiterCeiling": -0.3
+    "eqLow": 0.0,
+    "eqMid": 0.0,
+    "eqHigh": -4,
+    "limiterCeiling": -0.5
   },
   "macroKnobs": [
     {
-      "label": "Brightness",
+      "label": "Tone",
       "value": 0.5,
       "mappings": []
     },
@@ -135,11 +136,16 @@
     },
     {
       "label": "Dirt",
-      "value": 0,
+      "value": 0.5,
       "mappings": []
     },
     {
       "label": "Attack",
+      "value": 0.5,
+      "mappings": []
+    },
+    {
+      "label": "Release",
       "value": 0.5,
       "mappings": []
     },
@@ -149,15 +155,10 @@
       "mappings": []
     },
     {
-      "label": "Tone",
-      "value": 0.5,
-      "mappings": []
-    },
-    {
-      "label": "Mix",
+      "label": "Character",
       "value": 0.5,
       "mappings": []
     }
   ],
-  "checksum": "79eeaa1bb1a8b430"
+  "checksum": "7fed54a2ad1b9ee4"
 }
