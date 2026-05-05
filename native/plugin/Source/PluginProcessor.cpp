@@ -9,6 +9,10 @@ DiditagainProcessor::DiditagainProcessor()
       presetManager(*this),
       licenseClient()
 {
+    presetManager.onPresetLoaded = [this]()
+    {
+        presetResetPending.store(true);
+    };
 }
 
 DiditagainProcessor::~DiditagainProcessor() {}
@@ -239,6 +243,13 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     const float mA = getF("env3Attack"),  mD = getF("env3Decay"),
                 mS = getF("env3Sustain"), mR = getF("env3Release");
 
+    // Apply mono/poly changes before pushing per-voice settings so newly
+    // created voices receive the current preset values in the same block.
+    const bool mono     = getF("monoMode") > 0.5f;
+    const int  polyWant = juce::jlimit(1, 16, static_cast<int>(getF("polyphony")));
+    if (mono != lastMonoMode) { synthEngine.setMonoMode(mono); lastMonoMode = mono; lastPolyphony = -1; }
+    if (!mono && polyWant != lastPolyphony) { synthEngine.setMaxPolyphony(polyWant); lastPolyphony = polyWant; }
+
     synthEngine.forEachSynthVoice([&](SynthVoice& v)
     {
         v.setEngineMode(engineMode);
@@ -274,14 +285,8 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         v.getModEnv().setSustain(mS);     v.getModEnv().setRelease(mR);
     });
 
-    // Mono / poly + polyphony — apply each block, but only call into the
-    // engine when the value actually changes (cheap & avoids reallocations).
-    const bool mono     = getF("monoMode") > 0.5f;
-    const int  polyWant = juce::jlimit(1, 16, static_cast<int>(getF("polyphony")));
-    static bool lastMono = false;
-    static int  lastPoly = -1;
-    if (mono != lastMono) { synthEngine.setMonoMode(mono); lastMono = mono; lastPoly = -1; }
-    if (!mono && polyWant != lastPoly) { synthEngine.setMaxPolyphony(polyWant); lastPoly = polyWant; }
+    if (presetResetPending.exchange(false))
+        synthEngine.resetForPresetChange();
 
     // ---- FX parameters ----
     auto& fx = synthEngine.getFx();

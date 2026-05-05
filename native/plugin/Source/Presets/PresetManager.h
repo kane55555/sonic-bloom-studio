@@ -1,5 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
+#include <functional>
 #include <vector>
 #include <string>
 
@@ -29,6 +30,8 @@ public:
     int getNumPresets() const { return static_cast<int>(presets.size()); }
     int getCurrentPresetIndex() const { return currentIndex; }
     juce::String getPresetName(int index) const;
+
+    std::function<void()> onPresetLoaded;
 
     void toggleFavorite(int index);
     std::vector<int> searchByTag(const juce::String& tag) const;

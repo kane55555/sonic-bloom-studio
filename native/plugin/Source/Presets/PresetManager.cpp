@@ -230,6 +230,9 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
         setParam(processor, "fxReverbSize",       fx.getProperty("reverbSize", 0.5));
         setParam(processor, "fxDistortionAmount", fx.getProperty("distortionAmount", 0.0));
     }
+
+    if (onPresetLoaded)
+        onPresetLoaded();
 }
 
 void PresetManager::saveCurrentPreset(const juce::String& name, const juce::String& category)

@@ -1,5 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
+#include <atomic>
 #include "DSP/SynthEngine.h"
 #include "Presets/PresetManager.h"
 #include "Licensing/LicenseClient.h"
@@ -44,6 +45,9 @@ private:
     SynthEngine synthEngine;
     PresetManager presetManager;
     LicenseClient licenseClient;
+    std::atomic<bool> presetResetPending { false };
+    bool lastMonoMode = false;
+    int lastPolyphony = -1;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(DiditagainProcessor)
 };
