@@ -29,6 +29,8 @@ namespace key {
     constexpr const char* polyphony     = "polyphony";
     constexpr const char* mono          = "mono";
     constexpr const char* glideMs       = "glideMs";
+    constexpr const char* glideTime     = "glideTime";
+    constexpr const char* playMode      = "playMode";
     constexpr const char* oscA          = "oscA";
     constexpr const char* oscB          = "oscB";
     constexpr const char* subOsc        = "subOsc";

@@ -166,11 +166,18 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
     if (json.hasProperty(key::masterGain)) setParam(processor, "masterGain", json.getProperty(key::masterGain, 0.0));
     if (json.hasProperty(key::polyphony))  setParam(processor, "polyphony",  json.getProperty(key::polyphony, 8));
     if (json.hasProperty(key::mono))       setParam(processor, "monoMode",   json.getProperty(key::mono, false));
+    if (json.hasProperty(key::playMode))
+    {
+        const bool isMono = json.getProperty(key::playMode, "poly").toString().equalsIgnoreCase("mono");
+        setParam(processor, "monoMode", isMono);
+    }
     if (json.hasProperty(key::glideMs))
     {
         const double ms = (double) json.getProperty(key::glideMs, 0.0);
         setParam(processor, "glideTime", ms / 1000.0);
     }
+    if (json.hasProperty(key::glideTime))
+        setParam(processor, "glideTime", (double) json.getProperty(key::glideTime, 0.0));
 
     // Oscillators
     applyOscBlock(processor, json.getProperty(key::oscA, juce::var()),
