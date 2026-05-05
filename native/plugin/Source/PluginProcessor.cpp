@@ -243,12 +243,18 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     const float mA = getF("env3Attack"),  mD = getF("env3Decay"),
                 mS = getF("env3Sustain"), mR = getF("env3Release");
 
-    // Apply mono/poly changes before pushing per-voice settings so newly
-    // created voices receive the current preset values in the same block.
+    const bool canResizeVoices = synthEngine.canSafelyResetVoices();
+
+    // Apply mono/poly changes only when idle. Resizing JUCE's voice list while
+    // FL Studio is holding piano-roll notes can leave the synth silent after
+    // rapid preset stepping, so active playback keeps the current voice pool.
     const bool mono     = getF("monoMode") > 0.5f;
     const int  polyWant = juce::jlimit(1, 16, static_cast<int>(getF("polyphony")));
-    if (mono != lastMonoMode) { synthEngine.setMonoMode(mono); lastMonoMode = mono; lastPolyphony = -1; }
-    if (!mono && polyWant != lastPolyphony) { synthEngine.setMaxPolyphony(polyWant); lastPolyphony = polyWant; }
+    if (canResizeVoices)
+    {
+        if (mono != lastMonoMode) { synthEngine.setMonoMode(mono); lastMonoMode = mono; lastPolyphony = -1; }
+        if (!mono && polyWant != lastPolyphony) { synthEngine.setMaxPolyphony(polyWant); lastPolyphony = polyWant; }
+    }
 
     synthEngine.forEachSynthVoice([&](SynthVoice& v)
     {
@@ -285,8 +291,11 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         v.getModEnv().setSustain(mS);     v.getModEnv().setRelease(mR);
     });
 
-    if (presetResetPending.exchange(false))
+    if (presetResetPending.load() && canResizeVoices)
+    {
+        presetResetPending.store(false);
         synthEngine.resetForPresetChange();
+    }
 
     // ---- FX parameters ----
     auto& fx = synthEngine.getFx();
