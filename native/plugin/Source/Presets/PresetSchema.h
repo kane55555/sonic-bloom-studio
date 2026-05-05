@@ -50,10 +50,11 @@ namespace key {
 // Convert a string engine mode (as stored in JSON) to its choice index.
 inline int engineModeFromString(const juce::String& s)
 {
-    if (s.equalsIgnoreCase("FM2"))         return 1;
-    if (s.equalsIgnoreCase("FM4"))         return 2;
-    if (s.equalsIgnoreCase("Wavetable"))   return 3;
-    if (s.equalsIgnoreCase("Layered"))     return 4;
+    auto u = s.toLowerCase();
+    if (u == "fm2"  || u == "fm2op" || u == "fm")        return 1;
+    if (u == "fm4"  || u == "fm4op")                     return 2;
+    if (u == "wavetable" || u == "wt")                   return 3;
+    if (u == "layered")                                  return 4;
     return 0; // Subtractive
 }
 
