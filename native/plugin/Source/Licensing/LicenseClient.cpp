@@ -70,7 +70,7 @@ juce::String LicenseClient::getHardwareFingerprint() const
     auto systemStats = juce::SystemStats::getOperatingSystemName()
         + juce::SystemStats::getComputerName()
         + juce::String(juce::SystemStats::getNumCpus());
-    return juce::SHA256(systemStats.toUTF8()).toHexString().substring(0, 32);
+    return juce::String::toHexString((juce::int64) systemStats.hashCode64());
 }
 
 bool LicenseClient::activateDevice()

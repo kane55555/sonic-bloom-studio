@@ -69,7 +69,7 @@ public:
     {
         // Compact layout that always shows a value box under the knob.
         juce::Slider::SliderLayout layout;
-        const auto bounds = s.getLocalBounds();
+        auto bounds = s.getLocalBounds();
         layout.textBoxBounds = bounds.removeFromBottom(16);
         layout.sliderBounds  = bounds;
         return layout;
