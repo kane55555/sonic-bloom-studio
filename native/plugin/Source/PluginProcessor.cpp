@@ -1,6 +1,9 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+#define DIDA_PRESET_LOG(message) \
+    juce::Logger::outputDebugString(juce::String("[DIDITAGAIN preset] ") + (juce::String() << message))
+
 DiditagainProcessor::DiditagainProcessor()
     : AudioProcessor(BusesProperties()
           .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
@@ -13,7 +16,7 @@ DiditagainProcessor::DiditagainProcessor()
     {
         presetLoadRequested.store(true, std::memory_order_release);
         presetLoadSerial.fetch_add(1, std::memory_order_acq_rel);
-        DBG("[DIDITAGAIN preset] load requested serial=" << presetLoadSerial.load(std::memory_order_acquire)
+        DIDA_PRESET_LOG("load requested serial=" << presetLoadSerial.load(std::memory_order_acquire)
             << " index=" << presetManager.getCurrentPresetIndex()
             << " name=" << presetManager.getPresetName(presetManager.getCurrentPresetIndex()));
     };
@@ -271,7 +274,7 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         deferredPresetChange.presetSerial = latestPresetSerial;
         deferredPresetChange.ageInBlocks = previousAge;
 
-        DBG("[DIDITAGAIN preset] queued serial=" << deferredPresetChange.presetSerial
+        DIDA_PRESET_LOG("queued serial=" << deferredPresetChange.presetSerial
             << " mono=" << (deferredPresetChange.monoMode ? "true" : "false")
             << " poly=" << deferredPresetChange.polyphony
             << " appliedMono=" << (appliedMonoMode ? "true" : "false")
@@ -316,7 +319,7 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                 if (deferredPresetChange.resetState && canApplyVoiceMutation)
                     synthEngine.resetForPresetChange();
 
-                DBG("[DIDITAGAIN preset] applied serial=" << deferredPresetChange.presetSerial
+                DIDA_PRESET_LOG("applied serial=" << deferredPresetChange.presetSerial
                     << " mono=" << (deferredPresetChange.monoMode ? "true" : "false")
                     << " poly=" << deferredPresetChange.polyphony
                     << " mutatedVoices=" << (voicePoolNeedsMutation ? "true" : "false")
@@ -327,7 +330,7 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         }
         else if ((++debugBlockCounter % 128) == 0)
         {
-            DBG("[DIDITAGAIN preset] waiting serial=" << deferredPresetChange.presetSerial
+            DIDA_PRESET_LOG("waiting serial=" << deferredPresetChange.presetSerial
                 << " blocks=" << deferredPresetChange.ageInBlocks
                 << " heldNotes=" << synthEngine.getHeldNoteCount()
                 << " activeVoices=" << synthEngine.getActiveVoiceCount()
