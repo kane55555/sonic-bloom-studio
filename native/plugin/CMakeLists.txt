@@ -32,6 +32,8 @@ juce_add_plugin(DIDITAGAIN_STUDIO
     COPY_PLUGIN_AFTER_BUILD TRUE
 )
 
+juce_generate_juce_header(DIDITAGAIN_STUDIO)
+
 target_sources(DIDITAGAIN_STUDIO PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
