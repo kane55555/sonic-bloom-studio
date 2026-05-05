@@ -104,6 +104,8 @@ void DiditagainEditor::setupTabs()
     };
 
     cycleTestButton.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff8b5cf6));
+    cycleTestButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
+    cycleTestButton.setColour(juce::TextButton::textColourOnId,  juce::Colours::white);
     cycleTestButton.onClick = [this]()
     {
         if (! cycleTester) return;
