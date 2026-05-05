@@ -31,6 +31,9 @@ void SynthEngine::renderBlockWithFx(juce::AudioBuffer<float>& buffer,
 void SynthEngine::resetForPresetChange()
 {
     const juce::ScopedLock lock(getLock());
+    if (! canSafelyResetVoices())
+        return;
+
     allNotesOff(0, false);
     const auto sampleRate = getSampleRate();
     forEachSynthVoice([](SynthVoice& v)
@@ -47,6 +50,31 @@ void SynthEngine::resetForPresetChange()
         for (int note = 0; note < static_cast<int>(heldNotes[channel].size()); ++note)
             if (heldNotes[channel][note].active)
                 noteOn(channel + 1, note, heldNotes[channel][note].velocity);
+}
+
+bool SynthEngine::hasHeldNotes() const noexcept
+{
+    for (const auto& channel : heldNotes)
+        for (const auto& note : channel)
+            if (note.active)
+                return true;
+
+    return false;
+}
+
+bool SynthEngine::hasActiveVoices() const noexcept
+{
+    for (int i = 0; i < getNumVoices(); ++i)
+        if (auto* voice = getVoice(i))
+            if (voice->isVoiceActive())
+                return true;
+
+    return false;
+}
+
+bool SynthEngine::canSafelyResetVoices() const noexcept
+{
+    return ! hasHeldNotes() && ! hasActiveVoices();
 }
 
 void SynthEngine::updateHeldNotes(const juce::MidiBuffer& midi)
