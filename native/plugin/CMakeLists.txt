@@ -8,7 +8,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Set JUCE_DIR to your local JUCE installation path
 # e.g. cmake -DJUCE_DIR=C:/JUCE ..
 if(NOT DEFINED JUCE_DIR)
-    set(JUCE_DIR "${CMAKE_SOURCE_DIR}/../../third_party/JUCE" CACHE PATH "Path to JUCE framework")
+    if(EXISTS "C:/JUCE/CMakeLists.txt")
+        set(JUCE_DIR "C:/JUCE" CACHE PATH "Path to JUCE framework")
+    else()
+        set(JUCE_DIR "${CMAKE_SOURCE_DIR}/../../third_party/JUCE" CACHE PATH "Path to JUCE framework")
+    endif()
 endif()
 
 add_subdirectory(${JUCE_DIR} ${CMAKE_BINARY_DIR}/juce EXCLUDE_FROM_ALL)
@@ -94,3 +98,38 @@ set_target_properties(DIDITAGAIN_STUDIO PROPERTIES
     INTERPROCEDURAL_OPTIMIZATION FALSE
     INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
 )
+
+# VS 2026 Insiders currently ICEs in Release on both the huge embedded preset
+# translation unit and JUCE's generated VST3 wrapper when aggressive codegen is
+# enabled. Keep DSP/shared code optimized, but compile only the fragile preset
+# TU and thin format wrappers without optimisation/LTCG.
+if(MSVC)
+    set_source_files_properties(Source/Presets/FactoryPresets.cpp PROPERTIES
+        COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-;/Z7"
+    )
+
+    foreach(dida_format_target DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
+        if(TARGET ${dida_format_target})
+            set_target_properties(${dida_format_target} PROPERTIES
+                INTERPROCEDURAL_OPTIMIZATION FALSE
+                INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
+            )
+            target_compile_options(${dida_format_target} PRIVATE
+                /GL-
+                /Gy-
+                /Gw-
+                /Z7
+            )
+            target_link_options(${dida_format_target} PRIVATE
+                /LTCG:OFF
+            )
+        endif()
+    endforeach()
+
+    if(TARGET DIDITAGAIN_STUDIO_VST3)
+        target_compile_options(DIDITAGAIN_STUDIO_VST3 PRIVATE
+            $<$<CONFIG:Release>:/Od>
+            $<$<CONFIG:Release>:/Ob0>
+        )
+    endif()
+endif()
