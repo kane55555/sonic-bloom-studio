@@ -50,6 +50,8 @@ public:
     void setBaseCutoff(float hz)         noexcept { baseCutoff = juce::jlimit(20.0f, 20000.0f, hz); }
     void setOscAPitchOffset(int semis)   noexcept { oscAPitchSemis = semis; }
     void setOscBPitchOffset(int semis)   noexcept { oscBPitchSemis = semis; }
+    void setUnison(int voices, float detune, float spread) noexcept;
+    void setNoiseType(int type) noexcept { noiseType = juce::jlimit(0, 1, type); }
 
     Oscillator&   getOscA()      noexcept { return oscA; }
     Oscillator&   getOscB()      noexcept { return oscB; }
@@ -93,6 +95,7 @@ private:
     float baseCutoff           = 8000.0f;
     int   oscAPitchSemis       = 0;
     int   oscBPitchSemis       = 0;
+    int   noiseType            = 0;
 
     // ---- Noise generator state ----
     dida::PinkNoise noiseGen;
