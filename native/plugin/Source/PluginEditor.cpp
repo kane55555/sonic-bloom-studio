@@ -11,6 +11,18 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     synthPanel = std::make_unique<MainSynthPanel>(processor.getAPVTS());
     addAndMakeVisible(*synthPanel);
 
+    modPanel = std::make_unique<ModPanel>(processor.getAPVTS());
+    addChildComponent(*modPanel);
+
+    fxPanel = std::make_unique<FxPanel>(processor.getAPVTS());
+    addChildComponent(*fxPanel);
+
+    settingsPanel = std::make_unique<SettingsPanel>(processor.getAPVTS());
+    addChildComponent(*settingsPanel);
+
+    accountPanel = std::make_unique<AccountPanel>();
+    addChildComponent(*accountPanel);
+
     presetBrowserPanel = std::make_unique<PresetBrowser>();
     addChildComponent(*presetBrowserPanel);
 
@@ -28,12 +40,6 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
             presetSelector.setSelectedId(idx + 1, juce::dontSendNotification);
         };
     }
-
-    addChildComponent(placeholderPanel);
-    placeholderLabel.setText("Coming soon", juce::dontSendNotification);
-    placeholderLabel.setJustificationType(juce::Justification::centred);
-    placeholderLabel.setColour(juce::Label::textColourId, juce::Colour(0xff7D8596));
-    placeholderPanel.addAndMakeVisible(placeholderLabel);
 
     setupTabs();
     switchTab(Tab::Synth);
@@ -147,21 +153,10 @@ void DiditagainEditor::switchTab(Tab tab)
     currentTab = tab;
     if (synthPanel)         synthPanel->setVisible(tab == Tab::Synth);
     if (presetBrowserPanel) presetBrowserPanel->setVisible(tab == Tab::Browser);
-
-    const bool ph = (tab != Tab::Synth && tab != Tab::Browser);
-    placeholderPanel.setVisible(ph);
-    if (ph)
-    {
-        juce::String name;
-        switch (tab) {
-            case Tab::Mod:      name = "Modulation Matrix — coming soon"; break;
-            case Tab::FX:       name = "Effects Chain — use SYNTH tab FX section for now"; break;
-            case Tab::Settings: name = "Settings — coming soon"; break;
-            case Tab::Account:  name = "Account — coming soon"; break;
-            default: break;
-        }
-        placeholderLabel.setText(name, juce::dontSendNotification);
-    }
+    if (modPanel)           modPanel->setVisible(tab == Tab::Mod);
+    if (fxPanel)            fxPanel->setVisible(tab == Tab::FX);
+    if (settingsPanel)      settingsPanel->setVisible(tab == Tab::Settings);
+    if (accountPanel)       accountPanel->setVisible(tab == Tab::Account);
     repaint();
 }
 
@@ -223,6 +218,8 @@ void DiditagainEditor::resized()
 
     if (synthPanel)         synthPanel->setBounds(content);
     if (presetBrowserPanel) presetBrowserPanel->setBounds(content);
-    placeholderPanel.setBounds(content);
-    placeholderLabel.setBounds(placeholderPanel.getLocalBounds());
+    if (modPanel)           modPanel->setBounds(content);
+    if (fxPanel)            fxPanel->setBounds(content);
+    if (settingsPanel)      settingsPanel->setBounds(content);
+    if (accountPanel)       accountPanel->setBounds(content);
 }
