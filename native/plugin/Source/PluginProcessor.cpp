@@ -199,6 +199,42 @@ juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createP
         juce::ParameterID{"fxPhaserMix", 1}, "Phaser Mix",
         juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
 
+    // Quality mode
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{"qualityMode", 1}, "Quality Mode",
+        juce::StringArray{"Draft", "Standard", "High"}, 1));
+
+    // EQ
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"eqLow",  1}, "EQ Low",
+        juce::NormalisableRange<float>(-18.0f, 18.0f, 0.1f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"eqMid",  1}, "EQ Mid",
+        juce::NormalisableRange<float>(-18.0f, 18.0f, 0.1f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"eqHigh", 1}, "EQ High",
+        juce::NormalisableRange<float>(-18.0f, 18.0f, 0.1f), 0.0f));
+
+    // Compressor
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{"compEnabled", 1}, "Comp Enabled", false));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"compThreshold", 1}, "Comp Threshold",
+        juce::NormalisableRange<float>(-60.0f, 0.0f, 0.1f), -12.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"compRatio", 1}, "Comp Ratio",
+        juce::NormalisableRange<float>(1.0f, 20.0f, 0.1f), 2.0f));
+
+    // Limiter
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"limiterCeiling", 1}, "Limiter Ceiling",
+        juce::NormalisableRange<float>(-12.0f, 0.0f, 0.1f), -0.3f));
+
+    // Wet FX HPF
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"fxWetHighPass", 1}, "Wet FX HPF",
+        juce::NormalisableRange<float>(20.0f, 800.0f, 1.0f, 0.4f), 80.0f));
+
     return { params.begin(), params.end() };
 }
 
@@ -384,13 +420,18 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     fx.setDelayFeedback(getF("fxDelayFeedback"));
     fx.setReverbMix(getF("fxReverbMix"));
     fx.setReverbSize(getF("fxReverbSize"));
+    fx.setEqLowDb (getF("eqLow"));
+    fx.setEqMidDb (getF("eqMid"));
+    fx.setEqHighDb(getF("eqHigh"));
+    fx.setCompEnabled(getF("compEnabled") > 0.5f);
+    fx.setCompThresholdDb(getF("compThreshold"));
+    fx.setCompRatio(getF("compRatio"));
+    fx.setLimiterCeilingDb(getF("limiterCeiling"));
+    fx.setWetHighPassHz(getF("fxWetHighPass"));
+    fx.setMasterGainDb(getF("masterGain"));
 
-    // ---- Render voices + FX ----
+    // ---- Render voices + FX (master gain + limiter applied inside FX chain) ----
     synthEngine.renderBlockWithFx(buffer, midiMessages, 0, buffer.getNumSamples());
-
-    // ---- Master gain ----
-    const float gain = juce::Decibels::decibelsToGain(getF("masterGain"));
-    buffer.applyGain(gain);
 }
 
 juce::AudioProcessorEditor* DiditagainProcessor::createEditor()
