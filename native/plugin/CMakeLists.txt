@@ -86,6 +86,11 @@ target_link_libraries(DIDITAGAIN_STUDIO
         juce::juce_gui_extra
     PUBLIC
         juce::juce_recommended_config_flags
-        juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags
+)
+
+# Disable LTO — MSVC ICE on FactoryPresets.cpp raw-string literals during link-time codegen
+set_target_properties(DIDITAGAIN_STUDIO PROPERTIES
+    INTERPROCEDURAL_OPTIMIZATION FALSE
+    INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
 )
