@@ -67,10 +67,10 @@ inline int waveformFromString(const juce::String& s)
     if (u == "triangle")  return 1;
     if (u == "saw")       return 2;
     if (u == "square")    return 3;
-    if (u == "pulse")     return 4;
-    if (u == "supersaw")  return 5;
-    if (u == "fm" || u == "fmcarrier") return 6;
-    if (u == "wavetable") return 7;
+    if (u == "pulse")     return 3;
+    if (u == "supersaw")  return 4;
+    if (u == "fm" || u == "fmcarrier") return 0;
+    if (u == "wavetable") return 5;
     return 2; // saw default
 }
 
