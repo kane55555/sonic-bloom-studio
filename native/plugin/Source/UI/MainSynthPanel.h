@@ -7,7 +7,7 @@ public:
     explicit MainSynthPanel(juce::AudioProcessorValueTreeState& apvts)
         : ParameterPanel(apvts, "SYNTH ENGINE")
     {
-        const juce::StringArray waves { "Sine", "Triangle", "Saw", "Square", "SuperSaw", "Wavetable" };
+        const juce::StringArray waves { "Sine", "Triangle", "Saw", "Square", "Pulse", "SuperSaw", "FmCarrier", "Wavetable" };
         const juce::StringArray engines { "Subtractive", "FM2", "FM4", "Wavetable", "Layered" };
         const juce::StringArray filters { "LP12", "LP24", "HP12", "HP24", "BP", "Notch" };
         const juce::StringArray noise { "White", "Pink" };
