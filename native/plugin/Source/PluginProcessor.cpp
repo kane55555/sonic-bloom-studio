@@ -51,7 +51,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createP
     // Oscillator A
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{"oscAWaveform", 1}, "Osc A Waveform",
-        juce::StringArray{"Sine", "Triangle", "Saw", "Square", "SuperSaw", "Wavetable"}, 2));
+        juce::StringArray{"Sine", "Triangle", "Saw", "Square", "Pulse", "SuperSaw", "FmCarrier", "Wavetable"}, 2));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"oscALevel", 1}, "Osc A Level",
         juce::NormalisableRange<float>(0.0f, 1.0f), 0.8f));
@@ -69,7 +69,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createP
     // Oscillator B
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{"oscBWaveform", 1}, "Osc B Waveform",
-        juce::StringArray{"Sine", "Triangle", "Saw", "Square", "SuperSaw", "Wavetable"}, 0));
+        juce::StringArray{"Sine", "Triangle", "Saw", "Square", "Pulse", "SuperSaw", "FmCarrier", "Wavetable"}, 0));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"oscBLevel", 1}, "Osc B Level",
         juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
