@@ -19,6 +19,16 @@ void SynthVoice::prepare(double sr, int /*samplesPerBlock*/)
     recalcGlideCoeff();
 }
 
+void SynthVoice::setUnison(int voices, float detune, float spread) noexcept
+{
+    oscA.setUnisonVoices(voices);
+    oscB.setUnisonVoices(voices);
+    oscA.setUnisonDetune(detune);
+    oscB.setUnisonDetune(detune);
+    oscA.setStereoSpread(spread);
+    oscB.setStereoSpread(spread);
+}
+
 void SynthVoice::recalcGlideCoeff() noexcept
 {
     if (glideSeconds <= 0.0f)
@@ -106,7 +116,8 @@ float SynthVoice::renderSample()
     }
 
     const float subSample   = subOsc.getNextSample();
-    const float noiseSample = noiseGen.next();
+    const float whiteNoise = juce::Random::getSystemRandom().nextFloat() * 2.0f - 1.0f;
+    const float noiseSample = noiseType == 1 ? noiseGen.next() : whiteNoise;
 
     float mix = oscASample * oscALevel
               + oscBSample * oscBLevel
