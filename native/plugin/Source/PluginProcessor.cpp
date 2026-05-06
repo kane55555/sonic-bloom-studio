@@ -51,7 +51,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createP
     // Oscillator A
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{"oscAWaveform", 1}, "Osc A Waveform",
-        juce::StringArray{"Sine", "Triangle", "Saw", "Square", "SuperSaw", "Wavetable"}, 2));
+        juce::StringArray{"Sine", "Triangle", "Saw", "Square", "Pulse", "SuperSaw", "FmCarrier", "Wavetable"}, 2));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"oscALevel", 1}, "Osc A Level",
         juce::NormalisableRange<float>(0.0f, 1.0f), 0.8f));
@@ -69,7 +69,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createP
     // Oscillator B
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID{"oscBWaveform", 1}, "Osc B Waveform",
-        juce::StringArray{"Sine", "Triangle", "Saw", "Square", "SuperSaw", "Wavetable"}, 0));
+        juce::StringArray{"Sine", "Triangle", "Saw", "Square", "Pulse", "SuperSaw", "FmCarrier", "Wavetable"}, 0));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"oscBLevel", 1}, "Osc B Level",
         juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
@@ -270,6 +270,7 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     const int   oscBSemi  = static_cast<int>(getF("oscBSemi"));
     const float subLevel  = getF("subOscEnabled") > 0.5f ? getF("subOscLevel") : 0.0f;
     const float noiseLvl  = getF("noiseLevel");
+    const int   noiseType = static_cast<int>(getF("noiseType"));
     const float glide     = getF("glideTime");
     const float cutoff    = getF("filter1Cutoff");
     const float reso      = getF("filter1Resonance");
@@ -288,6 +289,9 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
     const bool mono     = getF("monoMode") > 0.5f;
     const int  polyWant = juce::jlimit(1, 16, static_cast<int>(getF("polyphony")));
+    const int   unisonVoices = juce::jlimit(1, 8, static_cast<int>(getF("unisonVoices")));
+    const float unisonDetune = getF("unisonDetune");
+    const float unisonSpread = getF("unisonSpread");
 
     const int latestPresetSerial = presetLoadSerial.load(std::memory_order_acquire);
     const bool newPresetLoaded = presetLoadRequested.exchange(false, std::memory_order_acq_rel)
@@ -382,9 +386,11 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         v.setOscBLevel(oscBLevel);
         v.setSubLevel(subLevel);
         v.setNoiseLevel(noiseLvl);
+        v.setNoiseType(noiseType);
         v.setFmAmount(fmAmount);
         v.setFmRatio(fmRatio);
         v.setGlideSeconds(glide);
+        v.setUnison(unisonVoices, unisonDetune, unisonSpread);
         v.setBaseCutoff(cutoff);
         v.setFilterEnvAmount(fEnvAmt);
         v.setFilterKeyTrack(keyTrk);

@@ -2,6 +2,10 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 #include "UI/MainSynthPanel.h"
+#include "UI/ModPanel.h"
+#include "UI/FxPanel.h"
+#include "UI/SettingsPanel.h"
+#include "UI/AccountPanel.h"
 #include "UI/PresetBrowser.h"
 #include "Debug/PresetCycleTester.h"
 
@@ -38,8 +42,10 @@ private:
     // Real content panels.
     std::unique_ptr<MainSynthPanel> synthPanel;
     std::unique_ptr<PresetBrowser>  presetBrowserPanel;
-    juce::Component                  placeholderPanel; // for Mod/FX/Settings/Account fallback
-    juce::Label                      placeholderLabel;
+    std::unique_ptr<ModPanel>        modPanel;
+    std::unique_ptr<FxPanel>         fxPanel;
+    std::unique_ptr<SettingsPanel>   settingsPanel;
+    std::unique_ptr<AccountPanel>    accountPanel;
 
     void setupTabs();
     void switchTab(Tab tab);
