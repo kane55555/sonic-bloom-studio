@@ -86,6 +86,7 @@ target_sources(DIDITAGAIN_STUDIO PRIVATE
     Source/DSP/DelayBlock.cpp
     Source/DSP/ReverbBlock.cpp
     Source/DSP/UtilityDSP.cpp
+    Source/DSP/SampleLibrary.cpp
     Source/Presets/PresetManager.cpp
     Source/Presets/FactoryPresets.cpp
     Source/Licensing/LicenseClient.cpp

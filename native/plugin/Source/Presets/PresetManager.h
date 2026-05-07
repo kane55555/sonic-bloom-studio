@@ -33,6 +33,9 @@ public:
 
     std::function<void()> onPresetLoaded;
 
+    // Most recent instrument folder requested by a preset (empty if none).
+    const juce::String& getRequestedInstrument() const noexcept { return requestedInstrument; }
+
     void toggleFavorite(int index);
     std::vector<int> searchByTag(const juce::String& tag) const;
     std::vector<int> searchByName(const juce::String& query) const;
@@ -47,6 +50,7 @@ private:
     juce::AudioProcessor& processor;
     std::vector<PresetInfo> presets;
     int currentIndex = 0;
+    juce::String requestedInstrument;
 
     void loadFactoryPresets();
     void loadUserPresets();

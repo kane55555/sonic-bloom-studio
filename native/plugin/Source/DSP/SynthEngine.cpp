@@ -156,6 +156,7 @@ bool SynthEngine::setMaxPolyphony(int n)
     {
         auto* v = new SynthVoice();
         v->prepare(getSampleRate(), 0);
+        v->setMultisample(activeMultisample);
         addVoice(v);
     }
 
@@ -182,4 +183,24 @@ bool SynthEngine::setMonoMode(bool mono)
         return false;
 
     return true;
+}
+
+bool SynthEngine::setInstrument(const juce::String& instrumentName)
+{
+    if (instrumentName == currentInstrumentName && activeMultisample != nullptr)
+        return true;
+
+    auto ms = instrumentName.isEmpty()
+        ? std::shared_ptr<const dida::Multisample>{}
+        : dida::SampleLibrary::loadInstrument(instrumentName);
+
+    activeMultisample = ms;
+    currentInstrumentName = instrumentName;
+
+    forEachSynthVoice([&](SynthVoice& v)
+    {
+        v.setMultisample(activeMultisample);
+    });
+
+    return ms != nullptr || instrumentName.isEmpty();
 }

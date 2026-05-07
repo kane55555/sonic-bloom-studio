@@ -25,6 +25,8 @@ namespace key {
     constexpr const char* tags          = "tags";
     constexpr const char* description   = "description";
     constexpr const char* engineMode    = "engineMode";
+    constexpr const char* sampler       = "sampler";    // { "instrument": "Brass" }
+    constexpr const char* instrument    = "instrument"; // string under "sampler"
     constexpr const char* masterGain    = "masterGain";
     constexpr const char* polyphony     = "polyphony";
     constexpr const char* mono          = "mono";

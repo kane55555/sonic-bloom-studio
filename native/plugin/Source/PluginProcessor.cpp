@@ -360,11 +360,17 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                 if (deferredPresetChange.resetState && canApplyVoiceMutation)
                     synthEngine.resetForPresetChange();
 
+                // Swap the active multisample instrument requested by the preset.
+                const auto& requested = presetManager.getRequestedInstrument();
+                if (requested.isNotEmpty() && requested != synthEngine.getInstrumentName())
+                    synthEngine.setInstrument(requested);
+
                 DIDA_PRESET_LOG("applied serial=" << deferredPresetChange.presetSerial
                     << " mono=" << (deferredPresetChange.monoMode ? "true" : "false")
                     << " poly=" << deferredPresetChange.polyphony
                     << " mutatedVoices=" << (voicePoolNeedsMutation ? "true" : "false")
-                    << " waitedBlocks=" << deferredPresetChange.ageInBlocks);
+                    << " waitedBlocks=" << deferredPresetChange.ageInBlocks
+                    << " instrument=" << synthEngine.getInstrumentName());
 
                 deferredPresetChange = {};
             }
