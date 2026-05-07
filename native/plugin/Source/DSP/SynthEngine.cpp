@@ -156,6 +156,7 @@ bool SynthEngine::setMaxPolyphony(int n)
     {
         auto* v = new SynthVoice();
         v->prepare(getSampleRate(), 0);
+        v->setMultisample(activeMultisample);
         addVoice(v);
     }
 
