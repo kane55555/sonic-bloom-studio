@@ -29,8 +29,10 @@ public:
         addKnob(dynamics, "Ceiling", "limiterCeiling");
         addKnob(dynamics, "Master", "masterGain");
 
+        const juce::StringArray qualityModes { "Draft", "Standard", "High" };
+
         const int quality = addGroup("QUALITY");
-        addChoice(quality, "Mode", "qualityMode", { "Draft", "Standard", "High" });
+        addChoice(quality, "Mode", "qualityMode", qualityModes);
         addKnob(quality, "Poly", "polyphony");
     }
 
