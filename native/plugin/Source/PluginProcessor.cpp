@@ -326,6 +326,10 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // Preset stepping may change mono/poly and requested polyphony every click.
     // Keep the latest request queued, but only touch JUCE's voice pool once the
     // host has stopped sending note events and all voices have fully released.
+    // If we've waited too long (FL is actively playing a clip with held notes),
+    // force-apply: silence everything, mutate, then let held notes retrigger.
+    static constexpr int kForceApplyAfterBlocks = 16;
+
     if (deferredPresetChange.queued)
     {
         ++deferredPresetChange.ageInBlocks;
@@ -333,8 +337,18 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         const bool voicePoolNeedsMutation = deferredPresetChange.monoMode != appliedMonoMode
             || (! deferredPresetChange.monoMode && deferredPresetChange.polyphony != appliedPolyphony);
         const bool sameVoicePool = ! voicePoolNeedsMutation;
+        const bool forceApply = deferredPresetChange.ageInBlocks >= kForceApplyAfterBlocks;
 
-        if (canApplyVoiceMutation || sameVoicePool)
+        if (forceApply && ! canApplyVoiceMutation)
+        {
+            // Hard-stop everything so mutation/reset is safe.
+            synthEngine.allNotesOff(0, false);
+            synthEngine.forEachSynthVoice([](SynthVoice& v) { v.resetNote(); });
+            DIDA_PRESET_LOG("force-apply silencing voices serial=" << deferredPresetChange.presetSerial
+                << " waitedBlocks=" << deferredPresetChange.ageInBlocks);
+        }
+
+        if (canApplyVoiceMutation || sameVoicePool || forceApply)
         {
             bool applied = true;
 
@@ -357,7 +371,7 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
             if (applied)
             {
-                if (deferredPresetChange.resetState && canApplyVoiceMutation)
+                if (deferredPresetChange.resetState && (canApplyVoiceMutation || forceApply))
                     synthEngine.resetForPresetChange();
 
                 // Swap the active multisample instrument requested by the preset.
@@ -369,6 +383,7 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                     << " mono=" << (deferredPresetChange.monoMode ? "true" : "false")
                     << " poly=" << deferredPresetChange.polyphony
                     << " mutatedVoices=" << (voicePoolNeedsMutation ? "true" : "false")
+                    << " forced=" << (forceApply ? "true" : "false")
                     << " waitedBlocks=" << deferredPresetChange.ageInBlocks
                     << " instrument=" << synthEngine.getInstrumentName());
 
