@@ -30,6 +30,33 @@ the following folders — create any (or all) of them and drop one-shots in:
 
 You can also create your own folder name and reference it from a custom
 preset's `"sampler": { "instrument": "MyFolder" }` field.
+
+## Auto-importing samples (recommended)
+
+Don't rename files by hand. Use the bundled importer:
+
+```cmd
+python native\tools\import_samples.py "C:\path\to\loose\samples"
+```
+
+It will:
+
+1. **Detect the note** in each filename (e.g. `..._D#`, `Trumpet_F4`, `Rhodes A2`).
+2. **Pick the right sub-folder** from keywords (`brass`, `trumpet`, `rhodes`,
+   `808`, `glock`, `pad`, etc.) — these match the factory preset folders.
+3. **Detect a velocity layer** from tags like `pp / mf / ff / soft / hard`
+   or `_v90`.
+4. **Copy + rename** the file into
+   `Documents\DIDITAGAIN STUDIO\Samples\<Category>\<Category>_<Note>[_v<Vel>].wav`.
+
+Useful flags:
+
+- `--dry-run` &nbsp;preview the routing without copying
+- `--inbox` &nbsp;&nbsp;&nbsp;process everything in `Documents\DIDITAGAIN STUDIO\Inbox`
+- `--force` &nbsp;&nbsp;overwrite existing files
+
+After the importer finishes, reload the preset (or restart FL) — the engine
+re-scans the folder and immediately uses the new samples to build the sound.
 ## Filename convention
 
 ```
