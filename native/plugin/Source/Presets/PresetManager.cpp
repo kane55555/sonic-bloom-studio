@@ -171,6 +171,12 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
 
     using namespace dida::preset;
 
+    // Sampler instrument
+    requestedInstrument = {};
+    auto sampler = json.getProperty(key::sampler, juce::var());
+    if (sampler.isObject())
+        requestedInstrument = sampler.getProperty(key::instrument, "").toString();
+
     // Engine
     if (json.hasProperty(key::engineMode))
     {
