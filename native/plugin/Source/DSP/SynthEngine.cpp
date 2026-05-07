@@ -23,6 +23,7 @@ void SynthEngine::renderBlockWithFx(juce::AudioBuffer<float>& buffer,
                                     const juce::MidiBuffer& midi,
                                     int startSample, int numSamples)
 {
+    const juce::ScopedLock lock(voiceMutationLock);
     renderNextBlock(buffer, midi, startSample, numSamples);
     updateHeldNotes(midi);
     fx.process(buffer);
@@ -30,7 +31,7 @@ void SynthEngine::renderBlockWithFx(juce::AudioBuffer<float>& buffer,
 
 void SynthEngine::resetForPresetChange()
 {
-    const juce::ScopedLock lock(getCallbackLock());
+    const juce::ScopedLock lock(voiceMutationLock);
     if (! canSafelyResetVoices())
         return;
 
@@ -134,6 +135,8 @@ void SynthEngine::updateHeldNotes(const juce::MidiBuffer& midi)
 
 bool SynthEngine::setMaxPolyphony(int n)
 {
+    const juce::ScopedLock lock(voiceMutationLock);
+
     n = juce::jlimit(1, MAX_POLYPHONY, n);
     if (n == getNumVoices()) return true;
 
