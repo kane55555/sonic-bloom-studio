@@ -7,8 +7,10 @@ public:
     explicit SettingsPanel(juce::AudioProcessorValueTreeState& apvts)
         : ParameterPanel(apvts, "SETTINGS")
     {
+        const juce::StringArray qualityModes { "Draft", "Standard", "High" };
+
         const int playback = addGroup("PLAYBACK");
-        addChoice(playback, "Quality", "qualityMode", { "Draft", "Standard", "High" });
+        addChoice(playback, "Quality", "qualityMode", qualityModes);
         addKnob(playback, "Polyphony", "polyphony");
         addToggle(playback, "Mono", "monoMode");
         addKnob(playback, "Glide", "glideTime");
