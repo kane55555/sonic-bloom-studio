@@ -62,7 +62,6 @@ private:
     static bool midiBufferHasPhraseActivity(const juce::MidiBuffer& midi) noexcept;
     void updateHeldNotes(const juce::MidiBuffer& midi);
 
-    juce::CriticalSection voiceMutationLock;
     FxChain fx;
     std::array<std::array<HeldNote, 128>, 16> heldNotes {};
     bool    monoMode = false;
