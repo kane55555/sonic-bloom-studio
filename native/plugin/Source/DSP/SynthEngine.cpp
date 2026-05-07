@@ -30,7 +30,7 @@ void SynthEngine::renderBlockWithFx(juce::AudioBuffer<float>& buffer,
 
 void SynthEngine::resetForPresetChange()
 {
-    const juce::ScopedLock lock(getLock());
+    const juce::ScopedLock lock(getCallbackLock());
     if (! canSafelyResetVoices())
         return;
 
@@ -38,7 +38,7 @@ void SynthEngine::resetForPresetChange()
     const auto sampleRate = getSampleRate();
     forEachSynthVoice([](SynthVoice& v)
     {
-        v.clearCurrentNote();
+        v.resetNote();
     });
     forEachSynthVoice([sampleRate](SynthVoice& v)
     {
@@ -143,9 +143,10 @@ bool SynthEngine::setMaxPolyphony(int n)
     // Silence everything before mutating the voice list so we don't
     // delete a voice that's currently rendering audio.
     allNotesOff(0, false);
-    for (int i = 0; i < getNumVoices(); ++i)
-        if (auto* v = getVoice(i))
-            v->clearCurrentNote();
+    forEachSynthVoice([](SynthVoice& v)
+    {
+        v.resetNote();
+    });
 
     while (getNumVoices() > n)
         removeVoice(getNumVoices() - 1);

@@ -36,6 +36,9 @@ public:
 
     void prepare(double sampleRate, int samplesPerBlock);
 
+    // Public wrapper to expose protected SynthesiserVoice::clearCurrentNote().
+    void resetNote() noexcept { clearCurrentNote(); }
+
     // ---- Per-voice configuration (called by the processor each block) ----
     void setEngineMode(EngineMode m)     noexcept { engineMode = m; }
     void setOscALevel(float v)           noexcept { oscALevel = v; }
