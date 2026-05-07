@@ -67,6 +67,7 @@ const std::vector<EmbeddedPreset>& getAll()
         { "Warm Analog Bass", "Bass", kPreset_Warm_Analog_Bass },
         { "Wide Analog Pad", "Pad", kPreset_Wide_Analog_Pad },
         { "Wide Portamento Lead", "Lead", kPreset_Wide_Portamento_Lead },
+        { "Sampled Brass", "Brass", kPreset_Sampled_Brass },
     };
     return presets;
 }
