@@ -183,3 +183,23 @@ bool SynthEngine::setMonoMode(bool mono)
 
     return true;
 }
+
+bool SynthEngine::setInstrument(const juce::String& instrumentName)
+{
+    if (instrumentName == currentInstrumentName && activeMultisample != nullptr)
+        return true;
+
+    auto ms = instrumentName.isEmpty()
+        ? std::shared_ptr<const dida::Multisample>{}
+        : dida::SampleLibrary::loadInstrument(instrumentName);
+
+    activeMultisample = ms;
+    currentInstrumentName = instrumentName;
+
+    forEachSynthVoice([&](SynthVoice& v)
+    {
+        v.setMultisample(activeMultisample);
+    });
+
+    return ms != nullptr || instrumentName.isEmpty();
+}
