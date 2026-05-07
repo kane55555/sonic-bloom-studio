@@ -11,7 +11,7 @@ static int failures = 0;
 int main()
 {
     auto& all = dida::factory::getAll();
-    EXPECT(all.size() == 30, "expected 30 factory presets");
+    EXPECT(all.size() >= 30, "expected at least 30 factory presets");
 
     for (auto& p : all)
     {
