@@ -1,6 +1,7 @@
 #include "PresetManager.h"
 #include "PresetSchema.h"
 #include "FactoryPresets.h"
+#include "../DSP/SampleLibrary.h"
 
 #define DIDA_PRESET_MANAGER_LOG(message) \
     juce::Logger::writeToLog(juce::String("[DIDITAGAIN preset-manager] ") + (juce::String() << message))
@@ -12,6 +13,10 @@ PresetManager::PresetManager(juce::AudioProcessor& proc) : processor(proc)
     auto factoryDir = getFactoryPresetDirectory();
     if (! factoryDir.exists()) factoryDir.createDirectory();
     dida::factory::extractMissing(factoryDir);
+
+    // Make sure the user-facing samples folder exists so it's easy to find.
+    auto samplesRoot = dida::SampleLibrary::getSamplesRoot();
+    if (! samplesRoot.exists()) samplesRoot.createDirectory();
 
     scanPresetDirectory();
 }
