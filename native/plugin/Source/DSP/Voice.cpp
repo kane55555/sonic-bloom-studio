@@ -7,52 +7,58 @@ bool SynthVoice::canPlaySound(juce::SynthesiserSound*) { return true; }
 void SynthVoice::prepare(double sr, int /*samplesPerBlock*/)
 {
     sampleRate = sr;
-    oscA.prepare(sr);
-    oscB.prepare(sr);
-    subOsc.prepare(sr);
     filter.prepare(sr);
     ampEnv.prepare(sr);
     filterEnv.prepare(sr);
     modEnv.prepare(sr);
-
-    subOsc.setWaveform(Oscillator::Waveform::Sine);
     recalcGlideCoeff();
-}
-
-void SynthVoice::setUnison(int voices, float detune, float spread) noexcept
-{
-    oscA.setUnisonVoices(voices);
-    oscB.setUnisonVoices(voices);
-    oscA.setUnisonDetune(detune);
-    oscB.setUnisonDetune(detune);
-    oscA.setStereoSpread(spread);
-    oscB.setStereoSpread(spread);
+    reset();
 }
 
 void SynthVoice::recalcGlideCoeff() noexcept
 {
-    if (glideSeconds <= 0.0f)
-    {
-        glideCoeff = 0.0f; // instant
-        return;
-    }
-    // one-pole towards target, ~63% in glideSeconds.
+    if (glideSeconds <= 0.0f) { glideCoeff = 0.0f; return; }
     glideCoeff = std::exp(-1.0f / (static_cast<float>(sampleRate) * glideSeconds));
 }
+
+void SynthVoice::reset() noexcept
+{
+    loZone = hiZone = nullptr;
+    loReadPos = hiReadPos = 0.0;
+    loFinished = hiFinished = true;
+    isActive = false;
+    filter.reset();
+}
+
+static double midiToHzD(double m) { return 440.0 * std::pow(2.0, (m - 69.0) / 12.0); }
 
 void SynthVoice::startNote(int midiNoteNumber, float vel,
                            juce::SynthesiserSound*, int /*pitchWheel*/)
 {
     targetMidiNote = static_cast<float>(midiNoteNumber);
 
-    // If no note was held (idle), snap to target so we don't glide from 60.
-    if (!isActive || ampEnv.getStage() == ADSREnvelope::Stage::Idle)
+    if (! isActive || ampEnv.getStage() == ADSREnvelope::Stage::Idle)
         currentMidiNote = targetMidiNote;
 
     velocity = juce::jlimit(0.0f, 1.0f, vel);
     isActive = true;
-
     recalcGlideCoeff();
+
+    // Pick zones from the current multisample for this note + velocity.
+    loZone = hiZone = nullptr;
+    zoneXfade = 0.0f;
+
+    if (multisample && ! multisample->isEmpty())
+    {
+        const int playedMidi = juce::jlimit(0, 127,
+            midiNoteNumber + pitchOffsetSemis);
+        const int playedVel = juce::jlimit(1, 127, static_cast<int>(vel * 127.0f + 0.5f));
+        multisample->pickZonesForNote(playedMidi, playedVel, &loZone, &hiZone, zoneXfade);
+    }
+
+    loReadPos = hiReadPos = 0.0;
+    loFinished = (loZone == nullptr);
+    hiFinished = (hiZone == nullptr);
 
     ampEnv.noteOn();
     filterEnv.noteOn();
@@ -65,105 +71,124 @@ void SynthVoice::stopNote(float, bool allowTailOff)
     filterEnv.noteOff();
     modEnv.noteOff();
 
-    if (!allowTailOff)
+    if (! allowTailOff)
     {
         clearCurrentNote();
-        isActive = false;
+        reset();
     }
 }
 
 void SynthVoice::pitchWheelMoved(int) {}
 void SynthVoice::controllerMoved(int, int) {}
 
-float SynthVoice::renderSample()
+void SynthVoice::readZone(const dida::SampleZone& z, double readPos,
+                          float& outL, float& outR) const noexcept
 {
-    // ---- Glide / portamento ----
-    if (glideCoeff > 0.0f)
-        currentMidiNote = targetMidiNote + (currentMidiNote - targetMidiNote) * glideCoeff;
-    else
-        currentMidiNote = targetMidiNote;
+    const auto* L = z.buffer.getReadPointer(0);
+    const auto* R = z.buffer.getReadPointer(1);
+    const int n = z.buffer.getNumSamples();
 
-    currentFrequency = dida::midiToHz(currentMidiNote);
+    const int i0 = static_cast<int>(readPos);
+    if (i0 < 0 || i0 >= n - 1) { outL = outR = 0.0f; return; }
 
-    // ---- Update oscillator pitches (with per-osc octave/semi offsets) ----
-    const float fA = dida::midiToHz(currentMidiNote + (float) oscAPitchSemis);
-    const float fB = dida::midiToHz(currentMidiNote + (float) oscBPitchSemis);
-    oscA.setFrequency(fA);
-
-    if (engineMode == EngineMode::FM2)
-        oscB.setFrequency(fA * fmRatio);
-    else
-        oscB.setFrequency(fB);
-
-    subOsc.setFrequency(currentFrequency * 0.5f); // -1 octave from played note
-
-    // ---- Generate sources ----
-    float oscBSample = oscB.getNextSample();
-    float oscASample;
-
-    if (engineMode == EngineMode::FM2)
-    {
-        // Phase-mod the carrier (oscA) with modulator (oscB).
-        // Modulation index in radians; capped so it can't explode.
-        const float pm = oscBSample * fmAmount;
-        oscA.setPhaseOffset(pm);   // see Oscillator.h: per-sample phase offset
-        oscASample = oscA.getNextSample();
-    }
-    else
-    {
-        oscA.setPhaseOffset(0.0f);
-        oscASample = oscA.getNextSample();
-    }
-
-    const float subSample   = subOsc.getNextSample();
-    const float whiteNoise = juce::Random::getSystemRandom().nextFloat() * 2.0f - 1.0f;
-    const float noiseSample = noiseType == 1 ? noiseGen.next() : whiteNoise;
-
-    float mix = oscASample * oscALevel
-              + oscBSample * oscBLevel
-              + subSample  * subLevel
-              + noiseSample * noiseLevel;
-
-    // Soft pre-filter clip to keep the filter input bounded.
-    mix = std::tanh(mix * 0.9f);
-
-    // ---- Filter modulation: env amount + key tracking ----
-    const float filtEnvVal = filterEnv.getNextSample();
-    const float keyOffset  = (currentMidiNote - 60.0f) * filterKeyTrack * 100.0f; // ~1 oct per 12 semitones * keyTrack
-    float modulatedCutoff  = baseCutoff
-                             * std::pow(2.0f, filterEnvAmount * filtEnvVal * 4.0f) // ±4 octaves at full env
-                             + keyOffset;
-    modulatedCutoff = juce::jlimit(20.0f, 20000.0f, modulatedCutoff);
-    filter.setCutoff(modulatedCutoff);
-
-    const float filtered = filter.processSample(mix);
-
-    // ---- Amp envelope + velocity response ----
-    const float amp = ampEnv.getNextSample();
-    if (!ampEnv.isActive())
-    {
-        clearCurrentNote();
-        isActive = false;
-        return 0.0f;
-    }
-
-    const float velCurve = 0.3f + 0.7f * velocity; // never fully silent at low vel
-    return filtered * amp * velCurve;
+    const float frac = static_cast<float>(readPos - i0);
+    outL = L[i0] + (L[i0 + 1] - L[i0]) * frac;
+    outR = R[i0] + (R[i0 + 1] - R[i0]) * frac;
 }
 
 void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
                                  int startSample, int numSamples)
 {
-    if (!isActive) return;
+    if (! isActive) return;
 
     const int numCh = outputBuffer.getNumChannels();
 
+    // Compute playback rate: source must be resampled by srcSR/dstSR, then
+    // scaled by the pitch ratio between the played note and the zone root.
+    auto rateFor = [this](const dida::SampleZone* z) -> double
+    {
+        if (z == nullptr) return 1.0;
+        const double playedHz = midiToHzD(currentMidiNote + (double) pitchOffsetSemis);
+        const double rootHz   = midiToHzD((double) z->rootMidi);
+        const double pitchRatio = playedHz / rootHz;
+        return (z->sourceSampleRate / sampleRate) * pitchRatio;
+    };
+
     for (int s = startSample; s < startSample + numSamples; ++s)
     {
-        const float v = renderSample();
-        if (!isActive) break;
+        // Glide
+        if (glideCoeff > 0.0f)
+            currentMidiNote = targetMidiNote + (currentMidiNote - targetMidiNote) * glideCoeff;
+        else
+            currentMidiNote = targetMidiNote;
 
-        for (int ch = 0; ch < numCh; ++ch)
-            outputBuffer.addSample(ch, s, v);
+        loStep = rateFor(loZone);
+        hiStep = rateFor(hiZone);
+
+        float l = 0.0f, r = 0.0f;
+
+        if (loZone && ! loFinished)
+        {
+            float zl = 0.0f, zr = 0.0f;
+            readZone(*loZone, loReadPos, zl, zr);
+            const float w = (hiZone ? (1.0f - zoneXfade) : 1.0f);
+            l += zl * w;
+            r += zr * w;
+            loReadPos += loStep;
+            if (loReadPos >= (double) (loZone->buffer.getNumSamples() - 1))
+                loFinished = true;
+        }
+        if (hiZone && ! hiFinished)
+        {
+            float zl = 0.0f, zr = 0.0f;
+            readZone(*hiZone, hiReadPos, zl, zr);
+            const float w = zoneXfade;
+            l += zl * w;
+            r += zr * w;
+            hiReadPos += hiStep;
+            if (hiReadPos >= (double) (hiZone->buffer.getNumSamples() - 1))
+                hiFinished = true;
+        }
+
+        // Filter (mono-summed cutoff modulation, processed per channel)
+        const float fEnv = filterEnv.getNextSample();
+        const float keyOffset = (currentMidiNote - 60.0f) * filterKeyTrack * 100.0f;
+        float modCut = baseCutoff
+                     * std::pow(2.0f, filterEnvAmount * fEnv * 4.0f)
+                     + keyOffset;
+        modCut = juce::jlimit(20.0f, 20000.0f, modCut);
+        filter.setCutoff(modCut);
+
+        const float mono = 0.5f * (l + r);
+        const float filtered = filter.processSample(mono);
+        // Mix filtered mono signal back in to preserve filter character but keep stereo from samples.
+        l = 0.5f * (l + filtered);
+        r = 0.5f * (r + filtered);
+
+        // Amp envelope
+        const float amp = ampEnv.getNextSample();
+        const float velCurve = 0.3f + 0.7f * velocity;
+        const float gain = amp * velCurve;
+        l *= gain; r *= gain;
+
+        if (numCh >= 2)
+        {
+            outputBuffer.addSample(0, s, l);
+            outputBuffer.addSample(1, s, r);
+        }
+        else
+        {
+            outputBuffer.addSample(0, s, 0.5f * (l + r));
+        }
+
+        // Note ends when amp env idle, OR when both sources have fully played out.
+        const bool sampleSourceDone = (loZone == nullptr || loFinished)
+                                   && (hiZone == nullptr || hiFinished);
+        if (! ampEnv.isActive() || (sampleSourceDone && multisample))
+        {
+            clearCurrentNote();
+            reset();
+            break;
+        }
     }
 }
