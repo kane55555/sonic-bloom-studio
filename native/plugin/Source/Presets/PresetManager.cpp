@@ -79,9 +79,16 @@ void PresetManager::loadUserPresets()
 }
 
 // Helper: set an APVTS parameter from a juce::var, normalising the value.
+//
+// IMPORTANT: during preset load we deliberately use setValue() instead of
+// setValueNotifyingHost(). Notifying the host on every parameter would flood
+// FL Studio (and other DAWs) with what looks like a wall of automation
+// events, which keeps the host's transport "active" and prevents pause /
+// produces audible stutter while switching presets. APVTS still picks up the
+// new values through its attached parameter listeners, so the engine sees
+// the change on the next processBlock — we just don't pester the host.
 static void setParam(juce::AudioProcessor& proc, const char* id, const juce::var& v)
 {
-    // Walk parameters by ID via the host-style API.
     for (auto* param : proc.getParameters())
     {
         if (auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
@@ -90,23 +97,22 @@ static void setParam(juce::AudioProcessor& proc, const char* id, const juce::var
             {
                 if (v.isBool())
                 {
-                    withId->setValueNotifyingHost(v ? 1.0f : 0.0f);
+                    withId->setValue(v ? 1.0f : 0.0f);
                 }
                 else if (v.isString())
                 {
-                    // Choice parameter — try to map by text.
                     if (auto* choice = dynamic_cast<juce::AudioParameterChoice*>(withId))
                     {
                         const int idx = choice->choices.indexOf(v.toString(), true);
                         if (idx >= 0)
-                            choice->setValueNotifyingHost(choice->convertTo0to1(static_cast<float>(idx)));
+                            choice->setValue(choice->convertTo0to1(static_cast<float>(idx)));
                     }
                 }
                 else if (v.isDouble() || v.isInt())
                 {
                     const float fv = static_cast<float>((double) v);
                     if (auto* fp = dynamic_cast<juce::RangedAudioParameter*>(withId))
-                        fp->setValueNotifyingHost(fp->convertTo0to1(fv));
+                        fp->setValue(fp->convertTo0to1(fv));
                 }
                 return;
             }
