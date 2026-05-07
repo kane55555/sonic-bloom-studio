@@ -17,21 +17,22 @@
 //==============================================================================
 #include <JuceHeader.h>
 #include <memory>
+#include "Oscillator.h"
 #include "FilterBlock.h"
 #include "Envelope.h"
 #include "SampleLibrary.h"
 
 // Lightweight stand-ins so legacy editor/UI code that took an Oscillator&
-// reference still compiles. They store values but generate no audio.
+// reference still compiles. They accept the same calls but produce no audio
+// (sample playback is now the audio source).
 class LegacyOscillatorStub
 {
 public:
-    enum class Waveform { Sine, Triangle, Saw, Square, Pulse, SuperSaw, FmCarrier, Wavetable };
-    void setWaveform(Waveform w) noexcept { waveform = w; }
+    void setWaveform(Oscillator::Waveform w) noexcept { waveform = w; }
     void setDetuneCents(float c) noexcept { detuneCents = c; }
     void setPulseWidth(float p)  noexcept { pulseWidth  = p; }
 private:
-    Waveform waveform = Waveform::Saw;
+    Oscillator::Waveform waveform = Oscillator::Waveform::Saw;
     float detuneCents = 0.0f;
     float pulseWidth  = 0.5f;
 };
