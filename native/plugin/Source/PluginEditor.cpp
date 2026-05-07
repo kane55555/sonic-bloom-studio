@@ -43,6 +43,12 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
 
     setupTabs();
     switchTab(Tab::Synth);
+
+    // setSize() fires resized() before the child controls above exist. Some
+    // hosts (including FL Studio) won't immediately send another resize event,
+    // which leaves every child component at 0x0 and makes the editor look blank.
+    resized();
+    repaint();
 }
 
 DiditagainEditor::~DiditagainEditor() {}
@@ -201,12 +207,12 @@ void DiditagainEditor::resized()
 
     cycleTestButton.setBounds(pw - 470, 56, 110, 28);
 
-    int tabX = 280;
-    for (auto* btn : { &tabBrowser, &tabSynth, &tabMod, &tabFX, &tabSettings, &tabAccount })
-    {
-        btn->setBounds(tabX, 12, 82, 26);
-        tabX += 90;
-    }
+    tabBrowser.setBounds(280, 12, 82, 26);
+    tabSynth.setBounds(370, 12, 82, 26);
+    tabMod.setBounds(460, 12, 82, 26);
+    tabFX.setBounds(550, 12, 82, 26);
+    tabSettings.setBounds(640, 12, 82, 26);
+    tabAccount.setBounds(730, 12, 82, 26);
 
     auto content = juce::Rectangle<int>(8, 96, getWidth() - 16, getHeight() - 104);
 
