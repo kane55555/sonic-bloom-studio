@@ -7,8 +7,10 @@
 //==============================================================================
 #include <JuceHeader.h>
 #include <array>
+#include <memory>
 #include "Voice.h"
 #include "FxChain.h"
+#include "SampleLibrary.h"
 
 class DiditagainSynthSound : public juce::SynthesiserSound
 {
