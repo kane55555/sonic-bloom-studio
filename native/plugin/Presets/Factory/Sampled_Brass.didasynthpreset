@@ -1,0 +1,35 @@
+{
+  "presetVersion": 1,
+  "presetName": "Sampled Brass",
+  "author": "DIDITAGAIN",
+  "category": "Brass",
+  "tags": ["sample", "brass", "multisample"],
+  "description": "Plays the multisample folder named 'Brass'. Drop one-shots like Brass_C3.wav, Brass_F#3.wav into Documents/DIDITAGAIN STUDIO/Samples/Brass/ to hear it.",
+  "sampler": {
+    "instrument": "Brass"
+  },
+  "playMode": "poly",
+  "polyphony": 8,
+  "masterGain": 0.0,
+  "glideTime": 0.0,
+  "filter1": {
+    "type": "LP24",
+    "cutoff": 18000,
+    "resonance": 0.0,
+    "drive": 0.0,
+    "envAmount": 0.0,
+    "keyTrack": 0.0
+  },
+  "env1": { "attack": 0.005, "decay": 0.2, "sustain": 1.0, "release": 0.4 },
+  "env2": { "attack": 0.01,  "decay": 0.3, "sustain": 0.0, "release": 0.3 },
+  "env3": { "attack": 0.01,  "decay": 0.3, "sustain": 0.0, "release": 0.3 },
+  "fxChain": {
+    "chorusMix": 0.0,
+    "delayMix": 0.0,
+    "delayTime": 0.3,
+    "delayFeedback": 0.35,
+    "reverbMix": 0.15,
+    "reverbSize": 0.6,
+    "distortionAmount": 0.0
+  }
+}
