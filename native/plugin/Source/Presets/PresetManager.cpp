@@ -132,7 +132,7 @@ static void applyOscBlock(juce::AudioProcessor& proc, const juce::var& obj,
         for (auto* p : proc.getParameters())
             if (auto* c = dynamic_cast<juce::AudioParameterChoice*>(p))
                 if (c->paramID == wfId)
-                    c->setValueNotifyingHost(c->convertTo0to1(static_cast<float>(wf)));
+                    c->setValue(c->convertTo0to1(static_cast<float>(wf)));
     }
     if (obj.hasProperty("level"))       setParam(proc, lvlId,  obj.getProperty("level", 0.0));
     if (obj.hasProperty("detuneCents")) setParam(proc, detId,  obj.getProperty("detuneCents", 0.0));
@@ -195,7 +195,7 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
         for (auto* p : processor.getParameters())
             if (auto* c = dynamic_cast<juce::AudioParameterChoice*>(p))
                 if (c->paramID == "engineMode")
-                    c->setValueNotifyingHost(c->convertTo0to1(static_cast<float>(idx)));
+                    c->setValue(c->convertTo0to1(static_cast<float>(idx)));
     }
     if (json.hasProperty(key::masterGain)) setParam(processor, "masterGain", json.getProperty(key::masterGain, 0.0));
     if (json.hasProperty(key::polyphony))  setParam(processor, "polyphony",  json.getProperty(key::polyphony, 8));
@@ -239,7 +239,7 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
             for (auto* p : processor.getParameters())
                 if (auto* c = dynamic_cast<juce::AudioParameterChoice*>(p))
                     if (c->paramID == "filter1Type")
-                        c->setValueNotifyingHost(c->convertTo0to1(static_cast<float>(t)));
+                        c->setValue(c->convertTo0to1(static_cast<float>(t)));
         }
         setParam(processor, "filter1Cutoff",     f1.getProperty("cutoff",     8000.0));
         setParam(processor, "filter1Resonance",  f1.getProperty("resonance",  0.2));
