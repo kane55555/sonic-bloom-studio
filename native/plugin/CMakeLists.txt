@@ -9,6 +9,31 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # passes while building JUCE wrappers, so prefer embedded debug info.
 if(MSVC)
     set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "Embedded")
+
+    # Strip /GL (whole-program optimization) and /LTCG from ALL configs and ALL
+    # targets globally, BEFORE add_subdirectory(JUCE). The MSVC ICE in
+    # juce_FileChooser.cpp happens during the LTCG "Generating code" pass, so
+    # JUCE's own object libraries must also be compiled without /GL.
+    foreach(flag_var
+            CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_RELWITHDEBINFO
+            CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_DEBUG
+            CMAKE_C_FLAGS CMAKE_C_FLAGS_RELEASE CMAKE_C_FLAGS_RELWITHDEBINFO
+            CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_DEBUG)
+        string(REGEX REPLACE "/GL(-)?" "" ${flag_var} "${${flag_var}}")
+        string(REGEX REPLACE "/LTCG(:[A-Za-z]+)?" "" ${flag_var} "${${flag_var}}")
+        set(${flag_var} "${${flag_var}} /GL-" CACHE STRING "" FORCE)
+    endforeach()
+    foreach(flag_var
+            CMAKE_EXE_LINKER_FLAGS CMAKE_EXE_LINKER_FLAGS_RELEASE
+            CMAKE_SHARED_LINKER_FLAGS CMAKE_SHARED_LINKER_FLAGS_RELEASE
+            CMAKE_MODULE_LINKER_FLAGS CMAKE_MODULE_LINKER_FLAGS_RELEASE
+            CMAKE_STATIC_LINKER_FLAGS CMAKE_STATIC_LINKER_FLAGS_RELEASE)
+        string(REGEX REPLACE "/LTCG(:[A-Za-z]+)?" "" ${flag_var} "${${flag_var}}")
+        set(${flag_var} "${${flag_var}} /LTCG:OFF" CACHE STRING "" FORCE)
+    endforeach()
+
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE OFF)
 endif()
 
 # --- JUCE ---
