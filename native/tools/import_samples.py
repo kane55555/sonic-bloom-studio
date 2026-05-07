@@ -141,10 +141,33 @@ NOTE_RE = re.compile(
 LETTER_TO_SEMI = {"C":0,"D":2,"E":4,"F":5,"G":7,"A":9,"B":11}
 
 VEL_TAGS = [
-    (r"\bppp\b", 20), (r"\bpp\b", 40), (r"\bp\b", 55),
+    # Classical dynamics
+    (r"\bppp\b", 15), (r"\bpp\b", 35), (r"\bp\b", 55),
     (r"\bmp\b", 70), (r"\bmf\b", 90),
-    (r"\bf\b", 105), (r"\bff\b", 120), (r"\bfff\b", 127),
-    (r"\bsoft\b", 60), (r"\bmedium\b", 95), (r"\bhard\b", 120), (r"\bloud\b", 120),
+    (r"\bfff\b", 127), (r"\bff\b", 120), (r"\bf\b", 105),
+
+    # Loudness words
+    (r"\bsoft\b", 55), (r"\bquiet\b", 45), (r"\bgentle\b", 55), (r"\bmellow\b", 60),
+    (r"\bmedium\b", 90), (r"\bmed\b", 90), (r"\bnormal\b", 95),
+    (r"\bhard\b", 120), (r"\bloud\b", 120), (r"\bstrong\b", 115),
+    (r"\bheavy\b", 120), (r"\bbig\b", 115), (r"\bpunch", 118), (r"\bbright\b", 110),
+
+    # Articulation / length words (mapped to a sensible velocity)
+    (r"\bsustain", 95),    (r"\bsistain", 95),     # common typo "sistained"
+    (r"\blong\s*held\b", 90), (r"\blong[-_\s]?hold\b", 90),
+    (r"\blong\b", 90),     (r"\bheld\b", 90),
+    (r"\bshort\b", 110),   (r"\bquick\b", 110),    (r"\btight\b", 110),
+    (r"\bstab\b", 120),    (r"\bstabs\b", 120),    (r"\bhit\b", 122), (r"\bhits\b", 122),
+    (r"\bstacc", 115),     (r"\bspicc", 118),      # staccato / spiccato
+    (r"\blegato\b", 95),   (r"\bsforz", 125),      # legato / sforzando
+    (r"\bmarcato\b", 118), (r"\btenuto\b", 95),
+    (r"\baccent", 118),    (r"\battack", 118),
+    (r"\bswell", 80),      (r"\bcrescendo\b", 100),
+    (r"\bfade\b", 60),     (r"\bdecay\b", 70),
+    (r"\bbow", 95),        (r"\bpluck", 110),
+
+    # Register words (loose hint, not a true velocity)
+    (r"\blow\b", 80), (r"\bmid\b", 95), (r"\bhigh\b", 105),
 ]
 VEL_NUM_RE = re.compile(r"(?:^|[_\-\s])v(\d{1,3})\b", re.IGNORECASE)
 
