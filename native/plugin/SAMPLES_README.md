@@ -12,19 +12,24 @@ Create one folder per instrument under:
 Documents/DIDITAGAIN STUDIO/Samples/<InstrumentName>/
 ```
 
-For example:
+The folder name **must exactly match** the `instrument` field of a preset
+(case-sensitive on macOS/Linux). The plugin ships with factory presets for
+the following folders — create any (or all) of them and drop one-shots in:
 
-```
-Documents/DIDITAGAIN STUDIO/Samples/
-├── Brass/
-│   ├── Brass_C3.wav
-│   ├── Brass_F#3.wav
-│   ├── Brass_C4.wav
-│   └── Brass_F#4_v90.wav
-├── Strings/
-│   └── ...
-```
+**Brass:** `Brass`, `Trumpet`, `Trombone`, `FrenchHorn`, `Saxophone`
+**Strings:** `Strings`, `Violin`, `Cello`, `Pizzicato`, `Harp`
+**Keys:** `Piano`, `GrandPiano`, `RhodesEP`, `WurliEP`, `Organ`, `Clavinet`, `Harpsichord`
+**Mallet / tuned perc:** `Marimba`, `Vibraphone`, `Xylophone`, `Glockenspiel`, `MusicBox`, `Kalimba`
+**Guitar:** `AcousticGuitar`, `ElectricGuitar`, `NylonGuitar`
+**Bass:** `Bass`, `UprightBass`, `SynthBass`
+**Wind:** `Flute`, `Clarinet`, `Oboe`, `PanFlute`
+**Vocal:** `Choir`, `VocalAhh`, `VocalOoh`
+**Drums:** `DrumKit`, `808Kit`, `Percussion`
+**Synth / hybrid:** `SynthLead`, `SynthPad`, `SynthPluck`, `FX`
+**World:** `Sitar`
 
+You can also create your own folder name and reference it from a custom
+preset's `"sampler": { "instrument": "MyFolder" }` field.
 ## Filename convention
 
 ```
