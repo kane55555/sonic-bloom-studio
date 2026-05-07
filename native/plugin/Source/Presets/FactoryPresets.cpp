@@ -32,7 +32,87 @@ static const char* kPreset_Tight_Synth_Pluck = R"DIDA({"presetVersion":"1.0.0","
 static const char* kPreset_Warm_Analog_Bass = R"DIDA({"presetVersion":"1.0.0","author":"DIDITAGAIN","engineMode":"subtractive","playMode":"mono","masterGain":-3,"polyphony":1,"glideTime":0,"uiSkinRef":"default","tuningRef":"12tet-440","signature":"","presetName":"Warm Analog Bass","category":"Bass","tags":["analog","warm","classic"],"description":"Round analog-style bass","oscA":{"waveform":"saw","level":0.6,"detuneCents":0,"octave":-1,"semitone":0,"pulseWidth":0.5,"unisonVoices":1,"unisonDetune":0.2,"unisonSpread":0.5},"oscB":{"waveform":"square","level":0.4,"detuneCents":0,"octave":-1,"semitone":0,"pulseWidth":0.4,"unisonVoices":1,"unisonDetune":0.2,"unisonSpread":0.5},"subOsc":{"enabled":true,"level":0.5,"octave":-1},"noise":{"type":"white","level":0},"filter1":{"type":"LP24","cutoff":600,"resonance":0.25,"drive":0.1,"envAmount":0.4,"keyTrack":0},"filter2":{"type":"HP12","cutoff":80,"resonance":0,"drive":0,"envAmount":0,"keyTrack":0},"env1":{"attack":0.005,"decay":0.4,"sustain":0.6,"release":0.3},"env2":{"attack":0.01,"decay":0.5,"sustain":0.3,"release":0.5},"env3":{"attack":0.01,"decay":0.8,"sustain":0,"release":0.3},"lfo1":{"rate":1.0,"shape":"sine","sync":false,"depth":0.5},"lfo2":{"rate":0.5,"shape":"triangle","sync":false,"depth":0.5},"modMatrix":[],"fxChain":{"chorusMix":0,"chorusRate":1.0,"chorusDepth":0.3,"delayMix":0,"delayTime":0.3,"delayFeedback":0.4,"delaySync":false,"reverbMix":0,"reverbSize":0.5,"reverbDamping":0.5,"phaserMix":0,"phaserRate":0.5,"distortionAmount":0,"distortionType":"soft","compressorThreshold":-10,"compressorRatio":4,"eqLow":0,"eqMid":0,"eqHigh":0,"limiterCeiling":-0.3},"macroKnobs":[{"label":"Brightness","value":0.5,"mappings":[]},{"label":"Movement","value":0.5,"mappings":[]},{"label":"Space","value":0.5,"mappings":[]},{"label":"Dirt","value":0,"mappings":[]},{"label":"Attack","value":0.5,"mappings":[]},{"label":"Width","value":0.5,"mappings":[]},{"label":"Tone","value":0.5,"mappings":[]},{"label":"Mix","value":0.5,"mappings":[]}],"checksum":"f164068b63373bb8"})DIDA";
 static const char* kPreset_Wide_Analog_Pad = R"DIDA({"presetVersion":"1.0.0","author":"DIDITAGAIN","engineMode":"subtractive","playMode":"poly","masterGain":-3,"polyphony":8,"glideTime":0,"uiSkinRef":"default","tuningRef":"12tet-440","signature":"","presetName":"Wide Analog Pad","category":"Pad","tags":["analog","wide","warm"],"description":"Classic wide analog pad","oscA":{"waveform":"saw","level":0.5,"detuneCents":8,"octave":0,"semitone":0,"pulseWidth":0.5,"unisonVoices":3,"unisonDetune":0.4,"unisonSpread":0.9},"oscB":{"waveform":"square","level":0.3,"detuneCents":-8,"octave":0,"semitone":0,"pulseWidth":0.45,"unisonVoices":1,"unisonDetune":0.2,"unisonSpread":0.5},"subOsc":{"enabled":false,"level":0.5,"octave":-1},"noise":{"type":"white","level":0},"filter1":{"type":"LP24","cutoff":2000,"resonance":0.2,"drive":0,"envAmount":0.15,"keyTrack":0},"filter2":{"type":"HP12","cutoff":80,"resonance":0,"drive":0,"envAmount":0,"keyTrack":0},"env1":{"attack":0.8,"decay":1.0,"sustain":0.8,"release":2.5},"env2":{"attack":0.01,"decay":0.5,"sustain":0.3,"release":0.5},"env3":{"attack":0.01,"decay":0.8,"sustain":0,"release":0.3},"lfo1":{"rate":1.0,"shape":"sine","sync":false,"depth":0.5},"lfo2":{"rate":0.5,"shape":"triangle","sync":false,"depth":0.5},"modMatrix":[],"fxChain":{"chorusMix":0.4,"chorusRate":1.0,"chorusDepth":0.3,"delayMix":0,"delayTime":0.3,"delayFeedback":0.4,"delaySync":false,"reverbMix":0.4,"reverbSize":0.5,"reverbDamping":0.5,"phaserMix":0,"phaserRate":0.5,"distortionAmount":0,"distortionType":"soft","compressorThreshold":-10,"compressorRatio":4,"eqLow":0,"eqMid":0,"eqHigh":0,"limiterCeiling":-0.3},"macroKnobs":[{"label":"Brightness","value":0.5,"mappings":[]},{"label":"Movement","value":0.5,"mappings":[]},{"label":"Space","value":0.5,"mappings":[]},{"label":"Dirt","value":0,"mappings":[]},{"label":"Attack","value":0.5,"mappings":[]},{"label":"Width","value":0.5,"mappings":[]},{"label":"Tone","value":0.5,"mappings":[]},{"label":"Mix","value":0.5,"mappings":[]}],"checksum":"e308c9481bf9c7e1"})DIDA";
 static const char* kPreset_Wide_Portamento_Lead = R"DIDA({"presetVersion":"1.0.0","author":"DIDITAGAIN","engineMode":"subtractive","playMode":"mono","masterGain":-3,"polyphony":8,"glideTime":0.15,"uiSkinRef":"default","tuningRef":"12tet-440","signature":"","presetName":"Wide Portamento Lead","category":"Lead","tags":["portamento","wide","smooth"],"description":"Smooth gliding lead with stereo width","oscA":{"waveform":"saw","level":0.7,"detuneCents":0,"octave":0,"semitone":0,"pulseWidth":0.5,"unisonVoices":3,"unisonDetune":0.35,"unisonSpread":0.8},"oscB":{"waveform":"sine","level":0,"detuneCents":0,"octave":0,"semitone":0,"pulseWidth":0.5,"unisonVoices":1,"unisonDetune":0.2,"unisonSpread":0.5},"subOsc":{"enabled":false,"level":0.5,"octave":-1},"noise":{"type":"white","level":0},"filter1":{"type":"LP24","cutoff":5000,"resonance":0.3,"drive":0,"envAmount":0.2,"keyTrack":0},"filter2":{"type":"HP12","cutoff":80,"resonance":0,"drive":0,"envAmount":0,"keyTrack":0},"env1":{"attack":0.05,"decay":0.3,"sustain":0.8,"release":0.6},"env2":{"attack":0.01,"decay":0.5,"sustain":0.3,"release":0.5},"env3":{"attack":0.01,"decay":0.8,"sustain":0,"release":0.3},"lfo1":{"rate":1.0,"shape":"sine","sync":false,"depth":0.5},"lfo2":{"rate":0.5,"shape":"triangle","sync":false,"depth":0.5},"modMatrix":[],"fxChain":{"chorusMix":0.4,"chorusRate":1.0,"chorusDepth":0.3,"delayMix":0.15,"delayTime":0.3,"delayFeedback":0.4,"delaySync":false,"reverbMix":0,"reverbSize":0.5,"reverbDamping":0.5,"phaserMix":0,"phaserRate":0.5,"distortionAmount":0,"distortionType":"soft","compressorThreshold":-10,"compressorRatio":4,"eqLow":0,"eqMid":0,"eqHigh":0,"limiterCeiling":-0.3},"macroKnobs":[{"label":"Brightness","value":0.5,"mappings":[]},{"label":"Movement","value":0.5,"mappings":[]},{"label":"Space","value":0.5,"mappings":[]},{"label":"Dirt","value":0,"mappings":[]},{"label":"Attack","value":0.5,"mappings":[]},{"label":"Width","value":0.5,"mappings":[]},{"label":"Tone","value":0.5,"mappings":[]},{"label":"Mix","value":0.5,"mappings":[]}],"checksum":"cce627b59da5796d"})DIDA";
-static const char* kPreset_Sampled_Brass = R"DIDA({"presetVersion":1,"presetName":"Sampled Brass","author":"DIDITAGAIN","category":"Brass","tags":["sample","brass","multisample"],"description":"Plays the multisample folder named 'Brass'. See SAMPLES_README.md.","sampler":{"instrument":"Brass"},"playMode":"poly","polyphony":8,"masterGain":0.0,"glideTime":0.0,"filter1":{"type":"LP24","cutoff":18000,"resonance":0.0,"drive":0.0,"envAmount":0.0,"keyTrack":0.0},"env1":{"attack":0.005,"decay":0.2,"sustain":1.0,"release":0.4},"env2":{"attack":0.01,"decay":0.3,"sustain":0.0,"release":0.3},"env3":{"attack":0.01,"decay":0.3,"sustain":0.0,"release":0.3},"fxChain":{"chorusMix":0.0,"delayMix":0.0,"delayTime":0.3,"delayFeedback":0.35,"reverbMix":0.15,"reverbSize":0.6,"distortionAmount":0.0}})DIDA";
+// ---------------------------------------------------------------------------
+//  Sampler presets — each one points at a folder under
+//      Documents/DIDITAGAIN STUDIO/Samples/<InstrumentName>/
+//  Drop one-shots into the matching folder with names like
+//  "Brass_C3.wav", "Piano_F#4_v100.wav" etc. (see SAMPLES_README.md).
+// ---------------------------------------------------------------------------
+#define DIDA_SAMPLER_PRESET(varName, displayName, folder, category, attack, release, reverbMix) \
+    static const char* varName = R"DIDA({"presetVersion":1,"presetName":")" displayName \
+    R"(","author":"DIDITAGAIN","category":")" category \
+    R"(","tags":["sample","multisample",")" folder \
+    R"("],"description":"Plays the multisample folder named ')" folder \
+    R"('. Drop audio one-shots into Documents/DIDITAGAIN STUDIO/Samples/)" folder \
+    R"(/.","sampler":{"instrument":")" folder \
+    R"("},"playMode":"poly","polyphony":16,"masterGain":0.0,"glideTime":0.0,)" \
+    R"("filter1":{"type":"LP24","cutoff":18000,"resonance":0.0,"drive":0.0,"envAmount":0.0,"keyTrack":0.0},)" \
+    R"("env1":{"attack":)" attack R"(,"decay":0.2,"sustain":1.0,"release":)" release R"(},)" \
+    R"("env2":{"attack":0.01,"decay":0.3,"sustain":0.0,"release":0.3},)" \
+    R"("env3":{"attack":0.01,"decay":0.3,"sustain":0.0,"release":0.3},)" \
+    R"("fxChain":{"chorusMix":0.0,"delayMix":0.0,"delayTime":0.3,"delayFeedback":0.35,"reverbMix":)" reverbMix R"(,"reverbSize":0.6,"distortionAmount":0.0}})DIDA";
+
+// Brass family
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Brass,         "Sampled Brass",          "Brass",          "Brass",   "0.005", "0.4",  "0.15")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Trumpet,       "Sampled Trumpet",        "Trumpet",        "Brass",   "0.01",  "0.3",  "0.18")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Trombone,      "Sampled Trombone",       "Trombone",       "Brass",   "0.02",  "0.4",  "0.18")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_FrenchHorn,    "Sampled French Horn",    "FrenchHorn",     "Brass",   "0.03",  "0.5",  "0.22")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Saxophone,     "Sampled Saxophone",      "Saxophone",      "Brass",   "0.01",  "0.35", "0.15")
+
+// Strings family
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Strings,       "Sampled Strings",        "Strings",        "Strings", "0.15",  "0.8",  "0.25")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Violin,        "Sampled Violin",         "Violin",         "Strings", "0.05",  "0.5",  "0.2")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Cello,         "Sampled Cello",          "Cello",          "Strings", "0.08",  "0.6",  "0.22")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Pizzicato,     "Sampled Pizzicato",      "Pizzicato",      "Strings", "0.001", "0.3",  "0.18")
+
+// Keys family
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Piano,         "Sampled Piano",          "Piano",          "Keys",    "0.001", "0.5",  "0.18")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_GrandPiano,    "Sampled Grand Piano",    "GrandPiano",     "Keys",    "0.001", "0.6",  "0.2")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_RhodesEP,      "Sampled Rhodes EP",      "RhodesEP",       "Keys",    "0.001", "0.6",  "0.18")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_WurliEP,       "Sampled Wurli EP",       "WurliEP",        "Keys",    "0.001", "0.4",  "0.15")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Organ,         "Sampled Organ",          "Organ",          "Keys",    "0.005", "0.2",  "0.15")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Clavinet,      "Sampled Clavinet",       "Clavinet",       "Keys",    "0.001", "0.25", "0.1")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Harpsichord,   "Sampled Harpsichord",    "Harpsichord",    "Keys",    "0.001", "0.3",  "0.12")
+
+// Mallet / tuned percussion
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Marimba,       "Sampled Marimba",        "Marimba",        "Mallet",  "0.001", "0.4",  "0.15")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Vibraphone,    "Sampled Vibraphone",     "Vibraphone",     "Mallet",  "0.001", "1.2",  "0.2")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Xylophone,     "Sampled Xylophone",      "Xylophone",      "Mallet",  "0.001", "0.3",  "0.15")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Glockenspiel,  "Sampled Glockenspiel",   "Glockenspiel",   "Mallet",  "0.001", "1.0",  "0.25")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_MusicBox,      "Sampled Music Box",      "MusicBox",       "Mallet",  "0.001", "1.5",  "0.3")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Kalimba,       "Sampled Kalimba",        "Kalimba",        "Mallet",  "0.001", "0.6",  "0.18")
+
+// Plucked / strung
+DIDA_SAMPLER_PRESET(kPreset_Sampled_AcousticGtr,   "Sampled Acoustic Guitar","AcousticGuitar", "Guitar",  "0.001", "0.4",  "0.15")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_ElectricGtr,   "Sampled Electric Guitar","ElectricGuitar", "Guitar",  "0.001", "0.4",  "0.12")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_NylonGtr,      "Sampled Nylon Guitar",   "NylonGuitar",    "Guitar",  "0.001", "0.4",  "0.15")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Bass,          "Sampled Bass",           "Bass",           "Bass",    "0.001", "0.3",  "0.05")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_UprightBass,   "Sampled Upright Bass",   "UprightBass",    "Bass",    "0.001", "0.3",  "0.1")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Harp,          "Sampled Harp",           "Harp",           "Strings", "0.001", "1.5",  "0.25")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Sitar,         "Sampled Sitar",          "Sitar",          "World",   "0.001", "0.8",  "0.2")
+
+// Wind
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Flute,         "Sampled Flute",          "Flute",          "Wind",    "0.02",  "0.3",  "0.2")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Clarinet,      "Sampled Clarinet",       "Clarinet",       "Wind",    "0.02",  "0.3",  "0.15")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Oboe,          "Sampled Oboe",           "Oboe",           "Wind",    "0.02",  "0.3",  "0.18")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_PanFlute,      "Sampled Pan Flute",      "PanFlute",       "Wind",    "0.02",  "0.4",  "0.25")
+
+// Vocal / choir
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Choir,         "Sampled Choir",          "Choir",          "Vocal",   "0.2",   "1.0",  "0.3")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_VocalAhh,      "Sampled Vocal Ahh",      "VocalAhh",       "Vocal",   "0.05",  "0.6",  "0.25")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_VocalOoh,      "Sampled Vocal Ooh",      "VocalOoh",       "Vocal",   "0.05",  "0.6",  "0.25")
+
+// Percussion / drum kit
+DIDA_SAMPLER_PRESET(kPreset_Sampled_DrumKit,       "Sampled Drum Kit",       "DrumKit",        "Drums",   "0.001", "0.2",  "0.05")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_808Kit,        "Sampled 808 Kit",        "808Kit",         "Drums",   "0.001", "0.4",  "0.0")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_Percussion,    "Sampled Percussion",     "Percussion",     "Drums",   "0.001", "0.3",  "0.1")
+
+// Synth / hybrid sample folders (use these for your own one-shot leads, pads, etc.)
+DIDA_SAMPLER_PRESET(kPreset_Sampled_SynthLead,     "Sampled Synth Lead",     "SynthLead",      "Lead",    "0.001", "0.4",  "0.15")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_SynthPad,      "Sampled Synth Pad",      "SynthPad",       "Pad",     "0.3",   "1.5",  "0.35")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_SynthPluck,    "Sampled Synth Pluck",    "SynthPluck",     "Pluck",   "0.001", "0.3",  "0.18")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_SynthBass,     "Sampled Synth Bass",     "SynthBass",      "Bass",    "0.001", "0.25", "0.05")
+DIDA_SAMPLER_PRESET(kPreset_Sampled_FX,            "Sampled FX",             "FX",             "FX",      "0.001", "1.0",  "0.3")
 
 const std::vector<EmbeddedPreset>& getAll()
 {
@@ -67,7 +147,51 @@ const std::vector<EmbeddedPreset>& getAll()
         { "Warm Analog Bass", "Bass", kPreset_Warm_Analog_Bass },
         { "Wide Analog Pad", "Pad", kPreset_Wide_Analog_Pad },
         { "Wide Portamento Lead", "Lead", kPreset_Wide_Portamento_Lead },
-        { "Sampled Brass", "Brass", kPreset_Sampled_Brass },
+        // ---- Sampler presets (one folder per instrument under Documents/DIDITAGAIN STUDIO/Samples/) ----
+        { "Sampled Brass",           "Brass",   kPreset_Sampled_Brass },
+        { "Sampled Trumpet",         "Brass",   kPreset_Sampled_Trumpet },
+        { "Sampled Trombone",        "Brass",   kPreset_Sampled_Trombone },
+        { "Sampled French Horn",     "Brass",   kPreset_Sampled_FrenchHorn },
+        { "Sampled Saxophone",       "Brass",   kPreset_Sampled_Saxophone },
+        { "Sampled Strings",         "Strings", kPreset_Sampled_Strings },
+        { "Sampled Violin",          "Strings", kPreset_Sampled_Violin },
+        { "Sampled Cello",           "Strings", kPreset_Sampled_Cello },
+        { "Sampled Pizzicato",       "Strings", kPreset_Sampled_Pizzicato },
+        { "Sampled Harp",            "Strings", kPreset_Sampled_Harp },
+        { "Sampled Piano",           "Keys",    kPreset_Sampled_Piano },
+        { "Sampled Grand Piano",     "Keys",    kPreset_Sampled_GrandPiano },
+        { "Sampled Rhodes EP",       "Keys",    kPreset_Sampled_RhodesEP },
+        { "Sampled Wurli EP",        "Keys",    kPreset_Sampled_WurliEP },
+        { "Sampled Organ",           "Keys",    kPreset_Sampled_Organ },
+        { "Sampled Clavinet",        "Keys",    kPreset_Sampled_Clavinet },
+        { "Sampled Harpsichord",     "Keys",    kPreset_Sampled_Harpsichord },
+        { "Sampled Marimba",         "Mallet",  kPreset_Sampled_Marimba },
+        { "Sampled Vibraphone",      "Mallet",  kPreset_Sampled_Vibraphone },
+        { "Sampled Xylophone",       "Mallet",  kPreset_Sampled_Xylophone },
+        { "Sampled Glockenspiel",    "Mallet",  kPreset_Sampled_Glockenspiel },
+        { "Sampled Music Box",       "Mallet",  kPreset_Sampled_MusicBox },
+        { "Sampled Kalimba",         "Mallet",  kPreset_Sampled_Kalimba },
+        { "Sampled Acoustic Guitar", "Guitar",  kPreset_Sampled_AcousticGtr },
+        { "Sampled Electric Guitar", "Guitar",  kPreset_Sampled_ElectricGtr },
+        { "Sampled Nylon Guitar",    "Guitar",  kPreset_Sampled_NylonGtr },
+        { "Sampled Bass",            "Bass",    kPreset_Sampled_Bass },
+        { "Sampled Upright Bass",    "Bass",    kPreset_Sampled_UprightBass },
+        { "Sampled Sitar",           "World",   kPreset_Sampled_Sitar },
+        { "Sampled Flute",           "Wind",    kPreset_Sampled_Flute },
+        { "Sampled Clarinet",        "Wind",    kPreset_Sampled_Clarinet },
+        { "Sampled Oboe",            "Wind",    kPreset_Sampled_Oboe },
+        { "Sampled Pan Flute",       "Wind",    kPreset_Sampled_PanFlute },
+        { "Sampled Choir",           "Vocal",   kPreset_Sampled_Choir },
+        { "Sampled Vocal Ahh",       "Vocal",   kPreset_Sampled_VocalAhh },
+        { "Sampled Vocal Ooh",       "Vocal",   kPreset_Sampled_VocalOoh },
+        { "Sampled Drum Kit",        "Drums",   kPreset_Sampled_DrumKit },
+        { "Sampled 808 Kit",         "Drums",   kPreset_Sampled_808Kit },
+        { "Sampled Percussion",      "Drums",   kPreset_Sampled_Percussion },
+        { "Sampled Synth Lead",      "Lead",    kPreset_Sampled_SynthLead },
+        { "Sampled Synth Pad",       "Pad",     kPreset_Sampled_SynthPad },
+        { "Sampled Synth Pluck",     "Pluck",   kPreset_Sampled_SynthPluck },
+        { "Sampled Synth Bass",      "Bass",    kPreset_Sampled_SynthBass },
+        { "Sampled FX",              "FX",      kPreset_Sampled_FX },
     };
     return presets;
 }
