@@ -4,6 +4,13 @@ project(DIDITAGAIN_STUDIO VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Keep MSVC preview/stable toolchains away from shared PDB/type-server paths.
+# The VS 2026 Insider linker has been crashing in PDB/type-server and LTCG
+# passes while building JUCE wrappers, so prefer embedded debug info.
+if(MSVC)
+    set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "Embedded")
+endif()
+
 # --- JUCE ---
 # Set JUCE_DIR to your local JUCE installation path
 # e.g. cmake -DJUCE_DIR=C:/JUCE ..
@@ -89,9 +96,12 @@ target_link_libraries(DIDITAGAIN_STUDIO
         juce::juce_gui_basics
         juce::juce_gui_extra
     PUBLIC
-        juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags
 )
+
+if(NOT MSVC)
+    target_link_libraries(DIDITAGAIN_STUDIO PUBLIC juce::juce_recommended_config_flags)
+endif()
 
 # Disable LTO — MSVC ICE on FactoryPresets.cpp raw-string literals during link-time codegen
 set_target_properties(DIDITAGAIN_STUDIO PROPERTIES
@@ -104,6 +114,22 @@ set_target_properties(DIDITAGAIN_STUDIO PROPERTIES
 # enabled. Keep DSP/shared code optimized, but compile only the fragile preset
 # TU and thin format wrappers without optimisation/LTCG.
 if(MSVC)
+    target_compile_options(DIDITAGAIN_STUDIO PUBLIC
+        /EHsc
+        /MP
+        /GL-
+        /Gy-
+        /Gw-
+        /Z7
+        $<$<CONFIG:Release>:/Od>
+        $<$<CONFIG:Release>:/Ob0>
+    )
+
+    target_link_options(DIDITAGAIN_STUDIO PUBLIC
+        /LTCG:OFF
+        /DEBUG:NONE
+    )
+
     set_source_files_properties(Source/Presets/FactoryPresets.cpp PROPERTIES
         COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-;/Z7"
     )
