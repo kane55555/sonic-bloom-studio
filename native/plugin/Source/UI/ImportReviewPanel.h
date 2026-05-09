@@ -337,6 +337,15 @@ private:
         auto sampleRel = juce::String("Samples/")
             + destSample.getRelativePathFrom(samplesRoot).replaceCharacter('\\', '/');
 
+        dida::SampleLibrary::invalidateCache();
+        if (dida::SampleLibrary::loadSampleSource(sampleRel, rootMidi, name) == nullptr)
+        {
+            juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+                "Import failed", "The sample was copied but the audio engine could not read it: "
+                    + destSample.getFileName() + "\n\nTry exporting it as a standard WAV or AIFF file and import again.");
+            return false;
+        }
+
         dida::preset::HybridPresetGenerator::Inputs in;
         in.category         = category;
         in.presetName       = name;
@@ -365,7 +374,7 @@ private:
             return false;
         }
 
-        // Drop any cached multisample so the new folder is picked up immediately.
+        // Drop any cached multisample so the new file is picked up immediately.
         dida::SampleLibrary::invalidateCache();
         presetManager->scanPresetDirectory();
         const int importedIndex = presetManager->findPresetIndexByFile(presetFile);
