@@ -137,7 +137,6 @@ juce::String AudioCropPanel::inferCategory(const juce::File& f)
 
 int AudioCropPanel::inferRootMidi(const juce::String& name, juce::String& outNoteText)
 {
-    juce::Regex r;
     // Look for _C3, _F#3, _Bb4 etc.
     auto upper = name;
     juce::StringArray notes { "C","C#","Db","D","D#","Eb","E","F","F#","Gb","G","G#","Ab","A","A#","Bb","B" };
