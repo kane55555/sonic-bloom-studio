@@ -1,7 +1,16 @@
 #include "PresetManager.h"
 #include "PresetSchema.h"
 #include "FactoryPresets.h"
+#include "HybridPresetV2.h"
+#include "PresetMigration.h"
 #include "../DSP/SampleLibrary.h"
+
+// JUCE made AudioParameterChoice::setValue() private to discourage direct
+// writes; it's still accessible through the AudioProcessorParameter base.
+static inline void setParamRaw(juce::AudioProcessorParameter* p, float normalised)
+{
+    if (p != nullptr) p->setValue(normalised);
+}
 
 #define DIDA_PRESET_MANAGER_LOG(message) \
     juce::Logger::writeToLog(juce::String("[DIDITAGAIN preset-manager] ") + (juce::String() << message))
