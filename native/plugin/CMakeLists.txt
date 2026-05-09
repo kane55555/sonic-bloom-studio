@@ -32,15 +32,25 @@ if(MSVC)
     # targets globally, BEFORE add_subdirectory(JUCE). The MSVC ICE in
     # juce_FileChooser.cpp happens during the LTCG "Generating code" pass, so
     # JUCE's own object libraries must also be compiled without /GL.
+    # ClangCL crashes in "Live DEBUG_VALUE analysis" when /Z7 (CodeView) debug
+    # info is requested in Release. Detect ClangCL and use no debug info; for
+    # MSVC proper, keep /Z7 (embedded) to dodge MSVC 14.51 PDB/type-server ICEs.
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        set(DIDA_DEBUG_FLAG "")
+        set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "" CACHE STRING "" FORCE)
+    else()
+        set(DIDA_DEBUG_FLAG "/Z7")
+    endif()
+
     foreach(flag_var
             CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_RELWITHDEBINFO
             CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_DEBUG
             CMAKE_C_FLAGS CMAKE_C_FLAGS_RELEASE CMAKE_C_FLAGS_RELWITHDEBINFO
             CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_DEBUG)
-        string(REGEX REPLACE "/Z[iI]" "/Z7" ${flag_var} "${${flag_var}}")
+        string(REGEX REPLACE "/Z[iI7]" "" ${flag_var} "${${flag_var}}")
         string(REGEX REPLACE "/GL(-)?" "" ${flag_var} "${${flag_var}}")
         string(REGEX REPLACE "/LTCG(:[A-Za-z]+)?" "" ${flag_var} "${${flag_var}}")
-        set(${flag_var} "${${flag_var}} /Z7 /GL-" CACHE STRING "" FORCE)
+        set(${flag_var} "${${flag_var}} ${DIDA_DEBUG_FLAG} /GL-" CACHE STRING "" FORCE)
     endforeach()
     foreach(flag_var
             CMAKE_EXE_LINKER_FLAGS CMAKE_EXE_LINKER_FLAGS_RELEASE
