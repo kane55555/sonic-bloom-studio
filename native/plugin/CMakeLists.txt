@@ -189,32 +189,9 @@ target_sources(DIDITAGAIN_STUDIO PRIVATE
     Source/UI/MainSynthPanel.cpp
     Source/UI/ParameterPanel.cpp
     Source/UI/AudioCropPanel.cpp
-)
-
-# Compile the preset browser outside the plugin target so this lightweight UI
-# translation unit does not inherit audio-processor module availability.
-add_library(DIDITAGAIN_UI_BROWSER OBJECT
     Source/UI/BrowserComponent.cpp
     Source/UI/PresetBrowser.cpp
 )
-
-target_include_directories(DIDITAGAIN_UI_BROWSER PRIVATE
-    Source
-    ${JUCE_DIR}/modules
-)
-
-target_compile_definitions(DIDITAGAIN_UI_BROWSER PRIVATE
-    JUCE_MODULE_AVAILABLE_juce_core=1
-    JUCE_MODULE_AVAILABLE_juce_data_structures=1
-    JUCE_MODULE_AVAILABLE_juce_events=1
-    JUCE_MODULE_AVAILABLE_juce_graphics=1
-    JUCE_MODULE_AVAILABLE_juce_gui_basics=1
-    JUCE_WEB_BROWSER=0
-    JUCE_USE_CURL=0
-    JUCE_DISPLAY_SPLASH_SCREEN=0
-)
-
-target_sources(DIDITAGAIN_STUDIO PRIVATE $<TARGET_OBJECTS:DIDITAGAIN_UI_BROWSER>)
 
 target_include_directories(DIDITAGAIN_STUDIO PRIVATE Source)
 
