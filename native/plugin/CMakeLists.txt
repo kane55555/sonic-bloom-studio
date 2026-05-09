@@ -125,8 +125,6 @@ target_compile_definitions(DIDITAGAIN_STUDIO PUBLIC
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0
     JUCE_DISPLAY_SPLASH_SCREEN=0
-    JUCE_PLUGINHOST_ARA=0
-    JUCE_PLUGINHOST_LV2=0
 )
 
 target_link_libraries(DIDITAGAIN_STUDIO
@@ -144,9 +142,23 @@ target_link_libraries(DIDITAGAIN_STUDIO
         juce::juce_graphics
         juce::juce_gui_basics
         juce::juce_gui_extra
-    PUBLIC
-        juce::juce_recommended_warning_flags
 )
+
+function(_dida_remove_forbidden_defs target_name)
+    if(TARGET ${target_name})
+        foreach(_dida_defs_property IN ITEMS COMPILE_DEFINITIONS INTERFACE_COMPILE_DEFINITIONS)
+            get_target_property(_dida_defs ${target_name} ${_dida_defs_property})
+            if(_dida_defs)
+                list(FILTER _dida_defs EXCLUDE REGEX "ARA|LV2")
+                set_property(TARGET ${target_name} PROPERTY ${_dida_defs_property} "${_dida_defs}")
+            endif()
+        endforeach()
+    endif()
+endfunction()
+
+foreach(_dida_defs_target IN ITEMS DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 juce_audio_plugin_client_VST3)
+    _dida_remove_forbidden_defs(${_dida_defs_target})
+endforeach()
 
 # ---------------------------------------------------------------------------
 # ClangCL workaround: the optimizer has been crashing on Release builds.
