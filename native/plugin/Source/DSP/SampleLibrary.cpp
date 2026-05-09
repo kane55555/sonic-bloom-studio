@@ -271,34 +271,8 @@ std::shared_ptr<const Multisample> SampleLibrary::loadInstrument(const juce::Str
         }
 
         SampleZone zone;
-        zone.sourceSampleRate = reader->sampleRate > 0 ? reader->sampleRate : 44100.0;
-        zone.rootMidi = rootMidi;
-        zone.loVel = 0;
-        zone.hiVel = hiVel;
-        zone.fileName = file.getFileName();
-
-        const int numSamples = static_cast<int>(reader->lengthInSamples);
-        if (numSamples <= 0) continue;
-
-        zone.buffer.setSize(2, numSamples);
-        zone.buffer.clear();
-
-        // Read into stereo buffer; mirror mono to both channels.
-        juce::AudioBuffer<float> tmp(static_cast<int>(reader->numChannels), numSamples);
-        reader->read(&tmp, 0, numSamples, 0, true, true);
-
-        if (reader->numChannels == 1)
-        {
-            zone.buffer.copyFrom(0, 0, tmp, 0, 0, numSamples);
-            zone.buffer.copyFrom(1, 0, tmp, 0, 0, numSamples);
-        }
-        else
-        {
-            zone.buffer.copyFrom(0, 0, tmp, 0, 0, numSamples);
-            zone.buffer.copyFrom(1, 0, tmp, 1, 0, numSamples);
-        }
-
-        ms->zones.push_back(std::move(zone));
+        if (readSampleZoneFromFile(file, rootMidi, hiVel, zone))
+            ms->zones.push_back(std::move(zone));
     }
 
     if (ms->zones.empty()) return nullptr;
