@@ -11,6 +11,7 @@
 #include "UI/AccountPanel.h"
 #include "UI/PresetBrowser.h"
 #include "Debug/PresetCycleTester.h"
+#include "DSP/SampleLibrary.h"
 
 class DiditagainEditor : public juce::AudioProcessorEditor
 {

@@ -188,9 +188,15 @@ namespace {
 
         auto root = SampleLibrary::getSamplesRoot();
         if (src.startsWithIgnoreCase("Samples/"))
-            return root.getChildFile(src.substring(8));
+            file = root.getChildFile(src.substring(8));
+        else
+            file = root.getChildFile(src);
 
-        return root.getChildFile(src);
+        if (! file.existsAsFile())
+            juce::Logger::writeToLog("[DIDITAGAIN sample] missing source file: " + file.getFullPathName()
+                + " from preset source=" + sourcePath);
+
+        return file;
     }
 
     bool readSampleZoneFromFile(const juce::File& file, int rootMidi, int hiVel, SampleZone& zone)

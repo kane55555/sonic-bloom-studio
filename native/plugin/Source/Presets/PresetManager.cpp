@@ -225,6 +225,16 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
                     break;
                 }
             }
+            if (requestedSampleSource.isEmpty() && p.hasSourceImport && p.sourceSamplePath.isNotEmpty())
+            {
+                requestedSampleSource = p.sourceSamplePath.replace("\\", "/");
+                requestedSampleRootMidi = juce::jlimit(0, 127, p.sourceRootMidi);
+                requestedSampleDisplayName = p.name;
+                setParam(processor, "oscALevel", 1.0);
+                setParam(processor, "oscBLevel", 0.0);
+                setParam(processor, "subOscEnabled", false);
+                setParam(processor, "noiseLevel", 0.0);
+            }
             setParam(processor, "filter1Cutoff",      p.globalFilter.cutoff);
             setParam(processor, "filter1Resonance",   p.globalFilter.resonance);
             setParam(processor, "fxReverbMix",        p.effects.reverbMix);
@@ -377,6 +387,16 @@ juce::String PresetManager::getPresetName(int index) const
     if (index >= 0 && index < static_cast<int>(presets.size()))
         return presets[index].name;
     return "Init";
+}
+
+int PresetManager::findPresetIndexByFile(const juce::File& file) const
+{
+    const auto target = file.getFullPathName();
+    for (int i = 0; i < static_cast<int>(presets.size()); ++i)
+        if (juce::File(presets[i].filePath).getFullPathName() == target)
+            return i;
+
+    return -1;
 }
 
 void PresetManager::toggleFavorite(int index)
