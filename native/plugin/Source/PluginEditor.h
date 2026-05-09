@@ -10,6 +10,7 @@
 #include "UI/SettingsPanel.h"
 #include "UI/AccountPanel.h"
 #include "UI/PresetBrowser.h"
+#include "UI/AudioCropPanel.h"
 #include "DSP/SampleLibrary.h"
 
 // Visible top-level tabs. Everything else lives in the header MENU dropdown.
