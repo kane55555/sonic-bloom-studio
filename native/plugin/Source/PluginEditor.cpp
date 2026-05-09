@@ -212,7 +212,8 @@ void DiditagainEditor::paint(juce::Graphics& g)
     };
     tabUnder(tabBrowser, currentTab == Tab::Browser);
     tabUnder(tabLayers,  currentTab == Tab::Layers);
-    tabUnder(tabFX,      currentTab == Tab::FX);
+    tabUnder(tabFX,        currentTab == Tab::FX);
+    tabUnder(tabAudioCrop, currentTab == Tab::AudioCrop);
 
     // Macro band background
     if (macroPanel)
