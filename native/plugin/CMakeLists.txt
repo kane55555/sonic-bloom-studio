@@ -223,7 +223,7 @@ if(MSVC)
         set_source_files_properties(Source/Presets/PresetTemplateFactory.cpp PROPERTIES
             COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-"
         )
-        foreach(dida_format_target DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
+        foreach(dida_format_target DIDITAGAIN_UI_BROWSER DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
             if(TARGET ${dida_format_target})
                 set_target_properties(${dida_format_target} PROPERTIES
                     INTERPROCEDURAL_OPTIMIZATION FALSE
@@ -248,7 +248,7 @@ if(MSVC)
             /GL-
             /Gy-
             /Gw-
-            /Z7
+            $<$<CONFIG:Debug>:/Z7>
             $<$<CONFIG:Release>:/Od>
             $<$<CONFIG:Release>:/Ob0>
         )
@@ -259,21 +259,21 @@ if(MSVC)
         )
 
         set_source_files_properties(Source/Presets/FactoryPresets.cpp PROPERTIES
-            COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-;/Z7"
+            COMPILE_OPTIONS "$<$<CONFIG:Release>:/Od>;$<$<CONFIG:Release>:/Ob0>;/GL-;/Gy-;/Gw-;$<$<CONFIG:Debug>:/Z7>"
         )
 
-        foreach(dida_format_target DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
+        foreach(dida_format_target DIDITAGAIN_UI_BROWSER DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
             if(TARGET ${dida_format_target})
                 set_target_properties(${dida_format_target} PROPERTIES
                     INTERPROCEDURAL_OPTIMIZATION FALSE
                     INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
-                    MSVC_DEBUG_INFORMATION_FORMAT Embedded
+                    MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug>:Embedded>"
                 )
                 target_compile_options(${dida_format_target} PRIVATE
                     /GL-
                     /Gy-
                     /Gw-
-                    /Z7
+                    $<$<CONFIG:Debug>:/Z7>
                 )
                 target_link_options(${dida_format_target} PRIVATE
                     /LTCG:OFF
