@@ -226,3 +226,11 @@ bool SynthEngine::setSampleSource(const juce::String& sourcePath, int rootMidi, 
 
     return ms != nullptr || sourcePath.isEmpty();
 }
+
+void SynthEngine::setFallbackSynthesisEnabled(bool enabled)
+{
+    forEachSynthVoice([enabled](SynthVoice& v)
+    {
+        v.setFallbackSynthesisEnabled(enabled);
+    });
+}
