@@ -126,6 +126,7 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         hiStep = rateFor(hiZone);
 
         float l = 0.0f, r = 0.0f;
+        bool hasSampleSource = (loZone != nullptr) || (hiZone != nullptr);
 
         if (loZone && ! loFinished)
         {
@@ -150,6 +151,26 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
                 hiFinished = true;
         }
 
+        // Fallback synth: when the active preset has no multisample loaded
+        // (or the chosen zone is null), produce a simple sine + soft-saw
+        // tone so non-sample presets are audible. The full 4-layer
+        // oscillator/noise renderer is wired separately in HybridPresetGenerator
+        // and SampleLayer; this fallback exists so the engine never goes
+        // silent during preset switching.
+        if (! hasSampleSource)
+        {
+            const double freq = 440.0 * std::pow(2.0,
+                ((double) currentMidiNote + (double) pitchOffsetSemis - 69.0) / 12.0);
+            sineFallbackPhase += freq / sampleRate;
+            if (sineFallbackPhase > 1.0) sineFallbackPhase -= 1.0;
+            const float twoPi = juce::MathConstants<float>::twoPi;
+            const float sineV = std::sin((float) sineFallbackPhase * twoPi);
+            // Detuned saw-ish overtone for body
+            const float over  = std::sin((float) sineFallbackPhase * twoPi * 2.0f) * 0.25f;
+            l += (sineV + over) * 0.35f;
+            r += (sineV + over) * 0.35f;
+        }
+
         // Filter (mono-summed cutoff modulation, processed per channel)
         const float fEnv = filterEnv.getNextSample();
         const float keyOffset = (currentMidiNote - 60.0f) * filterKeyTrack * 100.0f;
@@ -161,7 +182,6 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
 
         const float mono = 0.5f * (l + r);
         const float filtered = filter.processSample(mono);
-        // Mix filtered mono signal back in to preserve filter character but keep stereo from samples.
         l = 0.5f * (l + filtered);
         r = 0.5f * (r + filtered);
 
@@ -181,10 +201,12 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             outputBuffer.addSample(0, s, 0.5f * (l + r));
         }
 
-        // Note ends when amp env idle, OR when both sources have fully played out.
+        // Note ends when amp env idle, OR (for sample voices) when both
+        // sources have fully played out. Pure synth-fallback voices end
+        // only when the amp envelope releases.
         const bool sampleSourceDone = (loZone == nullptr || loFinished)
                                    && (hiZone == nullptr || hiFinished);
-        if (! ampEnv.isActive() || (sampleSourceDone && multisample))
+        if (! ampEnv.isActive() || (sampleSourceDone && multisample && hasSampleSource))
         {
             clearCurrentNote();
             reset();

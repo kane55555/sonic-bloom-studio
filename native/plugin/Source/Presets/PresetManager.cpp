@@ -33,7 +33,10 @@ static void readPresetInfoFromJson(const juce::var& json,
                                    bool isFactory,
                                    PresetInfo& info)
 {
-    info.name        = json.getProperty(dida::preset::key::presetName, "Untitled").toString();
+    // Support both v1 ("presetName") and v2 ("name") top-level keys.
+    info.name        = json.hasProperty("name")
+                         ? json.getProperty("name", "Untitled").toString()
+                         : json.getProperty(dida::preset::key::presetName, "Untitled").toString();
     info.author      = json.getProperty(dida::preset::key::author, "DIDITAGAIN").toString();
     info.category    = json.getProperty(dida::preset::key::category, "Init").toString();
     info.description = json.getProperty(dida::preset::key::description, "").toString();
@@ -182,7 +185,47 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
 
     using namespace dida::preset;
 
-    // Sampler instrument
+    // v2 hybrid presets: detect schemaVersion and translate Layer 1 + global
+    // FX into the existing parameter set so they play even before the full
+    // layered renderer is wired into Voice. Legacy v1 presets continue below.
+    if (json.getProperty("schemaVersion", juce::var()).toString() == kSchemaVersionV2)
+    {
+        HybridPresetV2 p;
+        if (PresetMigration::parseAny(json, p))
+        {
+            requestedInstrument = {};
+            for (auto& L : p.layers)
+            {
+                if (L.type == LayerType::Sample && L.enabled && L.source.isNotEmpty())
+                {
+                    auto src = L.source.replace("\\", "/");
+                    if (src.startsWith("Samples/")) src = src.substring(8);
+                    requestedInstrument = src.upToLastOccurrenceOf("/", false, false);
+                    if (requestedInstrument.isEmpty()) requestedInstrument = src;
+                    setParam(processor, "env1Attack",  L.ampEnv.attack);
+                    setParam(processor, "env1Decay",   L.ampEnv.decay);
+                    setParam(processor, "env1Sustain", L.ampEnv.sustain);
+                    setParam(processor, "env1Release", L.ampEnv.release);
+                    break;
+                }
+            }
+            setParam(processor, "filter1Cutoff",      p.globalFilter.cutoff);
+            setParam(processor, "filter1Resonance",   p.globalFilter.resonance);
+            setParam(processor, "fxReverbMix",        p.effects.reverbMix);
+            setParam(processor, "fxReverbSize",       p.effects.reverbSize);
+            setParam(processor, "fxDelayMix",         p.effects.delayMix);
+            setParam(processor, "fxDelayFeedback",    p.effects.delayFb);
+            setParam(processor, "fxChorusMix",        p.effects.chorusMix);
+            setParam(processor, "fxDistortionAmount", p.effects.satDrive);
+            if (onPresetLoaded) onPresetLoaded();
+            DIDA_PRESET_MANAGER_LOG("loaded v2 preset name=" << p.name
+                << " category=" << p.category
+                << " layers=" << (int) p.layers.size());
+            return;
+        }
+    }
+
+    // Sampler instrument (legacy)
     requestedInstrument = {};
     auto sampler = json.getProperty(key::sampler, juce::var());
     if (sampler.isObject())
@@ -360,9 +403,11 @@ bool PresetManager::validatePresetFile(const juce::File& file)
     if (!file.existsAsFile()) return false;
     auto json = juce::JSON::parse(file);
     if (!json.isObject()) return false;
-    if (!json.hasProperty(dida::preset::key::presetVersion)) return false;
-    if (!json.hasProperty(dida::preset::key::presetName))    return false;
-    return true;
+    // v2 uses schemaVersion+name; v1 used presetVersion+presetName.
+    const bool v2 = json.hasProperty("schemaVersion") && json.hasProperty("name");
+    const bool v1 = json.hasProperty(dida::preset::key::presetVersion)
+                 && json.hasProperty(dida::preset::key::presetName);
+    return v1 || v2;
 }
 
 juce::String PresetManager::computeChecksum(const juce::String& jsonContent)

@@ -127,6 +127,11 @@ private:
     float filterKeyTrack  = 0.0f;
     float baseCutoff      = 8000.0f;
 
+    // Phase for the simple sine fallback used when no sample is loaded
+    // (keeps non-sample factory presets audible until the layered engine
+    // is fully wired through Voice).
+    double sineFallbackPhase = 0.0;
+
     double sampleRate = 44100.0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SynthVoice)
