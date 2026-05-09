@@ -383,10 +383,10 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                     synthEngine.setSampleSource(requestedSample,
                                                 presetManager.getRequestedSampleRootMidi(),
                                                 presetManager.getRequestedSampleDisplayName());
-                    // Imported sounds = sustained, pitched instruments. Loop the
-                    // sample so holding a key produces a continuous tone instead
-                    // of a one-shot trigger.
-                    synthEngine.setSampleLooping(true);
+                    // Looping decision now comes from the V2 preset (category +
+                    // oneShotMode + per-layer loop flag). Bells/808s/plucks no
+                    // longer get force-looped into a sustained drone.
+                    synthEngine.setSampleLooping(presetManager.getRequestedSampleLooping());
                 }
                 else if (requested.isNotEmpty() && requested != synthEngine.getInstrumentName())
                 {
