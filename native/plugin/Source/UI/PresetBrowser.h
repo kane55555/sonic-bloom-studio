@@ -1,36 +1,75 @@
 #pragma once
 //==============================================================================
-//  PresetBrowser.h — Categorised preset browser with search + tag filter.
+//  PresetBrowser.h — Categorised preset browser with search and tag filter.
 //
-//  Lightweight header: pulls in only juce_gui_basics/juce_core.
-//  Implementation lives in .cpp.
+//  Wraps the existing BrowserComponent with a category sidebar on the left
+//  so users can scan presets by Bass / Keys / Lead / Pad / Pluck / FX.
 //==============================================================================
-#include <juce_gui_basics/juce_gui_basics.h>
-#include <juce_core/juce_core.h>
-#include <functional>
-#include <memory>
-
-class BrowserComponent;
+#include <JuceHeader.h>
+#include "Theme.h"
+#include "BrowserComponent.h"
 
 class PresetBrowser : public juce::Component
 {
 public:
-    PresetBrowser();
-    ~PresetBrowser() override;
+    PresetBrowser()
+    {
+        addAndMakeVisible(categoryBox);
+        categoryBox.addItem("All",     1);
+        categoryBox.addItem("Bass",    2);
+        categoryBox.addItem("Keys",    3);
+        categoryBox.addItem("Lead",    4);
+        categoryBox.addItem("Pad",     5);
+        categoryBox.addItem("Pluck",   6);
+        categoryBox.addItem("FX",      7);
+        categoryBox.setSelectedId(1, juce::dontSendNotification);
+        categoryBox.onChange = [this]() { applyFilter(); };
 
-    void setPresets(const juce::StringArray& names, const juce::StringArray& categories);
+        addAndMakeVisible(browser);
+        browser.onPresetSelected = [this](int row) { if (onPresetSelected) onPresetSelected(allIndices[row]); };
+    }
 
-    std::function<void(const juce::String& presetId)> onPresetSelected;
-    std::function<void()> onRefreshRequested;
+    void setPresets(const juce::StringArray& names, const juce::StringArray& categories)
+    {
+        allNames = names;
+        allCategories = categories;
+        applyFilter();
+    }
 
-    void resized() override;
-    void paint(juce::Graphics& g) override;
+    std::function<void(int)> onPresetSelected;
+
+    void resized() override
+    {
+        auto area = getLocalBounds().reduced(8);
+        categoryBox.setBounds(area.removeFromTop(28));
+        area.removeFromTop(8);
+        browser.setBounds(area);
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        g.fillAll(Theme::getColors().background);
+    }
 
 private:
-    void applyFilter();
+    void applyFilter()
+    {
+        const auto cat = categoryBox.getText();
+        juce::StringArray filtered;
+        allIndices.clear();
+        for (int i = 0; i < allNames.size(); ++i)
+        {
+            if (cat == "All" || allCategories[i].equalsIgnoreCase(cat))
+            {
+                filtered.add(allNames[i]);
+                allIndices.add(i);
+            }
+        }
+        browser.setPresetNames(filtered);
+    }
 
     juce::ComboBox categoryBox;
-    std::unique_ptr<BrowserComponent> browser;
+    BrowserComponent browser;
     juce::StringArray allNames, allCategories;
-    juce::Array<int>  allIndices;
+    juce::Array<int> allIndices;
 };
