@@ -183,6 +183,7 @@ void DiditagainEditor::switchTab(Tab tab)
     if (layerPanel)         layerPanel->setVisible(tab == Tab::Layers);
     if (presetBrowserPanel) presetBrowserPanel->setVisible(tab == Tab::Browser);
     if (fxPanel)            fxPanel->setVisible(tab == Tab::FX && overlayPanel == nullptr);
+    if (audioCropPanel)     audioCropPanel->setVisible(tab == Tab::AudioCrop);
     repaint();
 }
 
