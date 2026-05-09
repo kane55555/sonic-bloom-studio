@@ -65,6 +65,26 @@ export interface SampleLayer extends BaseLayer {
   startOffset: number;       // samples (or 0..1 fraction; we use samples)
   reverse: boolean;
   loop: boolean;
+  // --- Crop / loop metadata (0..1 fractions of the audio file length) ---
+  cropStart?: number;          // default 0.0
+  cropEnd?: number;            // default 1.0
+  loopStart?: number;          // default 0.2
+  loopEnd?: number;            // default 0.95
+  loopCrossfadeMs?: number;    // default 20
+  autoLoop?: boolean;          // default true for melodic categories
+}
+
+/** Non-destructive crop/loop metadata stored alongside an imported sample. */
+export interface SampleImportMetadata {
+  cropStart: number;
+  cropEnd: number;
+  loopEnabled: boolean;
+  loopStart: number;
+  loopEnd: number;
+  loopCrossfadeMs: number;
+  autoLoop: boolean;
+  oneShotMode: boolean;
+  pitchTracking: boolean;
 }
 
 export interface OscillatorLayer extends BaseLayer {

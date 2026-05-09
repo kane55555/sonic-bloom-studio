@@ -47,6 +47,12 @@ struct LayerV2
     bool         reverse = false;
     bool         loop = false;
 
+    // Crop/loop (0..1 fractions of audio length)
+    float        cropStart = 0.0f, cropEnd = 1.0f;
+    float        loopStart = 0.2f, loopEnd = 0.95f;
+    float        loopCrossfadeMs = 20.0f;
+    bool         autoLoop = true;
+
     // Oscillator-layer fields:
     juce::String waveform = "sine";
 };
