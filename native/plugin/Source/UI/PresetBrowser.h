@@ -20,7 +20,8 @@ public:
 
     void setPresets(const juce::StringArray& names, const juce::StringArray& categories);
 
-    std::function<void(int)> onPresetSelected;
+    std::function<void(const juce::String& presetId)> onPresetSelected;
+    std::function<void()> onRefreshRequested;
 
     void resized() override;
     void paint(juce::Graphics& g) override;
