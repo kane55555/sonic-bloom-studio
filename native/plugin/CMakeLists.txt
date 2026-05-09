@@ -184,6 +184,8 @@ set_target_properties(DIDITAGAIN_STUDIO PROPERTIES
 if(MSVC)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
         # ClangCL: NO debug info anywhere — avoids "Live DEBUG_VALUE analysis" ICE.
+        # clang-cl ignores -g0; use MSVC-style switches and CMake property.
+        set_property(TARGET DIDITAGAIN_STUDIO PROPERTY MSVC_DEBUG_INFORMATION_FORMAT "")
         target_compile_options(DIDITAGAIN_STUDIO PUBLIC
             /EHsc
             /GL-
@@ -191,28 +193,28 @@ if(MSVC)
             /Gw-
             $<$<CONFIG:Release>:/Od>
             $<$<CONFIG:Release>:/Ob0>
-            -g0
         )
         target_link_options(DIDITAGAIN_STUDIO PUBLIC
             /LTCG:OFF
             /DEBUG:NONE
         )
         set_source_files_properties(Source/Presets/FactoryPresets.cpp PROPERTIES
-            COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-;-g0"
+            COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-"
         )
         set_source_files_properties(Source/Presets/PresetTemplateFactory.cpp PROPERTIES
-            COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-;-g0"
+            COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-"
         )
         foreach(dida_format_target DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
             if(TARGET ${dida_format_target})
                 set_target_properties(${dida_format_target} PROPERTIES
                     INTERPROCEDURAL_OPTIMIZATION FALSE
                     INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
+                    MSVC_DEBUG_INFORMATION_FORMAT ""
                 )
                 target_compile_options(${dida_format_target} PRIVATE
-                    /GL- /Gy- /Gw- -g0
+                    /GL- /Gy- /Gw-
                 )
-                target_link_options(${dida_format_target} PRIVATE /LTCG:OFF)
+                target_link_options(${dida_format_target} PRIVATE /LTCG:OFF /DEBUG:NONE)
             endif()
         endforeach()
         if(TARGET DIDITAGAIN_STUDIO_VST3)
