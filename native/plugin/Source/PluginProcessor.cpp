@@ -383,7 +383,7 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                                                 presetManager.getRequestedSampleDisplayName());
                 else if (requested.isNotEmpty() && requested != synthEngine.getInstrumentName())
                     synthEngine.setInstrument(requested);
-                else if (requested.isEmpty() && synthEngine.getInstrumentName().startsWith("sample:"))
+                else if (requested.isEmpty() && synthEngine.getInstrumentName().isNotEmpty())
                     synthEngine.setInstrument({});
 
                 DIDA_PRESET_LOG("applied serial=" << deferredPresetChange.presetSerial
