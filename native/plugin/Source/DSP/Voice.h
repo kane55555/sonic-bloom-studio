@@ -55,6 +55,19 @@ public:
     void setFallbackSynthesisEnabled(bool enabled) noexcept { fallbackSynthesisEnabled = enabled; }
     void setSampleLooping(bool shouldLoop) noexcept { sampleLooping = shouldLoop; }
 
+    // --- Crop / loop metadata (fractions of the buffer length, 0..1) ---
+    void setCropRange(float start01, float end01) noexcept {
+        cropStartFrac = juce::jlimit(0.0f, 1.0f, start01);
+        cropEndFrac   = juce::jlimit(cropStartFrac, 1.0f, end01);
+    }
+    void setLoopRange(float lstart01, float lend01) noexcept {
+        loopStartFrac = juce::jlimit(0.0f, 1.0f, lstart01);
+        loopEndFrac   = juce::jlimit(loopStartFrac, 1.0f, lend01);
+    }
+    void setLoopCrossfadeMs(float ms)    noexcept { loopCrossfadeMs = juce::jlimit(0.0f, 200.0f, ms); }
+    void setOneShotMode(bool b)          noexcept { oneShotMode = b; }
+    void setPitchTracking(bool b)        noexcept { pitchTracking = b; }
+
     // ---- Per-voice configuration ----
     void setEngineMode(EngineMode m)      noexcept { engineMode = m; }
     void setOscALevel(float v)            noexcept { oscALevel = juce::jlimit(0.0f, 1.0f, v); }
@@ -158,6 +171,16 @@ private:
     double sineFallbackPhase = 0.0;
     bool fallbackSynthesisEnabled = true;
     bool sampleLooping = false;
+
+    // Crop/loop metadata (fractions of buffer length 0..1)
+    float cropStartFrac    = 0.0f;
+    float cropEndFrac      = 1.0f;
+    float loopStartFrac    = 0.2f;
+    float loopEndFrac      = 0.95f;
+    float loopCrossfadeMs  = 20.0f;
+    bool  oneShotMode      = false;
+    bool  pitchTracking    = true;
+
     double sampleRate = 44100.0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SynthVoice)
