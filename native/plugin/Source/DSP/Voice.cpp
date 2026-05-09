@@ -176,14 +176,28 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             const float w = (hiZone ? (1.0f - zoneXfade) : 1.0f);
             sampL += zl * w; sampR += zr * w;
             loReadPos += loStep;
-            if (loReadPos >= (double) (loZone->buffer.getNumSamples() - 1)) loFinished = true;
+            const double loEnd = (double) (loZone->buffer.getNumSamples() - 1);
+            if (loReadPos >= loEnd)
+            {
+                if (sampleLooping && loEnd > 1.0)
+                    loReadPos = std::fmod(loReadPos, loEnd);
+                else
+                    loFinished = true;
+            }
         }
         if (hiZone && ! hiFinished)
         {
             float zl, zr; readZone(*hiZone, hiReadPos, zl, zr);
             sampL += zl * zoneXfade; sampR += zr * zoneXfade;
             hiReadPos += hiStep;
-            if (hiReadPos >= (double) (hiZone->buffer.getNumSamples() - 1)) hiFinished = true;
+            const double hiEnd = (double) (hiZone->buffer.getNumSamples() - 1);
+            if (hiReadPos >= hiEnd)
+            {
+                if (sampleLooping && hiEnd > 1.0)
+                    hiReadPos = std::fmod(hiReadPos, hiEnd);
+                else
+                    hiFinished = true;
+            }
         }
 
         // Legacy synth fallback only for factory/pure-synth presets. Imported
