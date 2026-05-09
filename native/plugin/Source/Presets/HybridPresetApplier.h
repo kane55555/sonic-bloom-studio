@@ -23,6 +23,14 @@ struct AppliedPresetState
     bool         shouldLoop          = false;
     bool         monoMode            = false;
     juce::String category;
+    // Crop/loop
+    float        cropStart       = 0.0f;
+    float        cropEnd         = 1.0f;
+    float        loopStart       = 0.2f;
+    float        loopEnd         = 0.95f;
+    float        loopCrossfadeMs = 20.0f;
+    bool         oneShotMode     = false;
+    bool         pitchTracking   = true;
     HybridPresetV2 preset;            // kept for macro mapper / UI
 };
 

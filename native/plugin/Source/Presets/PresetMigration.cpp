@@ -65,6 +65,12 @@ static void readLayer(const juce::var& v, LayerV2& L)
         L.fineCents     = (int) v.getProperty("fineTune", 0);
         L.reverse       = (bool) v.getProperty("reverse", false);
         L.loop          = (bool) v.getProperty("loop", false);
+        L.cropStart       = (float) (double) v.getProperty("cropStart",       L.cropStart);
+        L.cropEnd         = (float) (double) v.getProperty("cropEnd",         L.cropEnd);
+        L.loopStart       = (float) (double) v.getProperty("loopStart",       L.loopStart);
+        L.loopEnd         = (float) (double) v.getProperty("loopEnd",         L.loopEnd);
+        L.loopCrossfadeMs = (float) (double) v.getProperty("loopCrossfadeMs", L.loopCrossfadeMs);
+        L.autoLoop        = (bool) v.getProperty("autoLoop",                  L.autoLoop);
     }
     if (L.type == LayerType::Oscillator)
     {

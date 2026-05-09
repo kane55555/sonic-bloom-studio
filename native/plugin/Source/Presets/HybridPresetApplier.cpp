@@ -112,9 +112,17 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
         out.sampleSource    = sampleLayer->source.replace("\\", "/");
         out.sampleRootMidi  = juce::jlimit(0, 127, sampleLayer->rootMidi);
         out.displayName     = p.name;
+        const bool effectiveLoop = sampleLayer->loop || sampleLayer->autoLoop;
         out.shouldLoop      = shouldLoopForCategory(p.category,
                                                     sampleLayer->oneShotMode,
-                                                    sampleLayer->loop);
+                                                    effectiveLoop);
+        out.cropStart       = sampleLayer->cropStart;
+        out.cropEnd         = sampleLayer->cropEnd;
+        out.loopStart       = sampleLayer->loopStart;
+        out.loopEnd         = sampleLayer->loopEnd;
+        out.loopCrossfadeMs = sampleLayer->loopCrossfadeMs;
+        out.oneShotMode     = sampleLayer->oneShotMode;
+        out.pitchTracking   = sampleLayer->pitchTracking;
 
         // Master amp env follows sample layer.
         setFloat(processor, "env1Attack",  sampleLayer->ampEnv.attack);
