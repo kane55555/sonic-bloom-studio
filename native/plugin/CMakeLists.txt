@@ -128,6 +128,7 @@ target_sources(DIDITAGAIN_STUDIO PRIVATE
     Source/UI/KnobLookAndFeel.cpp
     Source/UI/MainSynthPanel.cpp
     Source/UI/PresetBrowser.cpp
+    Source/UI/ParameterPanel.cpp
 )
 
 target_include_directories(DIDITAGAIN_STUDIO PRIVATE Source)
