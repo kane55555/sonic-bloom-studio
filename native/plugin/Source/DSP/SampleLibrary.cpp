@@ -149,8 +149,7 @@ juce::StringArray SampleLibrary::listInstruments()
 
     for (auto& sub : root.findChildFiles(juce::File::findDirectories, false))
     {
-        auto audio = sub.findChildFiles(juce::File::findFiles, false,
-                                        "*.wav;*.flac;*.ogg;*.mp3;*.aif;*.aiff");
+        auto audio = sub.findChildFiles(juce::File::findFiles, false, "*.wav");
         if (! audio.isEmpty())
             out.add(sub.getFileName());
     }
@@ -294,8 +293,7 @@ std::shared_ptr<const Multisample> SampleLibrary::loadInstrument(const juce::Str
     auto folder = getSamplesRoot().getChildFile(name);
     if (! folder.isDirectory()) return nullptr;
 
-    auto files = folder.findChildFiles(juce::File::findFiles, false,
-                                       "*.wav;*.flac;*.ogg;*.mp3;*.aif;*.aiff");
+    auto files = folder.findChildFiles(juce::File::findFiles, false, "*.wav");
     if (files.isEmpty()) return nullptr;
 
     auto ms = std::make_shared<Multisample>();
