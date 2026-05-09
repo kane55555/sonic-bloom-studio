@@ -6,7 +6,7 @@
 //      <UserDocuments>/DIDITAGAIN STUDIO/Samples/<InstrumentName>/
 //
 //  Filename convention (case-insensitive):
-//      <anything>_<NoteName><Octave>[_v<Vel>].{wav,flac,ogg,mp3,aiff}
+//      <anything>_<NoteName><Octave>[_v<Vel>].wav
 //
 //      Brass_C3.wav
 //      Brass_F#3_v90.wav

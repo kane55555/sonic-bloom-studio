@@ -59,6 +59,9 @@ CMake. That step compiles/runs JUCE's VST3 helper, which currently triggers an
 MSVC 14.51 internal compiler error around the VST3 SDK `json.h` wrapper.
 The CMake config also forces embedded `/Z7` debug info and disables LTCG/`/GL`
 to avoid VS 2026 PDB/type-server crashes while compiling JUCE modules.
+To avoid an MSVC 14.51 crash in JUCE's audio-format metadata templates, sample
+import currently supports uncompressed 16-bit PCM `.wav` files directly and does
+not link `juce_audio_formats`.
 
 ```bat
 cd native\plugin

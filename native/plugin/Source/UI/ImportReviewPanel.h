@@ -7,7 +7,7 @@
 
 //==============================================================================
 //  Drag-and-drop user sample importer (Phase 5 — user facing).
-//  Users drop .wav/.aif/.mp3/.flac files onto the panel, edit Name / Category /
+//  Users drop .wav files onto the panel, edit Name / Category /
 //  Root Note inline, and click "Create Preset" to build a 4-layer hybrid preset
 //  via PresetTemplateFactory + HybridPresetGenerator. No Python required.
 //==============================================================================
@@ -22,7 +22,7 @@ public:
         title.setColour(juce::Label::textColourId, Theme::getColors().textPrimary);
         addAndMakeVisible(title);
 
-        subtitle.setText("Drag any audio file (WAV / AIFF / MP3 / FLAC) anywhere on this panel, "
+        subtitle.setText("Drag 16-bit PCM WAV files anywhere on this panel, "
                          "edit the name, category and root note, then hit Create Preset.",
                          juce::dontSendNotification);
         subtitle.setFont(Theme::getBodyFont(13.0f));
@@ -253,8 +253,7 @@ private:
     static bool isAudioFile(const juce::String& path)
     {
         auto p = path.toLowerCase();
-        return p.endsWith(".wav") || p.endsWith(".aif") || p.endsWith(".aiff")
-            || p.endsWith(".mp3") || p.endsWith(".flac") || p.endsWith(".ogg");
+        return p.endsWith(".wav");
     }
 
     juce::Rectangle<int> dropZoneBounds() const { return dropZoneRect; }
@@ -270,7 +269,7 @@ private:
     void openBrowseDialog()
     {
         fileChooser = std::make_unique<juce::FileChooser>(
-            "Select audio samples", juce::File(), "*.wav;*.aif;*.aiff;*.mp3;*.flac;*.ogg");
+            "Select WAV samples", juce::File(), "*.wav");
         fileChooser->launchAsync(
             juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
                 | juce::FileBrowserComponent::canSelectMultipleItems,
@@ -342,7 +341,7 @@ private:
         {
             juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
                 "Import failed", "The sample was copied but the audio engine could not read it: "
-                    + destSample.getFileName() + "\n\nTry exporting it as a standard WAV or AIFF file and import again.");
+                    + destSample.getFileName() + "\n\nTry exporting it as a standard 16-bit PCM WAV file and import again.");
             return false;
         }
 

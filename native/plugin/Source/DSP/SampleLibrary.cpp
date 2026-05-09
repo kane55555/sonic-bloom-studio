@@ -1,5 +1,6 @@
 #include "SampleLibrary.h"
 #include <algorithm>
+#include <cstring>
 #include <mutex>
 
 namespace dida {
@@ -148,8 +149,7 @@ juce::StringArray SampleLibrary::listInstruments()
 
     for (auto& sub : root.findChildFiles(juce::File::findDirectories, false))
     {
-        auto audio = sub.findChildFiles(juce::File::findFiles, false,
-                                        "*.wav;*.flac;*.ogg;*.mp3;*.aif;*.aiff");
+        auto audio = sub.findChildFiles(juce::File::findFiles, false, "*.wav");
         if (! audio.isEmpty())
             out.add(sub.getFileName());
     }
@@ -167,14 +167,6 @@ namespace {
     {
         static std::unordered_map<std::string, std::shared_ptr<const Multisample>> c;
         return c;
-    }
-
-    juce::AudioFormatManager& formatManager()
-    {
-        static juce::AudioFormatManager m;
-        static bool registered = false;
-        if (! registered) { m.registerBasicFormats(); registered = true; }
-        return m;
     }
 
     juce::File resolveSampleSourceFile(const juce::String& sourcePath)
@@ -199,39 +191,86 @@ namespace {
         return file;
     }
 
-    bool readSampleZoneFromFile(const juce::File& file, int rootMidi, int hiVel, SampleZone& zone)
+    static uint32_t readU32(const char* p) noexcept
     {
-        auto& fm = formatManager();
-        std::unique_ptr<juce::AudioFormatReader> reader(fm.createReaderFor(file));
-        if (! reader) return false;
+        return static_cast<uint32_t>(static_cast<unsigned char>(p[0]))
+             | (static_cast<uint32_t>(static_cast<unsigned char>(p[1])) << 8)
+             | (static_cast<uint32_t>(static_cast<unsigned char>(p[2])) << 16)
+             | (static_cast<uint32_t>(static_cast<unsigned char>(p[3])) << 24);
+    }
 
-        const int numSamples = static_cast<int>(reader->lengthInSamples);
+    static uint16_t readU16(const char* p) noexcept
+    {
+        return static_cast<uint16_t>(static_cast<unsigned char>(p[0])
+             | (static_cast<uint16_t>(static_cast<unsigned char>(p[1])) << 8));
+    }
+
+    bool readWavSampleZoneFromFile(const juce::File& file, int rootMidi, int hiVel, SampleZone& zone)
+    {
+        juce::MemoryBlock bytes;
+        if (! file.loadFileAsData(bytes) || bytes.getSize() < 44) return false;
+
+        const auto* data = static_cast<const char*>(bytes.getData());
+        const auto size = bytes.getSize();
+        if (std::memcmp(data, "RIFF", 4) != 0 || std::memcmp(data + 8, "WAVE", 4) != 0) return false;
+
+        uint16_t channels = 0, bitsPerSample = 0, audioFormat = 0;
+        uint32_t sampleRate = 44100, dataOffset = 0, dataBytes = 0;
+
+        size_t pos = 12;
+        while (pos + 8 <= size)
+        {
+            const char* chunk = data + pos;
+            const uint32_t chunkSize = readU32(chunk + 4);
+            const size_t chunkData = pos + 8;
+            if (chunkData + chunkSize > size) break;
+
+            if (std::memcmp(chunk, "fmt ", 4) == 0 && chunkSize >= 16)
+            {
+                audioFormat = readU16(data + chunkData);
+                channels = readU16(data + chunkData + 2);
+                sampleRate = readU32(data + chunkData + 4);
+                bitsPerSample = readU16(data + chunkData + 14);
+            }
+            else if (std::memcmp(chunk, "data", 4) == 0)
+            {
+                dataOffset = static_cast<uint32_t>(chunkData);
+                dataBytes = chunkSize;
+            }
+
+            pos = chunkData + chunkSize + (chunkSize & 1u);
+        }
+
+        if (audioFormat != 1 || channels < 1 || channels > 2 || bitsPerSample != 16 || dataOffset == 0 || dataBytes == 0)
+            return false;
+
+        const int numSamples = static_cast<int>(dataBytes / (channels * sizeof(int16_t)));
         if (numSamples <= 0) return false;
 
-        zone.sourceSampleRate = reader->sampleRate > 0 ? reader->sampleRate : 44100.0;
+        zone.sourceSampleRate = sampleRate > 0 ? static_cast<double>(sampleRate) : 44100.0;
         zone.rootMidi = juce::jlimit(0, 127, rootMidi);
         zone.loVel = 0;
         zone.hiVel = juce::jlimit(1, 127, hiVel);
         zone.fileName = file.getFileName();
-
         zone.buffer.setSize(2, numSamples);
         zone.buffer.clear();
 
-        juce::AudioBuffer<float> tmp(static_cast<int>(reader->numChannels), numSamples);
-        reader->read(&tmp, 0, numSamples, 0, true, true);
-
-        if (reader->numChannels == 1)
+        const auto* pcm = reinterpret_cast<const int16_t*>(data + dataOffset);
+        constexpr float scale = 1.0f / 32768.0f;
+        for (int i = 0; i < numSamples; ++i)
         {
-            zone.buffer.copyFrom(0, 0, tmp, 0, 0, numSamples);
-            zone.buffer.copyFrom(1, 0, tmp, 0, 0, numSamples);
-        }
-        else
-        {
-            zone.buffer.copyFrom(0, 0, tmp, 0, 0, numSamples);
-            zone.buffer.copyFrom(1, 0, tmp, 1, 0, numSamples);
+            const float left = static_cast<float>(pcm[i * channels]) * scale;
+            const float right = channels > 1 ? static_cast<float>(pcm[i * channels + 1]) * scale : left;
+            zone.buffer.setSample(0, i, left);
+            zone.buffer.setSample(1, i, right);
         }
 
         return true;
+    }
+
+    bool readSampleZoneFromFile(const juce::File& file, int rootMidi, int hiVel, SampleZone& zone)
+    {
+        return file.hasFileExtension("wav") && readWavSampleZoneFromFile(file, rootMidi, hiVel, zone);
     }
 }
 
@@ -254,8 +293,7 @@ std::shared_ptr<const Multisample> SampleLibrary::loadInstrument(const juce::Str
     auto folder = getSamplesRoot().getChildFile(name);
     if (! folder.isDirectory()) return nullptr;
 
-    auto files = folder.findChildFiles(juce::File::findFiles, false,
-                                       "*.wav;*.flac;*.ogg;*.mp3;*.aif;*.aiff");
+    auto files = folder.findChildFiles(juce::File::findFiles, false, "*.wav");
     if (files.isEmpty()) return nullptr;
 
     auto ms = std::make_shared<Multisample>();
