@@ -182,7 +182,6 @@ set_target_properties(DIDITAGAIN_STUDIO PROPERTIES
 # enabled. Keep DSP/shared code optimized, but compile only the fragile preset
 # TU and thin format wrappers without optimisation/LTCG.
 if(MSVC)
-if(MSVC)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
         # ClangCL: NO debug info anywhere — avoids "Live DEBUG_VALUE analysis" ICE.
         target_compile_options(DIDITAGAIN_STUDIO PUBLIC
