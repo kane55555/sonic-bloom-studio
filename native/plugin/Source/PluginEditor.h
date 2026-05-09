@@ -24,15 +24,19 @@ public:
 private:
     DiditagainProcessor& processor;
 
-    enum class Tab { Browser, Synth, Mod, FX, Settings, Account };
-    Tab currentTab = Tab::Synth;
+    enum class Tab { Browser, Layers, Synth, Mod, FX, Import, Settings, Account };
+    Tab currentTab = Tab::Layers;
+    bool advancedMode = true;
 
     juce::TextButton tabBrowser{"BROWSER"};
+    juce::TextButton tabLayers{"LAYERS"};
     juce::TextButton tabSynth{"SYNTH"};
     juce::TextButton tabMod{"MOD"};
     juce::TextButton tabFX{"FX"};
+    juce::TextButton tabImport{"IMPORT"};
     juce::TextButton tabSettings{"SETTINGS"};
     juce::TextButton tabAccount{"ACCOUNT"};
+    juce::TextButton modeToggle{"ADVANCED"};
 
     juce::ComboBox presetSelector;
     juce::TextButton prevPreset{"<"};
@@ -43,12 +47,15 @@ private:
     std::unique_ptr<PresetCycleTester> cycleTester;
 
     // Real content panels.
-    std::unique_ptr<MainSynthPanel> synthPanel;
-    std::unique_ptr<PresetBrowser>  presetBrowserPanel;
-    std::unique_ptr<ModPanel>        modPanel;
-    std::unique_ptr<FxPanel>         fxPanel;
-    std::unique_ptr<SettingsPanel>   settingsPanel;
-    std::unique_ptr<AccountPanel>    accountPanel;
+    std::unique_ptr<LayerEditor>      layerPanel;
+    std::unique_ptr<MacroPanel>       macroPanel;
+    std::unique_ptr<MainSynthPanel>   synthPanel;
+    std::unique_ptr<PresetBrowser>    presetBrowserPanel;
+    std::unique_ptr<ModPanel>         modPanel;
+    std::unique_ptr<FxPanel>          fxPanel;
+    std::unique_ptr<ImportReviewPanel> importPanel;
+    std::unique_ptr<SettingsPanel>    settingsPanel;
+    std::unique_ptr<AccountPanel>     accountPanel;
 
     void setupTabs();
     void switchTab(Tab tab);
