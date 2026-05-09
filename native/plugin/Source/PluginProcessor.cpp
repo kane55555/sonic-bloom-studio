@@ -1,7 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-static inline void didaPresetLog(const juce::String& message)
+static inline void didaPresetLog([[maybe_unused]] const juce::String& message)
 {
     DBG(juce::String("[DIDITAGAIN PRESET] ") + message);
 }
