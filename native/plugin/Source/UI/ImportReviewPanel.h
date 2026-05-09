@@ -352,7 +352,8 @@ private:
         auto preset = dida::preset::HybridPresetGenerator::generate(in);
         preset.name = name;
 
-        auto presetDir  = userPresets.getChildFile(category);
+        auto userPresets = presetManager->getUserPresetDirectory();
+        auto presetDir   = userPresets.getChildFile(category);
         presetDir.createDirectory();
         auto presetFile = presetDir.getNonexistentChildFile(name, ".didasynthpreset", true);
 
