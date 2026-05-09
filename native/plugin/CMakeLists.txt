@@ -139,6 +139,7 @@ target_sources(DIDITAGAIN_STUDIO PRIVATE
     Source/UI/MainSynthPanel.cpp
     Source/UI/PresetBrowser.cpp
     Source/UI/ParameterPanel.cpp
+    Source/UI/AudioCropPanel.cpp
 )
 
 target_include_directories(DIDITAGAIN_STUDIO PRIVATE Source)
