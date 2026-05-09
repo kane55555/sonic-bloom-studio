@@ -174,7 +174,6 @@ if(MSVC)
         /Gy-
         /Gw-
         /Z7
-        /FS-
         $<$<CONFIG:Release>:/Od>
         $<$<CONFIG:Release>:/Ob0>
     )
@@ -200,7 +199,6 @@ if(MSVC)
                 /Gy-
                 /Gw-
                 /Z7
-                /FS-
             )
             target_link_options(${dida_format_target} PRIVATE
                 /LTCG:OFF
