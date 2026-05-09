@@ -195,6 +195,9 @@ bool SynthEngine::setInstrument(const juce::String& instrumentName)
         ? std::shared_ptr<const dida::Multisample>{}
         : dida::SampleLibrary::loadInstrument(instrumentName);
 
+    if (instrumentName.isNotEmpty() && ms == nullptr)
+        juce::Logger::writeToLog("[DIDITAGAIN sample] failed to load instrument folder: " + instrumentName);
+
     activeMultisample = ms;
     currentInstrumentName = instrumentName;
 
@@ -216,6 +219,10 @@ bool SynthEngine::setSampleSource(const juce::String& sourcePath, int rootMidi, 
     auto ms = sourcePath.isEmpty()
         ? std::shared_ptr<const dida::Multisample>{}
         : dida::SampleLibrary::loadSampleSource(sourcePath, rootMidi, displayName);
+
+    if (sourcePath.isNotEmpty() && ms == nullptr)
+        juce::Logger::writeToLog("[DIDITAGAIN sample] failed to load imported source: " + sourcePath
+            + " rootMidi=" + juce::String(rootMidi));
 
     activeMultisample = ms;
     currentInstrumentName = sourceName;
