@@ -1,9 +1,9 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-static void didaPresetLog(const juce::String& message)
+static inline void didaPresetLog(const juce::String& message)
 {
-    juce::Logger::writeToLog(juce::String("[DIDITAGAIN preset] ") + message);
+    DBG(juce::String("[DIDITAGAIN PRESET] ") + message);
 }
 
 DiditagainProcessor::DiditagainProcessor()
