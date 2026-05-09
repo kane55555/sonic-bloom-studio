@@ -368,6 +368,9 @@ private:
         // Drop any cached multisample so the new folder is picked up immediately.
         dida::SampleLibrary::invalidateCache();
         presetManager->scanPresetDirectory();
+        const int importedIndex = presetManager->findPresetIndexByFile(presetFile);
+        if (importedIndex >= 0)
+            presetManager->loadPreset(importedIndex);
         return true;
     }
 
