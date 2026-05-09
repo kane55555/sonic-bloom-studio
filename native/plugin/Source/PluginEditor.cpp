@@ -90,11 +90,28 @@ void DiditagainEditor::setupTabs()
     };
 
     setupTab(tabBrowser, Tab::Browser);
+    setupTab(tabLayers, Tab::Layers);
     setupTab(tabSynth, Tab::Synth);
     setupTab(tabMod, Tab::Mod);
     setupTab(tabFX, Tab::FX);
+    setupTab(tabImport, Tab::Import);
     setupTab(tabSettings, Tab::Settings);
     setupTab(tabAccount, Tab::Account);
+
+    modeToggle.setClickingTogglesState(true);
+    modeToggle.setToggleState(advancedMode, juce::dontSendNotification);
+    modeToggle.setColour(juce::TextButton::buttonColourId,   juce::Colour(0xff1e1e2e));
+    modeToggle.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff8b5cf6));
+    modeToggle.setColour(juce::TextButton::textColourOnId,   juce::Colours::white);
+    modeToggle.setColour(juce::TextButton::textColourOffId,  juce::Colour(0xffe0e0e0));
+    modeToggle.onClick = [this]() {
+        advancedMode = modeToggle.getToggleState();
+        modeToggle.setButtonText(advancedMode ? "ADVANCED" : "SIMPLE");
+        switchTab(currentTab);
+        resized();
+        repaint();
+    };
+    addAndMakeVisible(modeToggle);
 
     addAndMakeVisible(presetSelector);
     addAndMakeVisible(prevPreset);
