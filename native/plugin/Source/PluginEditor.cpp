@@ -263,6 +263,7 @@ void DiditagainEditor::resized()
     if (layerPanel)         layerPanel->setBounds(content);
     if (presetBrowserPanel) presetBrowserPanel->setBounds(content);
     if (fxPanel)            fxPanel->setBounds(content);
+    if (audioCropPanel)     audioCropPanel->setBounds(content);
 
     // Modal overlay region (smaller, centered)
     auto modal = getLocalBounds().reduced(80, 90).withTrimmedTop(10);
