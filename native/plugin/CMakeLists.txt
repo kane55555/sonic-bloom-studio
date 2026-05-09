@@ -14,13 +14,9 @@ project(DIDITAGAIN_STUDIO VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Visual Studio 18/2026 Insider's MSVC 14.51 compiler currently hits multiple
-# internal compiler errors inside JUCE itself (VST3 SDK json.h, audio metadata
-# templates, and juce_RenderingHelpers.h). Do not keep retrying cl.exe; use the
-# ClangCL toolset that ships with the VS C++ workload instead.
-# Note: VS 2026 Insiders MSVC 14.51 has previously ICE'd inside JUCE. If that
-# happens again, reconfigure with -T ClangCL. We no longer hard-block MSVC here
-# because the user has asked to use the standard MSVC toolchain by default.
+# Visual Studio 18/2026 Insider's MSVC 14.51 has previously hit internal
+# compiler errors inside JUCE. Keep the standard MSVC generator/toolchain as the
+# default and capture the first real compiler error if one appears.
 
 # Keep MSVC preview/stable toolchains away from shared PDB/type-server paths.
 # The VS 2026 Insider linker has been crashing in PDB/type-server and LTCG

@@ -50,18 +50,10 @@ native/plugin/
 Prerequisites:
 
 - Visual Studio 2026 with the Desktop C++ workload
-- The Visual Studio Installer component **C++ Clang tools for Windows**
 - CMake 3.22+
 - Git
 - JUCE 7.0.x cloned locally (e.g. `C:\JUCE`)
 
-VS 2026's MSVC 14.51 compiler currently hits internal compiler errors while
-compiling JUCE itself, including the VST3 SDK `json.h` wrapper,
-`juce_audio_formats`, and `juce_RenderingHelpers.h`. Build with the ClangCL
-toolset instead; it still uses the Visual Studio generator and Windows SDK, but
-avoids the broken `cl.exe` compiler path. The CMake config blocks raw MSVC
-14.51 by default so the build fails early with a useful message instead of
-crashing deep inside JUCE.
 To avoid an MSVC 14.51 crash in JUCE's audio-format metadata templates, sample
 import currently supports uncompressed 16-bit PCM `.wav` files directly and does
 not link `juce_audio_formats`.
@@ -69,8 +61,8 @@ not link `juce_audio_formats`.
 ```bat
 cd native\plugin
 if exist build rmdir /s /q build
-cmake -S . -B build -G "Visual Studio 18 2026" -A x64 -T ClangCL -DJUCE_DIR=C:/JUCE
-cmake --build build --config Release --target DIDITAGAIN_STUDIO_All -- /m:1
+cmake -S . -B build -G "Visual Studio 18 2026" -A x64 -DJUCE_DIR=C:/JUCE
+cmake --build build --config Release --target DIDITAGAIN_STUDIO_VST3 -- /m:1
 ```
 
 Output:
