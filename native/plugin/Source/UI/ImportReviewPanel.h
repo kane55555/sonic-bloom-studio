@@ -3,6 +3,7 @@
 #include "Theme.h"
 #include "../Presets/HybridPresetGenerator.h"
 #include "../Presets/PresetManager.h"
+#include "../DSP/SampleLibrary.h"
 
 //==============================================================================
 //  Drag-and-drop user sample importer (Phase 5 — user facing).
