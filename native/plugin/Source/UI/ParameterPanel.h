@@ -16,7 +16,9 @@ public:
 
     int addGroup(const juce::String& groupTitle)
     {
-        groups.push_back({ groupTitle });
+        Group group;
+        group.title = groupTitle;
+        groups.push_back(std::move(group));
         return static_cast<int>(groups.size()) - 1;
     }
 

@@ -1,9 +1,10 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-#define DIDA_PRESET_LOG(message) \
-    do { juce::String _didaLogMsg; _didaLogMsg << message; \
-         juce::Logger::writeToLog(juce::String("[DIDITAGAIN preset] ") + _didaLogMsg); } while (false)
+static void didaPresetLog(const juce::String& message)
+{
+    juce::Logger::writeToLog(juce::String("[DIDITAGAIN preset] ") + message);
+}
 
 DiditagainProcessor::DiditagainProcessor()
     : AudioProcessor(BusesProperties()
@@ -17,9 +18,11 @@ DiditagainProcessor::DiditagainProcessor()
     {
         presetLoadRequested.store(true, std::memory_order_release);
         presetLoadSerial.fetch_add(1, std::memory_order_acq_rel);
-        DIDA_PRESET_LOG("load requested serial=" << presetLoadSerial.load(std::memory_order_acquire)
+        juce::String logMessage;
+        logMessage << "load requested serial=" << presetLoadSerial.load(std::memory_order_acquire)
             << " index=" << presetManager.getCurrentPresetIndex()
-            << " name=" << presetManager.getPresetName(presetManager.getCurrentPresetIndex()));
+            << " name=" << presetManager.getPresetName(presetManager.getCurrentPresetIndex());
+        didaPresetLog(logMessage);
     };
 }
 
@@ -316,12 +319,14 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         deferredPresetChange.presetSerial = latestPresetSerial;
         deferredPresetChange.ageInBlocks = previousAge;
 
-        DIDA_PRESET_LOG("queued serial=" << deferredPresetChange.presetSerial
+        juce::String logMessage;
+        logMessage << "queued serial=" << deferredPresetChange.presetSerial
             << " mono=" << (deferredPresetChange.monoMode ? "true" : "false")
             << " poly=" << deferredPresetChange.polyphony
             << " appliedMono=" << (appliedMonoMode ? "true" : "false")
             << " appliedPoly=" << appliedPolyphony
-            << " midiEvents=" << midiMessages.getNumEvents());
+            << " midiEvents=" << midiMessages.getNumEvents();
+        didaPresetLog(logMessage);
     }
 
     // Preset stepping may change mono/poly and requested polyphony every click.
@@ -345,8 +350,10 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             // Hard-stop everything so mutation/reset is safe.
             synthEngine.allNotesOff(0, false);
             synthEngine.forEachSynthVoice([](SynthVoice& v) { v.resetNote(); });
-            DIDA_PRESET_LOG("force-apply silencing voices serial=" << deferredPresetChange.presetSerial
-                << " waitedBlocks=" << deferredPresetChange.ageInBlocks);
+            juce::String logMessage;
+            logMessage << "force-apply silencing voices serial=" << deferredPresetChange.presetSerial
+                << " waitedBlocks=" << deferredPresetChange.ageInBlocks;
+            didaPresetLog(logMessage);
         }
 
         if (canApplyVoiceMutation || sameVoicePool || forceApply)
@@ -400,24 +407,28 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                     synthEngine.setSampleLooping(false);
                 }
 
-                DIDA_PRESET_LOG("applied serial=" << deferredPresetChange.presetSerial
+                juce::String logMessage;
+                logMessage << "applied serial=" << deferredPresetChange.presetSerial
                     << " mono=" << (deferredPresetChange.monoMode ? "true" : "false")
                     << " poly=" << deferredPresetChange.polyphony
                     << " mutatedVoices=" << (voicePoolNeedsMutation ? "true" : "false")
                     << " forced=" << (forceApply ? "true" : "false")
                     << " waitedBlocks=" << deferredPresetChange.ageInBlocks
-                    << " instrument=" << synthEngine.getInstrumentName());
+                    << " instrument=" << synthEngine.getInstrumentName();
+                didaPresetLog(logMessage);
 
                 deferredPresetChange = {};
             }
         }
         else if ((++debugBlockCounter % 128) == 0)
         {
-            DIDA_PRESET_LOG("waiting serial=" << deferredPresetChange.presetSerial
+            juce::String logMessage;
+            logMessage << "waiting serial=" << deferredPresetChange.presetSerial
                 << " blocks=" << deferredPresetChange.ageInBlocks
                 << " heldNotes=" << synthEngine.getHeldNoteCount()
                 << " activeVoices=" << synthEngine.getActiveVoiceCount()
-                << " midiEvents=" << midiMessages.getNumEvents());
+                << " midiEvents=" << midiMessages.getNumEvents();
+            didaPresetLog(logMessage);
         }
     }
 
