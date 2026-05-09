@@ -1,7 +1,7 @@
-# DIDITAGAIN STUDIO - Native Plugin v2
+# DIDITAGAIN STUDIO - Native Plugin
 
-Clean rebuild of the native JUCE plugin, beside the legacy `native/plugin/`.
-The legacy folder is intentionally left untouched.
+Clean rebuild of the native JUCE plugin. The old unstable plugin is archived in
+`native/plugin_legacy_broken/` and is not part of the active build path.
 
 ## Phase 1 (this folder)
 
@@ -11,13 +11,13 @@ Smallest stable JUCE VST3 / Standalone:
 - Dark editor window with the "DIDITAGAIN STUDIO" title.
 - No browser, no sampler, no crop tab, no FX chain, no hybrid layers.
 - Only standard JUCE modules. No `juce_audio_processors_headless`.
-- One target: `DIDITAGAIN_STUDIO_V2` (VST3 + Standalone).
+- One plugin target: `DIDITAGAIN_STUDIO` (VST3 + Standalone).
 
 ## Build
 
 ```bash
-cmake -S native/plugin_v2 -B native/plugin_v2/build -DJUCE_DIR=<path-to-JUCE>
-cmake --build native/plugin_v2/build --config Release --target DIDITAGAIN_STUDIO_V2_VST3
+cmake -S native/plugin -B native/plugin/build -DJUCE_DIR=<path-to-JUCE>
+cmake --build native/plugin/build --config Release --target DIDITAGAIN_STUDIO_VST3
 ```
 
 `JUCE_DIR` defaults to `../JUCE` or `C:/JUCE` if available.
