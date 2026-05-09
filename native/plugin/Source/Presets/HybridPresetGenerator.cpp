@@ -10,8 +10,17 @@ HybridPresetV2 HybridPresetGenerator::generate(const Inputs& in)
     if (! p.layers.empty())
     {
         auto& L = p.layers[0];
+        L.source        = in.sampleRelPath;
+        L.rootNote      = in.rootNote;
+        L.rootMidi      = in.rootMidi;
+        L.volume        = 1.0f;
         L.pitchTracking = in.pitchTracking;
         L.oneShotMode   = in.oneShotMode;
+    }
+    for (size_t i = 1; i < p.layers.size(); ++i)
+    {
+        p.layers[i].enabled = false;
+        p.layers[i].volume = 0.0f;
     }
     p.hasSourceImport         = true;
     p.sourceOriginalFileName  = in.originalFileName;
