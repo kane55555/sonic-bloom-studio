@@ -14,6 +14,20 @@ project(DIDITAGAIN_STUDIO VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Visual Studio 18/2026 Insider's MSVC 14.51 compiler currently hits multiple
+# internal compiler errors inside JUCE itself (VST3 SDK json.h, audio metadata
+# templates, and juce_RenderingHelpers.h). Do not keep retrying cl.exe; use the
+# ClangCL toolset that ships with the VS C++ workload instead.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" AND MSVC_VERSION GREATER_EQUAL 1950)
+    option(DIDITAGAIN_ALLOW_MSVC_1451 "Force use of the known-broken MSVC 14.51 compiler" OFF)
+    if(NOT DIDITAGAIN_ALLOW_MSVC_1451)
+        message(FATAL_ERROR
+            "MSVC ${MSVC_VERSION} / Visual Studio 2026 Insiders is currently crashing while compiling JUCE. "
+            "Install the 'C++ Clang tools for Windows' component in Visual Studio Installer, delete the build folder, "
+            "then reconfigure with: cmake -S . -B build -G \"Visual Studio 18 2026\" -A x64 -T ClangCL -DJUCE_DIR=C:/JUCE")
+    endif()
+endif()
+
 # Keep MSVC preview/stable toolchains away from shared PDB/type-server paths.
 # The VS 2026 Insider linker has been crashing in PDB/type-server and LTCG
 # passes while building JUCE wrappers, so prefer embedded debug info.
