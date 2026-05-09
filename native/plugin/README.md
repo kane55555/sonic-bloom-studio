@@ -54,8 +54,12 @@ Prerequisites:
 - Git
 - JUCE 7.0.x cloned locally (e.g. `C:\JUCE`)
 
+Do **not** use the Visual Studio 18/2026 Insiders generator for this plugin; its
+MSVC 14.51 compiler currently crashes inside the JUCE/VST3 SDK `json.h` wrapper.
+
 ```bat
 cd native\plugin
+if exist build rmdir /s /q build
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DJUCE_DIR=C:/JUCE
 cmake --build build --config Release
 ```
