@@ -41,16 +41,16 @@ public:
 
     static juce::Font getHeadingFont(float size = 18.0f)
     {
-        return juce::Font(juce::Font::getDefaultSansSerifFontName(), size, juce::Font::bold);
+        return juce::Font(juce::FontOptions(juce::Font::getDefaultSansSerifFontName(), size, juce::Font::bold));
     }
 
     static juce::Font getBodyFont(float size = 13.0f)
     {
-        return juce::Font(juce::Font::getDefaultSansSerifFontName(), size, juce::Font::plain);
+        return juce::Font(juce::FontOptions(juce::Font::getDefaultSansSerifFontName(), size, juce::Font::plain));
     }
 
     static juce::Font getMonoFont(float size = 12.0f)
     {
-        return juce::Font(juce::Font::getDefaultMonospacedFontName(), size, juce::Font::plain);
+        return juce::Font(juce::FontOptions(juce::Font::getDefaultMonospacedFontName(), size, juce::Font::plain));
     }
 };
