@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ALL_CATEGORIES, type PresetCategory } from "../../../packages/preset-schema/src";
-import logo from "@/assets/diditagain-logo.jpg";
+import logo from "@/assets/diditagain-logo.png";
 import { SampleCropEditor, defaultCropMetadata, type SampleCropMetadata } from "./SampleCropEditor";
 
 export type ImportCandidate = {
