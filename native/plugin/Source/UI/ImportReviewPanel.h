@@ -353,8 +353,11 @@ private:
         in.originalFileName = row.file.getFileName();
         in.rootNote         = rootName;
         in.rootMidi         = rootMidi;
-        in.pitchTracking    = ! (category == "FXRisers");
-        in.oneShotMode      = (category == "FXRisers");
+        // All imported sounds are treated as sustained, pitched instruments so
+        // they play continuously while a key is held and pitch-track across the
+        // entire keyboard. The looping is applied at the engine level.
+        in.pitchTracking    = true;
+        in.oneShotMode      = false;
         in.needsReview      = false;
         in.rootNoteSource   = "manual";
 

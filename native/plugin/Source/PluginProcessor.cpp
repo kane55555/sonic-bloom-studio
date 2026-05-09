@@ -379,13 +379,25 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                 const auto& requested = presetManager.getRequestedInstrument();
                 synthEngine.setFallbackSynthesisEnabled(requestedSample.isEmpty());
                 if (requestedSample.isNotEmpty())
+                {
                     synthEngine.setSampleSource(requestedSample,
                                                 presetManager.getRequestedSampleRootMidi(),
                                                 presetManager.getRequestedSampleDisplayName());
+                    // Imported sounds = sustained, pitched instruments. Loop the
+                    // sample so holding a key produces a continuous tone instead
+                    // of a one-shot trigger.
+                    synthEngine.setSampleLooping(true);
+                }
                 else if (requested.isNotEmpty() && requested != synthEngine.getInstrumentName())
+                {
                     synthEngine.setInstrument(requested);
+                    synthEngine.setSampleLooping(false);
+                }
                 else if (requested.isEmpty() && synthEngine.getInstrumentName().isNotEmpty())
+                {
                     synthEngine.setInstrument({});
+                    synthEngine.setSampleLooping(false);
+                }
 
                 DIDA_PRESET_LOG("applied serial=" << deferredPresetChange.presetSerial
                     << " mono=" << (deferredPresetChange.monoMode ? "true" : "false")
