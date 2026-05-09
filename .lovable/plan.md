@@ -1,102 +1,91 @@
-# DIDITAGAIN STUDIO — Hybrid Preset Architecture v2
+## Goal
 
-This refactor turns the current Nexus-style sample player into a hybrid preset workstation (70% sampler / 30% editable synth) with a 4-layer engine, macro system, import-review workflow, and a real preset library — without breaking what already works.
+Keep the current "imported sample plays across the piano roll" behavior, but make every imported preset load as a full hybrid instrument (sample + body + air + shimmer/sub + per-category FX + working macros), not as a bare sampler.
 
-The work is large. I'll land it in phased commits so the repo stays buildable after each phase.
+This is a native (C++/JUCE) plugin refactor in `native/plugin/Source/`. Lovable web UI is unchanged except for documentation and an optional preset-edit panel (task 8) which I'll keep minimal.
 
----
+## Scope (in order)
 
-## Phase 1 — Schema & TypeScript types (foundation)
+### 1. New: `Presets/HybridPresetApplier.{h,cpp}`
+Single mapper from `HybridPresetV2` → engine. Owns all V2-to-engine translation that currently lives inline in `PresetManager.cpp`.
 
-**`packages/preset-schema/src/`**
-- `presetTypes.ts` — `HybridPresetV2`, `Layer` (sample/oscillator/noise/texture), `Effects`, `Macro`, `Quality`, `SourceImport`.
-- `importTypes.ts` — `ImportCandidate`, `ImportResult`, `ImportReviewItem`, `RootNoteSource`.
-- `categoryTemplates.ts` — Default templates for all 11 categories (DrillBells, AlienLeads, PainPianos, ChoirsVox, Guitars, DarkPads, Plucks, Bass808, FXRisers, Textures, Uncategorized).
-- `presetValidators.ts` — Zod-style runtime validators + `isLegacyPreset()` / `migrateLegacyToV2()`.
-- `index.ts` — barrel exports + `SCHEMA_VERSION = "2.0.0"`.
+Responsibilities:
+- Layer 1 (Sample): set sample source, root MIDI, `pitchTracking`, `oneShotMode`, per-layer loop, volume, envelope.
+- Layer 2 (Oscillator body): waveform → `oscBWave`, pitch/fine → `oscBPitchOffsetSemis`/detune, volume → `oscBLevel`, enabled flag respected.
+- Layer 3 (Noise/Air): noise type, volume → `noiseLevel`.
+- Layer 4 (Shimmer/Sub): if category Bass808 → sub osc; else → second osc-style shimmer (waveform/pitch+12/detune via existing oscB or sub channel — see task 5).
+- `globalFilter` → APVTS `filterCutoff`/`filterRes`/`filterType`.
+- `effects.*` → APVTS reverb/delay/chorus/saturation/width/limiter parameters.
+- Per-layer amp envelope → voice amp env (Layer 1 wins for the master amp env; support layers use lighter envs internally).
+- Mono mode + glide for Bass808.
+- Calls `synthEngine.setSampleSource`, `setSampleLooping(shouldLoopForCategory(...))`, `setFallbackSynthesisEnabled(false)` when a sample is present.
+- Does **NOT** zero out support layers blindly. Replaces the current `oscBLevel = 0 / sub disabled / noiseLevel = 0` block in `PresetManager.cpp`.
 
-## Phase 2 — Python import pipeline rewrite
+### 2. `PresetManager.cpp`
+- Detect `schemaVersion == "2.0.0"` → delegate to `HybridPresetApplier::apply(preset, apvts, synthEngine, macroMapper)`.
+- V1 path untouched.
 
-**`native/tools/import_samples.py`** (refactor, keep CLI):
-- New layout: `Samples/Imported/<Category>/`, `Presets/User/<Category>/`, `Metadata/Imports/`, `Logs/`.
-- New keyword classifier (DrillBells / AlienLeads / PainPianos / ChoirsVox / Guitars / DarkPads / Plucks / Bass808 / FXRisers / Textures / Uncategorized) with old-name fallback mapping.
-- Stop skipping no-note files. Defaults: Bass808→C2, FXRisers/Textures→C4 + `pitchTracking:false`, others→C5. Set `quality.rootNoteVerified=false` and `needsReview=true` when guessed.
-- Output per file: copied sample + `*.import.json` metadata + `*.didasynthpreset` (built from category template) + `Presets/index.json` upsert.
-- Flags: `--dry-run`, `--inbox`, `--force`, `--review-json` (emits review payload without finalizing).
+### 3. `PluginProcessor.cpp` — looping helper
+Add free function:
+```cpp
+bool shouldLoopForCategory(const juce::String& category, bool oneShotMode, bool layerLoop);
+```
+Rules per spec (FXRisers/oneShotMode → false; DarkPads/Textures → true; layerLoop → true; ChoirsVox optional; bells/plucks/guitars/808 → false unless layerLoop). Replace the unconditional `setSampleLooping(true)` call.
 
-**`native/tools/migrate_old_samples.py`** — walks old `Samples/<Brass|Piano|...>/` layout and re-routes into the new `Imported/<NewCategory>/` + generates presets.
+### 4. `PresetTemplateFactory.cpp` + `HybridPresetGenerator.cpp` — keep support layers alive
+- `PresetTemplateFactory::build` already produces category templates; extend it to fully populate Layers 2/3/4 with the per-category gain/pitch/waveform values from the spec (DrillBells, Bass808, ChoirsVox, PainPianos, AlienLeads, Plucks, DarkPads, Textures, FXRisers).
+- `HybridPresetGenerator::generate`: **remove** the loop that disables/zeroes `layers[i>=1]`. Only override Layer 1 with imported sample data; trust the template for the rest.
+- Set `oneShotMode`/`pitchTracking`/category-specific defaults from the template, not from generator overrides.
 
-**`native/tools/validate_presets.py`** — JSON-schema validator for `.didasynthpreset` v2 files.
+### 5. New: `Presets/MacroMapper.{h,cpp}`
+- Parses `macros[].targets[].path` strings.
+- Supported paths: `globalFilter.cutoff`, `effects.reverb.{mix,size}`, `effects.delay.{mix,feedback}`, `effects.saturation.drive`, `effects.chorus.mix`, `effects.width.amount`, `layers[N].volume`, `glideTime`, `monoMode`.
+- Stores runtime `(apvtsParamID, min, max)` tuples per macro.
+- Called from `PluginProcessor::processBlock` (or via APVTS listener on `macroN`) to push macro values onto target params.
+- Falls back to current hardcoded macro1..8 mapping when a preset has no targets.
 
-## Phase 3 — JUCE engine: layered Voice
+### 6. `DSP/Voice.{h,cpp}` — minor cleanup, no API break
+- Add `RuntimeLayerState` struct + `setLayerState(int, const RuntimeLayerState&)` in `Voice.h`.
+- Internally route to existing `oscBLevel` / `subLevel` / `noiseLevel` / sample fields. APVTS bridge stays. This is the "prepare for real per-layer rendering" hook the spec asks for; the audio path itself does not change in this pass beyond honoring per-layer volumes/pitch from the applier.
 
-**`native/plugin/Source/Sampler/`** (new)
-- `SampleAsset.[h/cpp]`, `SampleMap.[h/cpp]`, `SampleLayer.[h/cpp]`, `RootNoteDetector.[h/cpp]`, `SampleImportMetadata.[h/cpp]`.
-- `SampleLibrary` moves here (forwarding header left in DSP/ for compat).
+### 7. UI — `LayerEditor.h`, `MacroPanel.h`, simple/advanced split
+- `MacroPanel`: keep 8 knobs but pull display names from current preset's macro names (fallback to defaults). Read names from a small `PresetManager` getter.
+- `LayerEditor`: render 4 layer rows (Main Sample / Body / Air / Shimmer-Sub) showing enabled toggle, volume, pitch, waveform (osc layers) or sample source (sample layer), `oneShotMode`/`pitchTracking` toggles for Layer 1.
+- Hide/remove any controls that aren't wired (per spec: don't show fake controls).
 
-**`native/plugin/Source/DSP/Voice.{h,cpp}`** — extend (don't replace):
-- Hold up to 4 layer renderers (sample / oscillator / noise / texture).
-- Per-layer: enabled, gain, pan, pitch+fine, filter, ADSR.
-- Sum layers → global filter → existing `FxChain`.
-- Restores oscillator/noise audibility for non-sample presets (also fixes the silent-preset bug for non-Brass factory presets).
+### 8. Imported-preset edit (minimal)
+Add a "Preset Info" section in `LayerEditor` (or a small new panel) where the user can change category, root note, toggle pitchTracking/oneShotMode, enable/disable layers 2-4, adjust their volume, and save back to the `.didasynthpreset` JSON via `HybridPresetGenerator::toJsonString` + index refresh. Lovable dashboard counterpart deferred — native is the source of truth.
 
-## Phase 4 — Preset system v2 in C++
+### 9. Docs
+Update `docs/HYBRID_LAYER_ENGINE.md`; create `docs/CURRENT_AUDIO_ARCHITECTURE.md` and `docs/IMPORTED_PRESET_PLAYBACK.md` describing layer→DSP mapping, looping rules, macro target system, and what's wired vs planned.
 
-**`native/plugin/Source/Presets/`**
-- `PresetSchema.h` — extend with v2 keys (`schemaVersion`, `layers[]`, `macros[]`, `globalFilter`, `effects.*`).
-- `PresetManager.{h,cpp}` — load v2 presets directly; if `schemaVersion < 2` or absent, route through `PresetMigration::toV2()` then apply.
-- `PresetMigration.{h,cpp}` — legacy `sampler.instrument` → Layer 1 sample preset; legacy oscillator params → Layer 2 oscillator.
-- `PresetIndex.{h,cpp}` — read/write `Presets/index.json`, search by category/tag/needsReview.
-- `PresetTemplateFactory.{h,cpp}` — C++ mirror of `categoryTemplates.ts` for in-plugin "New Preset from Template".
-- `HybridPresetGenerator.{h,cpp}` — given a sample asset + category, build a v2 preset.
-- `FactoryPresets.{h,cpp}` — keep existing factory list; tag schema v1, migrated on load.
+## Out of scope for this pass
+- Reworking the FX chain DSP itself.
+- True multi-voice unison rendering inside a single `SynthVoice`.
+- A full Lovable-side preset editor UI (web). Native edit panel covers task 8.
 
-## Phase 5 — Plugin UI: Simple / Advanced
+## Files touched
 
-**`native/plugin/Source/UI/`**
-- `MainSynthPanel` — add Simple/Advanced toggle.
-- Simple: preset browser, 8 macros, ADSR, cutoff/res, glide, reverb, delay, dist, width, master.
-- Advanced (new): `LayerEditor` (4 tabs), `MacroPanel` (4 macros + mapping), `EffectsPanel` (chain), `ImportReviewPanel` (drop zone + review table → finalize).
-- `PresetBrowser` — category sidebar driven by `PresetIndex`, search + Needs Review filter.
+New:
+- `native/plugin/Source/Presets/HybridPresetApplier.h` / `.cpp`
+- `native/plugin/Source/Presets/MacroMapper.h` / `.cpp`
+- `docs/CURRENT_AUDIO_ARCHITECTURE.md`
+- `docs/IMPORTED_PRESET_PLAYBACK.md`
 
-## Phase 6 — Web admin (`src/`)
+Edited:
+- `native/plugin/Source/Presets/PresetManager.cpp` (delegate V2)
+- `native/plugin/Source/Presets/PresetTemplateFactory.cpp` (full category templates)
+- `native/plugin/Source/Presets/HybridPresetGenerator.cpp` (stop zeroing support layers)
+- `native/plugin/Source/PluginProcessor.cpp` (looping helper, macro mapper hookup)
+- `native/plugin/Source/DSP/Voice.h` / `.cpp` (`RuntimeLayerState`)
+- `native/plugin/Source/DSP/SynthEngine.h` / `.cpp` (forward layer-state setters)
+- `native/plugin/Source/UI/LayerEditor.h` (4-layer editor + preset info)
+- `native/plugin/Source/UI/MacroPanel.h` (dynamic macro names)
+- `native/plugin/CMakeLists.txt` (register new source files)
+- `docs/HYBRID_LAYER_ENGINE.md`
 
-- `pages/PresetsPage.tsx` — replace mock cards with: Library overview, Factory/User tabs, Import dropzone, search, category filters, Needs Review filter, preset grid, detail drawer.
-- `components/admin/PresetImportPanel.tsx` — drop zone + review table (mirrors plugin review screen, talks to local file index via existing backend stubs).
-- `components/admin/PresetBrowserAdmin.tsx` — table/grid powered by `index.json`.
-- `components/admin/PresetTemplateEditor.tsx` — edit category templates JSON.
+## Verification
+After each phase, the plugin must still compile (CMake target). I'll run a compile check at the end. I cannot run audio in the sandbox, so the four acceptance tests (Test A–D) are for you to perform in FL Studio after the build.
 
-All visuals use existing semantic tokens in `index.css` / `tailwind.config.ts`.
-
-## Phase 7 — Tests & docs
-
-- `native/plugin/Tests/PresetValidationTests.cpp` — extend with v2 + migration cases.
-- `native/tools/tests/` — pytest cases: bell→DrillBells, 808→Bass808/C2, FX→FXRisers+pitchTracking false, no-note doesn't skip, old folder migration, schema validates.
-- `src/test/` — Vitest for `presetValidators`.
-- Docs: `docs/PRESET_ARCHITECTURE.md`, `docs/IMPORT_PIPELINE.md`, `docs/HYBRID_LAYER_ENGINE.md`, plus update `DIDITAGAIN_README.md`.
-
----
-
-## Backwards compatibility guarantees
-
-- Existing `.didasynthpreset` files (incl. `Sampled_Brass`) continue to load via `PresetMigration`.
-- Old `Samples/<Instrument>/` folders still resolve at runtime; `migrate_old_samples.py` upgrades them on demand.
-- Existing CLI invocations of `import_samples.py <path>` keep working; new behaviors are additive.
-- Public Voice API (setOscALevel, setFmAmount, etc.) preserved as either functional (Phase 3) or no-ops where the layer system supersedes them.
-
-## Out of scope (call out explicitly)
-
-- No new auth/billing changes.
-- No DSP rewrite of existing oscillator/filter/FX modules — they're reused inside layers.
-- No change to VST3 plugin ID / host automation parameter IDs (keeps existing FL projects loading).
-
-## Suggested commit order
-
-1. Phase 1 (schema + types) — pure additive, no risk.
-2. Phase 2 (Python pipeline + migration script).
-3. Phase 3 + 4 (engine layers + PresetManager v2 + migration) — single coherent C++ commit.
-4. Phase 5 (plugin UI).
-5. Phase 6 (web admin).
-6. Phase 7 (tests + docs).
-
-Approve this and I'll start with Phase 1 immediately. If you'd rather I narrow the first pass (e.g. just Phases 1–3 to unblock the plugin), say so and I'll cut scope.
+## Confirm before I start
+This is a multi-hour native refactor across ~12 files. I'll do it in one pass without further questions unless something is genuinely ambiguous. Reply "go" (or with edits) and I'll execute.
