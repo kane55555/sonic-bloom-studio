@@ -257,9 +257,6 @@ std::shared_ptr<const Multisample> SampleLibrary::loadInstrument(const juce::Str
 
     for (auto& file : files)
     {
-        std::unique_ptr<juce::AudioFormatReader> reader(fm.createReaderFor(file));
-        if (! reader) continue;
-
         int rootMidi = 60;
         int hiVel = 127;
         if (! parseSampleName(file.getFileNameWithoutExtension(), rootMidi, hiVel))
