@@ -6,6 +6,7 @@
 //  audio-processor headers. Implementation lives in PresetBrowser.cpp.
 //==============================================================================
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <juce_core/juce_core.h>
 #include <functional>
 #include <memory>
 

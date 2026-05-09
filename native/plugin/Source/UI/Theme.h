@@ -6,7 +6,7 @@
 //  source compat with existing call sites, but the colour is now teal so all
 //  panels pick up the new look automatically.
 //==============================================================================
-#include <JuceHeader.h>
+#include <juce_graphics/juce_graphics.h>
 
 struct ThemeColors
 {
