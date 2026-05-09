@@ -375,9 +375,16 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                     synthEngine.resetForPresetChange();
 
                 // Swap the active multisample instrument requested by the preset.
+                const auto& requestedSample = presetManager.getRequestedSampleSource();
                 const auto& requested = presetManager.getRequestedInstrument();
-                if (requested.isNotEmpty() && requested != synthEngine.getInstrumentName())
+                if (requestedSample.isNotEmpty())
+                    synthEngine.setSampleSource(requestedSample,
+                                                presetManager.getRequestedSampleRootMidi(),
+                                                presetManager.getRequestedSampleDisplayName());
+                else if (requested.isNotEmpty() && requested != synthEngine.getInstrumentName())
                     synthEngine.setInstrument(requested);
+                else if (requested.isEmpty() && synthEngine.getInstrumentName().startsWith("sample:"))
+                    synthEngine.setInstrument({});
 
                 DIDA_PRESET_LOG("applied serial=" << deferredPresetChange.presetSerial
                     << " mono=" << (deferredPresetChange.monoMode ? "true" : "false")
