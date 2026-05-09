@@ -13,6 +13,7 @@ import ActivationsPage from "./pages/ActivationsPage";
 import SecurityPage from "./pages/SecurityPage";
 import AnnouncementsPage from "./pages/AnnouncementsPage";
 import SettingsPage from "./pages/SettingsPage";
+import SampleLibraryPage from "./pages/SampleLibraryPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
