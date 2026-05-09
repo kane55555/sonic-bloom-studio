@@ -74,12 +74,15 @@ bool HybridPresetApplier::shouldLoopForCategory(const juce::String& category,
     if (layerLoop)   return true;
 
     const auto c = category;
-    if (c == "DarkPads" || c == "Textures") return true;
-    if (c == "ChoirsVox")                    return true;  // sustained vocal pad behavior
-    if (c == "AlienLeads")                   return true;
-    if (c == "Bass808")                      return false; // unless layerLoop
-    if (c == "DrillBells" || c == "Plucks" || c == "PainPianos" || c == "Guitars") return false;
-    if (c == "FXRisers")                     return false;
+    // Melodic / sustained categories autoloop by default.
+    if (c == "DrillBells" || c == "PainPianos" || c == "ChoirsVox"
+        || c == "Guitars"   || c == "DarkPads"  || c == "AlienLeads"
+        || c == "Textures")
+        return true;
+    if (c == "Bass808")  return false; // unless layerLoop / detected loop points
+    if (c == "Plucks")   return false; // typically short
+    if (c == "FXRisers") return false;
+    if (c == "Uncategorized") return true; // melodic-friendly default
     return false;
 }
 
@@ -112,9 +115,17 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
         out.sampleSource    = sampleLayer->source.replace("\\", "/");
         out.sampleRootMidi  = juce::jlimit(0, 127, sampleLayer->rootMidi);
         out.displayName     = p.name;
+        const bool effectiveLoop = sampleLayer->loop || sampleLayer->autoLoop;
         out.shouldLoop      = shouldLoopForCategory(p.category,
                                                     sampleLayer->oneShotMode,
-                                                    sampleLayer->loop);
+                                                    effectiveLoop);
+        out.cropStart       = sampleLayer->cropStart;
+        out.cropEnd         = sampleLayer->cropEnd;
+        out.loopStart       = sampleLayer->loopStart;
+        out.loopEnd         = sampleLayer->loopEnd;
+        out.loopCrossfadeMs = sampleLayer->loopCrossfadeMs;
+        out.oneShotMode     = sampleLayer->oneShotMode;
+        out.pitchTracking   = sampleLayer->pitchTracking;
 
         // Master amp env follows sample layer.
         setFloat(processor, "env1Attack",  sampleLayer->ampEnv.attack);

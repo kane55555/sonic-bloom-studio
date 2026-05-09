@@ -49,6 +49,9 @@ public:
     bool setSampleSource(const juce::String& sourcePath, int rootMidi, const juce::String& displayName = {});
     void setFallbackSynthesisEnabled(bool enabled);
     void setSampleLooping(bool shouldLoop);
+    void setSampleCropLoop(float cropStart, float cropEnd,
+                           float loopStart, float loopEnd,
+                           float crossfadeMs, bool oneShot, bool pitchTracking);
     const juce::String& getInstrumentName() const noexcept { return currentInstrumentName; }
 
     // Apply config to every voice (called when APVTS changes).

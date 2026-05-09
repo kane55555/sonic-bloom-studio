@@ -251,3 +251,16 @@ void SynthEngine::setSampleLooping(bool shouldLoop)
         v.setSampleLooping(shouldLoop);
     });
 }
+
+void SynthEngine::setSampleCropLoop(float cs, float ce, float ls, float le,
+                                    float xfMs, bool oneShot, bool pitchTrack)
+{
+    forEachSynthVoice([&](SynthVoice& v)
+    {
+        v.setCropRange(cs, ce);
+        v.setLoopRange(ls, le);
+        v.setLoopCrossfadeMs(xfMs);
+        v.setOneShotMode(oneShot);
+        v.setPitchTracking(pitchTrack);
+    });
+}
