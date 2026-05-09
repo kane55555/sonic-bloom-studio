@@ -186,8 +186,10 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             if (hiReadPos >= (double) (hiZone->buffer.getNumSamples() - 1)) hiFinished = true;
         }
 
-        // Sine fallback when no sample is loaded
-        if (! hasSampleSource)
+        // Legacy synth fallback only for factory/pure-synth presets. Imported
+        // hybrid presets disable this so a missing sample cannot masquerade as
+        // the same cheap synth sound.
+        if (! hasSampleSource && fallbackSynthesisEnabled)
         {
             const double f = midiToHzD((double) currentMidiNote + (double) pitchOffsetSemis
                                        + (double) oscADetuneCents / 100.0);
