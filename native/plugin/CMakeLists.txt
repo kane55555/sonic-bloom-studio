@@ -61,9 +61,19 @@ if(TARGET juce_audio_processors_headless)
     endif()
 endif()
 
+# NOTE: Do NOT clear juce_audio_processors INTERFACE_SOURCES or INTERFACE_LINK_LIBRARIES.
+# That target carries the actual juce_audio_processors.cpp compile unit and its
+# transitive module dependencies. Clearing them produces undefined symbols at
+# link time (juce::AudioProcessor::*, AudioProcessorParameterGroup, etc.).
+# Strip ARA/LV2 helpers from its link list instead, leaving the rest intact.
 if(TARGET juce_audio_processors)
-    set_property(TARGET juce_audio_processors PROPERTY INTERFACE_SOURCES "")
-    set_property(TARGET juce_audio_processors PROPERTY INTERFACE_LINK_LIBRARIES "juce_gui_extra")
+    get_target_property(_dida_ap_links juce_audio_processors INTERFACE_LINK_LIBRARIES)
+    if(_dida_ap_links)
+        list(REMOVE_ITEM _dida_ap_links
+            juce_lilv_headers juce::juce_lilv_headers
+            juce_ara_headers juce::juce_ara_headers)
+        set_property(TARGET juce_audio_processors PROPERTY INTERFACE_LINK_LIBRARIES "${_dida_ap_links}")
+    endif()
 endif()
 
 foreach(_dida_forbidden_headers IN ITEMS juce_lilv_headers juce_ara_headers)
