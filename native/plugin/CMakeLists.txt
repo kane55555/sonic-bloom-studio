@@ -233,7 +233,10 @@ if(MSVC)
                 target_compile_options(${dida_format_target} PRIVATE
                     /GL- /Gy- /Gw-
                 )
-                target_link_options(${dida_format_target} PRIVATE /LTCG:OFF /DEBUG:NONE)
+                get_target_property(dida_target_type ${dida_format_target} TYPE)
+                if(NOT dida_target_type STREQUAL "OBJECT_LIBRARY")
+                    target_link_options(${dida_format_target} PRIVATE /LTCG:OFF /DEBUG:NONE)
+                endif()
             endif()
         endforeach()
         if(TARGET DIDITAGAIN_STUDIO_VST3)
@@ -275,9 +278,12 @@ if(MSVC)
                     /Gw-
                     $<$<CONFIG:Debug>:/Z7>
                 )
-                target_link_options(${dida_format_target} PRIVATE
-                    /LTCG:OFF
-                )
+                get_target_property(dida_target_type ${dida_format_target} TYPE)
+                if(NOT dida_target_type STREQUAL "OBJECT_LIBRARY")
+                    target_link_options(${dida_format_target} PRIVATE
+                        /LTCG:OFF
+                    )
+                endif()
             endif()
         endforeach()
 
