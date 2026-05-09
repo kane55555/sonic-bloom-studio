@@ -181,48 +181,90 @@ set_target_properties(DIDITAGAIN_STUDIO PROPERTIES
 # enabled. Keep DSP/shared code optimized, but compile only the fragile preset
 # TU and thin format wrappers without optimisation/LTCG.
 if(MSVC)
-    target_compile_options(DIDITAGAIN_STUDIO PUBLIC
-        /EHsc
-        /GL-
-        /Gy-
-        /Gw-
-        /Z7
-        $<$<CONFIG:Release>:/Od>
-        $<$<CONFIG:Release>:/Ob0>
-    )
-
-    target_link_options(DIDITAGAIN_STUDIO PUBLIC
-        /LTCG:OFF
-        /DEBUG:NONE
-    )
-
-    set_source_files_properties(Source/Presets/FactoryPresets.cpp PROPERTIES
-        COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-;/Z7"
-    )
-
-    foreach(dida_format_target DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
-        if(TARGET ${dida_format_target})
-            set_target_properties(${dida_format_target} PROPERTIES
-                INTERPROCEDURAL_OPTIMIZATION FALSE
-                INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
-                MSVC_DEBUG_INFORMATION_FORMAT Embedded
-            )
-            target_compile_options(${dida_format_target} PRIVATE
-                /GL-
-                /Gy-
-                /Gw-
-                /Z7
-            )
-            target_link_options(${dida_format_target} PRIVATE
-                /LTCG:OFF
+if(MSVC)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        # ClangCL: NO debug info anywhere — avoids "Live DEBUG_VALUE analysis" ICE.
+        target_compile_options(DIDITAGAIN_STUDIO PUBLIC
+            /EHsc
+            /GL-
+            /Gy-
+            /Gw-
+            $<$<CONFIG:Release>:/Od>
+            $<$<CONFIG:Release>:/Ob0>
+            -g0
+        )
+        target_link_options(DIDITAGAIN_STUDIO PUBLIC
+            /LTCG:OFF
+            /DEBUG:NONE
+        )
+        set_source_files_properties(Source/Presets/FactoryPresets.cpp PROPERTIES
+            COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-;-g0"
+        )
+        set_source_files_properties(Source/Presets/PresetTemplateFactory.cpp PROPERTIES
+            COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-;-g0"
+        )
+        foreach(dida_format_target DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
+            if(TARGET ${dida_format_target})
+                set_target_properties(${dida_format_target} PROPERTIES
+                    INTERPROCEDURAL_OPTIMIZATION FALSE
+                    INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
+                )
+                target_compile_options(${dida_format_target} PRIVATE
+                    /GL- /Gy- /Gw- -g0
+                )
+                target_link_options(${dida_format_target} PRIVATE /LTCG:OFF)
+            endif()
+        endforeach()
+        if(TARGET DIDITAGAIN_STUDIO_VST3)
+            target_compile_options(DIDITAGAIN_STUDIO_VST3 PRIVATE
+                $<$<CONFIG:Release>:/Od>
+                $<$<CONFIG:Release>:/Ob0>
             )
         endif()
-    endforeach()
-
-    if(TARGET DIDITAGAIN_STUDIO_VST3)
-        target_compile_options(DIDITAGAIN_STUDIO_VST3 PRIVATE
+    else()
+        target_compile_options(DIDITAGAIN_STUDIO PUBLIC
+            /EHsc
+            /GL-
+            /Gy-
+            /Gw-
+            /Z7
             $<$<CONFIG:Release>:/Od>
             $<$<CONFIG:Release>:/Ob0>
         )
+
+        target_link_options(DIDITAGAIN_STUDIO PUBLIC
+            /LTCG:OFF
+            /DEBUG:NONE
+        )
+
+        set_source_files_properties(Source/Presets/FactoryPresets.cpp PROPERTIES
+            COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-;/Z7"
+        )
+
+        foreach(dida_format_target DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
+            if(TARGET ${dida_format_target})
+                set_target_properties(${dida_format_target} PROPERTIES
+                    INTERPROCEDURAL_OPTIMIZATION FALSE
+                    INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
+                    MSVC_DEBUG_INFORMATION_FORMAT Embedded
+                )
+                target_compile_options(${dida_format_target} PRIVATE
+                    /GL-
+                    /Gy-
+                    /Gw-
+                    /Z7
+                )
+                target_link_options(${dida_format_target} PRIVATE
+                    /LTCG:OFF
+                )
+            endif()
+        endforeach()
+
+        if(TARGET DIDITAGAIN_STUDIO_VST3)
+            target_compile_options(DIDITAGAIN_STUDIO_VST3 PRIVATE
+                $<$<CONFIG:Release>:/Od>
+                $<$<CONFIG:Release>:/Ob0>
+            )
+        endif()
     endif()
 endif()
