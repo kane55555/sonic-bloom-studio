@@ -414,13 +414,11 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         }
         else if ((++debugBlockCounter % 128) == 0)
         {
-            juce::String logMessage;
-            logMessage << "waiting serial=" << deferredPresetChange.presetSerial
-                << " blocks=" << deferredPresetChange.ageInBlocks
-                << " heldNotes=" << synthEngine.getHeldNoteCount()
-                << " activeVoices=" << synthEngine.getActiveVoiceCount()
-                << " midiEvents=" << midiMessages.getNumEvents();
-            didaPresetLog(logMessage);
+            didaPresetLog(juce::String("waiting serial=") + juce::String(deferredPresetChange.presetSerial)
+                + " blocks=" + juce::String(deferredPresetChange.ageInBlocks)
+                + " heldNotes=" + juce::String(synthEngine.getHeldNoteCount())
+                + " activeVoices=" + juce::String(synthEngine.getActiveVoiceCount())
+                + " midiEvents=" + juce::String(midiMessages.getNumEvents()));
         }
     }
 
