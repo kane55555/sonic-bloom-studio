@@ -189,32 +189,9 @@ target_sources(DIDITAGAIN_STUDIO PRIVATE
     Source/UI/MainSynthPanel.cpp
     Source/UI/ParameterPanel.cpp
     Source/UI/AudioCropPanel.cpp
-)
-
-# Compile the preset browser outside the plugin target so this lightweight UI
-# translation unit does not inherit audio-processor module availability.
-add_library(DIDITAGAIN_UI_BROWSER OBJECT
     Source/UI/BrowserComponent.cpp
     Source/UI/PresetBrowser.cpp
 )
-
-target_include_directories(DIDITAGAIN_UI_BROWSER PRIVATE
-    Source
-    ${JUCE_DIR}/modules
-)
-
-target_compile_definitions(DIDITAGAIN_UI_BROWSER PRIVATE
-    JUCE_MODULE_AVAILABLE_juce_core=1
-    JUCE_MODULE_AVAILABLE_juce_data_structures=1
-    JUCE_MODULE_AVAILABLE_juce_events=1
-    JUCE_MODULE_AVAILABLE_juce_graphics=1
-    JUCE_MODULE_AVAILABLE_juce_gui_basics=1
-    JUCE_WEB_BROWSER=0
-    JUCE_USE_CURL=0
-    JUCE_DISPLAY_SPLASH_SCREEN=0
-)
-
-target_sources(DIDITAGAIN_STUDIO PRIVATE $<TARGET_OBJECTS:DIDITAGAIN_UI_BROWSER>)
 
 target_include_directories(DIDITAGAIN_STUDIO PRIVATE Source)
 
@@ -281,7 +258,7 @@ if(MSVC)
         set_source_files_properties(Source/Presets/PresetTemplateFactory.cpp PROPERTIES
             COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-"
         )
-        foreach(dida_format_target DIDITAGAIN_UI_BROWSER DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
+        foreach(dida_format_target DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
             if(TARGET ${dida_format_target})
                 set_target_properties(${dida_format_target} PROPERTIES
                     INTERPROCEDURAL_OPTIMIZATION FALSE
@@ -323,7 +300,7 @@ if(MSVC)
             COMPILE_OPTIONS "$<$<CONFIG:Release>:/Od>;$<$<CONFIG:Release>:/Ob0>;/GL-;/Gy-;/Gw-;$<$<CONFIG:Debug>:/Z7>"
         )
 
-        foreach(dida_format_target DIDITAGAIN_UI_BROWSER DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
+        foreach(dida_format_target DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
             if(TARGET ${dida_format_target})
                 set_target_properties(${dida_format_target} PROPERTIES
                     INTERPROCEDURAL_OPTIMIZATION FALSE
