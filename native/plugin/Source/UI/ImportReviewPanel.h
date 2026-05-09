@@ -312,12 +312,14 @@ private:
         // The note suffix is required: SampleLibrary skips any file whose name
         // doesn't match the "_C5" / "_F#3" convention. Without this, the
         // instrument loads empty and the voice falls back to a generic sine.
-        auto userPresets = presetManager->getUserPresetDirectory();
-        auto studioRoot  = userPresets.getParentDirectory().getParentDirectory(); // ".../DIDITAGAIN STUDIO"
-        auto samplesDir  = studioRoot.getChildFile("Samples")
-                                     .getChildFile("Imported")
-                                     .getChildFile(category)
-                                     .getChildFile(safeName);
+        // Samples MUST live under the same root SampleLibrary reads from
+        // (Documents/DIDITAGAIN STUDIO/Samples), NOT under the user-preset
+        // folder (which is in AppData on Windows). Mismatch = silent fallback.
+        auto samplesRoot = dida::SampleLibrary::getSamplesRoot();
+        samplesRoot.createDirectory();
+        auto samplesDir  = samplesRoot.getChildFile("Imported")
+                                      .getChildFile(category)
+                                      .getChildFile(safeName);
         samplesDir.createDirectory();
 
         const juce::String destStem = safeName + "_" + rootName;
