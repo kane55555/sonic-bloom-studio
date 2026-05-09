@@ -65,7 +65,10 @@ juce_add_plugin(DIDITAGAIN_STUDIO
     NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS TRUE
-    COPY_PLUGIN_AFTER_BUILD TRUE
+    # Disabled: auto-copy to "C:\Program Files\Common Files\VST3" requires
+    # an elevated (admin) MSBuild. Use the manual xcopy step from the build
+    # instructions instead, or run cmake/MSBuild from an Administrator shell.
+    COPY_PLUGIN_AFTER_BUILD FALSE
 )
 
 juce_generate_juce_header(DIDITAGAIN_STUDIO)
