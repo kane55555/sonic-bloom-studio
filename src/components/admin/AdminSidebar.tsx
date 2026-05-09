@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { Users, CreditCard, Music, Shield, Monitor, Bell, LayoutDashboard, Settings, Scissors, FileAudio } from "lucide-react";
+import logo from "@/assets/diditagain-logo.png";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
