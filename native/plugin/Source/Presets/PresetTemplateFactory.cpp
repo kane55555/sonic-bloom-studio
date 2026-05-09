@@ -1,4 +1,6 @@
 #include "PresetTemplateFactory.h"
+#include <tuple>
+#include <initializer_list>
 
 namespace dida { namespace preset {
 
