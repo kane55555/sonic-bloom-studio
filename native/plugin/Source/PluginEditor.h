@@ -10,9 +10,9 @@
 #include "UI/SettingsPanel.h"
 #include "UI/AccountPanel.h"
 #include "UI/PresetBrowser.h"
-#include "Debug/PresetCycleTester.h"
 #include "DSP/SampleLibrary.h"
 
+// Visible top-level tabs. Everything else lives in the header MENU dropdown.
 class DiditagainEditor : public juce::AudioProcessorEditor
 {
 public:
@@ -25,29 +25,22 @@ public:
 private:
     DiditagainProcessor& processor;
 
-    enum class Tab { Browser, Layers, Synth, Mod, FX, Import, Settings, Account };
-    Tab currentTab = Tab::Layers;
-    bool advancedMode = true;
+    enum class Tab { Browser, Layers, FX };
+    Tab currentTab = Tab::Browser;
 
+    // Visible tabs only
     juce::TextButton tabBrowser{"BROWSER"};
-    juce::TextButton tabLayers{"LAYERS"};
-    juce::TextButton tabSynth{"SYNTH"};
-    juce::TextButton tabMod{"MOD"};
-    juce::TextButton tabFX{"FX"};
-    juce::TextButton tabImport{"IMPORT"};
-    juce::TextButton tabSettings{"SETTINGS"};
-    juce::TextButton tabAccount{"ACCOUNT"};
-    juce::TextButton modeToggle{"ADVANCED"};
+    juce::TextButton tabLayers {"LAYERS"};
+    juce::TextButton tabFX     {"FX"};
 
-    juce::ComboBox presetSelector;
+    // Header
+    juce::TextButton menuButton{ juce::String::charToString(juce::juce_wchar(0x2630)) }; // ☰
+    juce::ComboBox   presetSelector;
     juce::TextButton prevPreset{"<"};
     juce::TextButton nextPreset{">"};
     juce::TextButton savePreset{"SAVE"};
-    juce::TextButton cycleTestButton{"CYCLE TEST"};
-    juce::TextEditor cycleTestLog;
-    std::unique_ptr<PresetCycleTester> cycleTester;
 
-    // Real content panels.
+    // Panels (Browser/Layers/FX always visible via tabs; rest opened modally)
     std::unique_ptr<LayerEditor>      layerPanel;
     std::unique_ptr<MacroPanel>       macroPanel;
     std::unique_ptr<MainSynthPanel>   synthPanel;
@@ -58,9 +51,17 @@ private:
     std::unique_ptr<SettingsPanel>    settingsPanel;
     std::unique_ptr<AccountPanel>     accountPanel;
 
+    // Modal overlay state
+    juce::Component* overlayPanel = nullptr;
+    juce::TextButton overlayClose{"CLOSE"};
+    juce::Label      overlayTitle;
+
     void setupTabs();
     void switchTab(Tab tab);
     void refreshPresetCombo();
+    void showOverlay(juce::Component* panel, const juce::String& title);
+    void hideOverlay();
+    void openMenu();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(DiditagainEditor)
 };
