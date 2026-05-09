@@ -157,6 +157,7 @@ bool SynthEngine::setMaxPolyphony(int n)
         auto* v = new SynthVoice();
         v->prepare(getSampleRate(), 0);
         v->setMultisample(activeMultisample);
+        v->setFallbackSynthesisEnabled(fallbackSynthesisEnabled);
         addVoice(v);
     }
 
@@ -203,4 +204,35 @@ bool SynthEngine::setInstrument(const juce::String& instrumentName)
     });
 
     return ms != nullptr || instrumentName.isEmpty();
+}
+
+bool SynthEngine::setSampleSource(const juce::String& sourcePath, int rootMidi, const juce::String& displayName)
+{
+    const auto sourceName = sourcePath.isEmpty() ? juce::String()
+        : (juce::String("sample:") + sourcePath + ":" + juce::String(rootMidi));
+    if (sourceName == currentInstrumentName && activeMultisample != nullptr)
+        return true;
+
+    auto ms = sourcePath.isEmpty()
+        ? std::shared_ptr<const dida::Multisample>{}
+        : dida::SampleLibrary::loadSampleSource(sourcePath, rootMidi, displayName);
+
+    activeMultisample = ms;
+    currentInstrumentName = sourceName;
+
+    forEachSynthVoice([&](SynthVoice& v)
+    {
+        v.setMultisample(activeMultisample);
+    });
+
+    return ms != nullptr || sourcePath.isEmpty();
+}
+
+void SynthEngine::setFallbackSynthesisEnabled(bool enabled)
+{
+    fallbackSynthesisEnabled = enabled;
+    forEachSynthVoice([enabled](SynthVoice& v)
+    {
+        v.setFallbackSynthesisEnabled(enabled);
+    });
 }

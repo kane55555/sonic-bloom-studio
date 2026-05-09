@@ -176,6 +176,57 @@ namespace {
         if (! registered) { m.registerBasicFormats(); registered = true; }
         return m;
     }
+
+    juce::File resolveSampleSourceFile(const juce::String& sourcePath)
+    {
+        auto src = sourcePath.replace("\\", "/").trim();
+        if (src.isEmpty()) return {};
+
+        auto file = juce::File(src);
+        if (juce::File::isAbsolutePath(src) && file.existsAsFile())
+            return file;
+
+        auto root = SampleLibrary::getSamplesRoot();
+        if (src.startsWithIgnoreCase("Samples/"))
+            return root.getChildFile(src.substring(8));
+
+        return root.getChildFile(src);
+    }
+
+    bool readSampleZoneFromFile(const juce::File& file, int rootMidi, int hiVel, SampleZone& zone)
+    {
+        auto& fm = formatManager();
+        std::unique_ptr<juce::AudioFormatReader> reader(fm.createReaderFor(file));
+        if (! reader) return false;
+
+        const int numSamples = static_cast<int>(reader->lengthInSamples);
+        if (numSamples <= 0) return false;
+
+        zone.sourceSampleRate = reader->sampleRate > 0 ? reader->sampleRate : 44100.0;
+        zone.rootMidi = juce::jlimit(0, 127, rootMidi);
+        zone.loVel = 0;
+        zone.hiVel = juce::jlimit(1, 127, hiVel);
+        zone.fileName = file.getFileName();
+
+        zone.buffer.setSize(2, numSamples);
+        zone.buffer.clear();
+
+        juce::AudioBuffer<float> tmp(static_cast<int>(reader->numChannels), numSamples);
+        reader->read(&tmp, 0, numSamples, 0, true, true);
+
+        if (reader->numChannels == 1)
+        {
+            zone.buffer.copyFrom(0, 0, tmp, 0, 0, numSamples);
+            zone.buffer.copyFrom(1, 0, tmp, 0, 0, numSamples);
+        }
+        else
+        {
+            zone.buffer.copyFrom(0, 0, tmp, 0, 0, numSamples);
+            zone.buffer.copyFrom(1, 0, tmp, 1, 0, numSamples);
+        }
+
+        return true;
+    }
 }
 
 void SampleLibrary::invalidateCache()
@@ -204,13 +255,8 @@ std::shared_ptr<const Multisample> SampleLibrary::loadInstrument(const juce::Str
     auto ms = std::make_shared<Multisample>();
     ms->instrumentName = name;
 
-    auto& fm = formatManager();
-
     for (auto& file : files)
     {
-        std::unique_ptr<juce::AudioFormatReader> reader(fm.createReaderFor(file));
-        if (! reader) continue;
-
         int rootMidi = 60;
         int hiVel = 127;
         if (! parseSampleName(file.getFileNameWithoutExtension(), rootMidi, hiVel))
@@ -220,34 +266,8 @@ std::shared_ptr<const Multisample> SampleLibrary::loadInstrument(const juce::Str
         }
 
         SampleZone zone;
-        zone.sourceSampleRate = reader->sampleRate > 0 ? reader->sampleRate : 44100.0;
-        zone.rootMidi = rootMidi;
-        zone.loVel = 0;
-        zone.hiVel = hiVel;
-        zone.fileName = file.getFileName();
-
-        const int numSamples = static_cast<int>(reader->lengthInSamples);
-        if (numSamples <= 0) continue;
-
-        zone.buffer.setSize(2, numSamples);
-        zone.buffer.clear();
-
-        // Read into stereo buffer; mirror mono to both channels.
-        juce::AudioBuffer<float> tmp(static_cast<int>(reader->numChannels), numSamples);
-        reader->read(&tmp, 0, numSamples, 0, true, true);
-
-        if (reader->numChannels == 1)
-        {
-            zone.buffer.copyFrom(0, 0, tmp, 0, 0, numSamples);
-            zone.buffer.copyFrom(1, 0, tmp, 0, 0, numSamples);
-        }
-        else
-        {
-            zone.buffer.copyFrom(0, 0, tmp, 0, 0, numSamples);
-            zone.buffer.copyFrom(1, 0, tmp, 1, 0, numSamples);
-        }
-
-        ms->zones.push_back(std::move(zone));
+        if (readSampleZoneFromFile(file, rootMidi, hiVel, zone))
+            ms->zones.push_back(std::move(zone));
     }
 
     if (ms->zones.empty()) return nullptr;
@@ -282,6 +302,38 @@ std::shared_ptr<const Multisample> SampleLibrary::loadInstrument(const juce::Str
         std::lock_guard<std::mutex> lock(cacheMutex());
         cache()[name.toStdString()] = ms;
     }
+    return ms;
+}
+
+std::shared_ptr<const Multisample> SampleLibrary::loadSampleSource(const juce::String& sourcePath,
+                                                                   int rootMidi,
+                                                                   const juce::String& displayName)
+{
+    auto file = resolveSampleSourceFile(sourcePath);
+    if (! file.existsAsFile()) return nullptr;
+
+    const auto cacheKey = (juce::String("sample:") + file.getFullPathName()
+        + ":" + juce::String(rootMidi)).toStdString();
+
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex());
+        auto it = cache().find(cacheKey);
+        if (it != cache().end()) return it->second;
+    }
+
+    SampleZone zone;
+    if (! readSampleZoneFromFile(file, rootMidi, 127, zone))
+        return nullptr;
+
+    auto ms = std::make_shared<Multisample>();
+    ms->instrumentName = displayName.isNotEmpty() ? displayName : file.getFileNameWithoutExtension();
+    ms->zones.push_back(std::move(zone));
+
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex());
+        cache()[cacheKey] = ms;
+    }
+
     return ms;
 }
 

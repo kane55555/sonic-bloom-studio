@@ -35,6 +35,10 @@ public:
 
     // Most recent instrument folder requested by a preset (empty if none).
     const juce::String& getRequestedInstrument() const noexcept { return requestedInstrument; }
+    const juce::String& getRequestedSampleSource() const noexcept { return requestedSampleSource; }
+    int getRequestedSampleRootMidi() const noexcept { return requestedSampleRootMidi; }
+    const juce::String& getRequestedSampleDisplayName() const noexcept { return requestedSampleDisplayName; }
+    bool isCurrentPresetSampleSourceDriven() const noexcept { return requestedSampleSource.isNotEmpty(); }
 
     void toggleFavorite(int index);
     std::vector<int> searchByTag(const juce::String& tag) const;
@@ -51,6 +55,9 @@ private:
     std::vector<PresetInfo> presets;
     int currentIndex = 0;
     juce::String requestedInstrument;
+    juce::String requestedSampleSource;
+    juce::String requestedSampleDisplayName;
+    int requestedSampleRootMidi = 60;
 
     void loadFactoryPresets();
     void loadUserPresets();

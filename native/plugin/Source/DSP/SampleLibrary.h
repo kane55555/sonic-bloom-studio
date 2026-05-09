@@ -71,6 +71,13 @@ public:
     // the folder is missing or contains no usable samples.
     static std::shared_ptr<const Multisample> loadInstrument(const juce::String& name);
 
+    // Loads one exact sample referenced by a generated hybrid preset. This is
+    // the user-import path: the preset owns a specific source file instead of
+    // depending on "folder name = instrument" discovery.
+    static std::shared_ptr<const Multisample> loadSampleSource(const juce::String& sourcePath,
+                                                              int rootMidi,
+                                                              const juce::String& displayName = {});
+
     // Force a rescan (clears the in-memory cache).
     static void invalidateCache();
 

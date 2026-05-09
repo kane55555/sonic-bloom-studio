@@ -203,18 +203,25 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
         if (PresetMigration::parseAny(json, p))
         {
             requestedInstrument = {};
+            requestedSampleSource = {};
+            requestedSampleDisplayName = {};
+            requestedSampleRootMidi = 60;
             for (auto& L : p.layers)
             {
                 if (L.type == LayerType::Sample && L.enabled && L.source.isNotEmpty())
                 {
                     auto src = L.source.replace("\\", "/");
-                    if (src.startsWith("Samples/")) src = src.substring(8);
-                    requestedInstrument = src.upToLastOccurrenceOf("/", false, false);
-                    if (requestedInstrument.isEmpty()) requestedInstrument = src;
+                    requestedSampleSource = src;
+                    requestedSampleRootMidi = juce::jlimit(0, 127, L.rootMidi);
+                    requestedSampleDisplayName = p.name;
                     setParam(processor, "env1Attack",  L.ampEnv.attack);
                     setParam(processor, "env1Decay",   L.ampEnv.decay);
                     setParam(processor, "env1Sustain", L.ampEnv.sustain);
                     setParam(processor, "env1Release", L.ampEnv.release);
+                    setParam(processor, "oscALevel",   L.volume);
+                    setParam(processor, "oscBLevel",   0.0);
+                    setParam(processor, "subOscEnabled", false);
+                    setParam(processor, "noiseLevel",  0.0);
                     break;
                 }
             }
@@ -236,6 +243,9 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
 
     // Sampler instrument (legacy)
     requestedInstrument = {};
+    requestedSampleSource = {};
+    requestedSampleDisplayName = {};
+    requestedSampleRootMidi = 60;
     auto sampler = json.getProperty(key::sampler, juce::var());
     if (sampler.isObject())
         requestedInstrument = sampler.getProperty(key::instrument, "").toString();
