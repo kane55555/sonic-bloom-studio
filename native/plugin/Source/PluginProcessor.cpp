@@ -18,11 +18,9 @@ DiditagainProcessor::DiditagainProcessor()
     {
         presetLoadRequested.store(true, std::memory_order_release);
         presetLoadSerial.fetch_add(1, std::memory_order_acq_rel);
-        juce::String logMessage;
-        logMessage << "load requested serial=" << presetLoadSerial.load(std::memory_order_acquire)
-            << " index=" << presetManager.getCurrentPresetIndex()
-            << " name=" << presetManager.getPresetName(presetManager.getCurrentPresetIndex());
-        didaPresetLog(logMessage);
+        didaPresetLog(juce::String("load requested serial=") + juce::String(presetLoadSerial.load(std::memory_order_acquire))
+            + " index=" + juce::String(presetManager.getCurrentPresetIndex())
+            + " name=" + presetManager.getPresetName(presetManager.getCurrentPresetIndex()));
     };
 }
 
