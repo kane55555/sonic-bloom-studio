@@ -346,10 +346,8 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             // Hard-stop everything so mutation/reset is safe.
             synthEngine.allNotesOff(0, false);
             synthEngine.forEachSynthVoice([](SynthVoice& v) { v.resetNote(); });
-            juce::String logMessage;
-            logMessage << "force-apply silencing voices serial=" << deferredPresetChange.presetSerial
-                << " waitedBlocks=" << deferredPresetChange.ageInBlocks;
-            didaPresetLog(logMessage);
+            didaPresetLog(juce::String("force-apply silencing voices serial=") + juce::String(deferredPresetChange.presetSerial)
+                + " waitedBlocks=" + juce::String(deferredPresetChange.ageInBlocks));
         }
 
         if (canApplyVoiceMutation || sameVoicePool || forceApply)
