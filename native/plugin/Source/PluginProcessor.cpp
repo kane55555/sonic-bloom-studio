@@ -2,7 +2,8 @@
 #include "PluginEditor.h"
 
 #define DIDA_PRESET_LOG(message) \
-    juce::Logger::writeToLog(juce::String("[DIDITAGAIN preset] ") + (juce::String() << message))
+    do { juce::String _didaLogMsg; _didaLogMsg << message; \
+         juce::Logger::writeToLog(juce::String("[DIDITAGAIN preset] ") + _didaLogMsg); } while (false)
 
 DiditagainProcessor::DiditagainProcessor()
     : AudioProcessor(BusesProperties()
