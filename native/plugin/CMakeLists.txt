@@ -125,14 +125,18 @@ target_include_directories(DIDITAGAIN_STUDIO PRIVATE
 # also propagate via the plugin client module target.
 foreach(_dida_vst3_inc_target IN ITEMS DIDITAGAIN_STUDIO_VST3 juce_audio_plugin_client_VST3 juce_vst3_headers)
     if(TARGET ${_dida_vst3_inc_target})
-        target_include_directories(${_dida_vst3_inc_target} INTERFACE
-            "${JUCE_DIR}/modules/juce_audio_processors/format_types/VST3_SDK"
-            "${JUCE_DIR}/modules/juce_audio_processors_headless/format_types/VST3_SDK"
-        )
-        target_include_directories(${_dida_vst3_inc_target} PRIVATE
-            "${JUCE_DIR}/modules/juce_audio_processors/format_types/VST3_SDK"
-            "${JUCE_DIR}/modules/juce_audio_processors_headless/format_types/VST3_SDK"
-        )
+        get_target_property(_dida_vst3_target_type ${_dida_vst3_inc_target} TYPE)
+        if(_dida_vst3_target_type STREQUAL "INTERFACE_LIBRARY")
+            target_include_directories(${_dida_vst3_inc_target} INTERFACE
+                "${JUCE_DIR}/modules/juce_audio_processors/format_types/VST3_SDK"
+                "${JUCE_DIR}/modules/juce_audio_processors_headless/format_types/VST3_SDK"
+            )
+        else()
+            target_include_directories(${_dida_vst3_inc_target} PRIVATE
+                "${JUCE_DIR}/modules/juce_audio_processors/format_types/VST3_SDK"
+                "${JUCE_DIR}/modules/juce_audio_processors_headless/format_types/VST3_SDK"
+            )
+        endif()
     endif()
 endforeach()
 
