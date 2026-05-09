@@ -1,4 +1,14 @@
 cmake_minimum_required(VERSION 3.22)
+
+if(POLICY CMP0141)
+    cmake_policy(SET CMP0141 NEW)
+endif()
+
+# VS 2026/MSVC 14.51 has been crashing in CloseTypeServerPDB/mspdbsrv when
+# JUCE modules use Program Database debug info. Set this before project() so
+# generated .vcxproj files use OldStyle /Z7 embedded debug info instead of /Zi.
+set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "Embedded" CACHE STRING "" FORCE)
+
 project(DIDITAGAIN_STUDIO VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -8,7 +18,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # The VS 2026 Insider linker has been crashing in PDB/type-server and LTCG
 # passes while building JUCE wrappers, so prefer embedded debug info.
 if(MSVC)
-    set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "Embedded")
+    set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "Embedded" CACHE STRING "" FORCE)
 
     # JUCE 8's Sheenbidi sources contain non-ASCII characters; MSVC needs
     # /utf-8 to parse them correctly (otherwise C2065 in ScriptLookup.c).
@@ -23,9 +33,10 @@ if(MSVC)
             CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_DEBUG
             CMAKE_C_FLAGS CMAKE_C_FLAGS_RELEASE CMAKE_C_FLAGS_RELWITHDEBINFO
             CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_DEBUG)
+        string(REGEX REPLACE "/Z[iI]" "/Z7" ${flag_var} "${${flag_var}}")
         string(REGEX REPLACE "/GL(-)?" "" ${flag_var} "${${flag_var}}")
         string(REGEX REPLACE "/LTCG(:[A-Za-z]+)?" "" ${flag_var} "${${flag_var}}")
-        set(${flag_var} "${${flag_var}} /GL-" CACHE STRING "" FORCE)
+        set(${flag_var} "${${flag_var}} /Z7 /GL-" CACHE STRING "" FORCE)
     endforeach()
     foreach(flag_var
             CMAKE_EXE_LINKER_FLAGS CMAKE_EXE_LINKER_FLAGS_RELEASE
@@ -159,7 +170,6 @@ set_target_properties(DIDITAGAIN_STUDIO PROPERTIES
 if(MSVC)
     target_compile_options(DIDITAGAIN_STUDIO PUBLIC
         /EHsc
-        /MP
         /GL-
         /Gy-
         /Gw-
@@ -182,6 +192,7 @@ if(MSVC)
             set_target_properties(${dida_format_target} PROPERTIES
                 INTERPROCEDURAL_OPTIMIZATION FALSE
                 INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
+                MSVC_DEBUG_INFORMATION_FORMAT Embedded
             )
             target_compile_options(${dida_format_target} PRIVATE
                 /GL-

@@ -57,12 +57,14 @@ Prerequisites:
 VS 2026 builds are supported by disabling JUCE's automatic VST3 manifest step in
 CMake. That step compiles/runs JUCE's VST3 helper, which currently triggers an
 MSVC 14.51 internal compiler error around the VST3 SDK `json.h` wrapper.
+The CMake config also forces embedded `/Z7` debug info and disables LTCG/`/GL`
+to avoid VS 2026 PDB/type-server crashes while compiling JUCE modules.
 
 ```bat
 cd native\plugin
 if exist build rmdir /s /q build
 cmake -S . -B build -G "Visual Studio 18 2026" -A x64 -DJUCE_DIR=C:/JUCE
-cmake --build build --config Release
+cmake --build build --config Release --target DIDITAGAIN_STUDIO_VST3 -- /m:1
 ```
 
 Output:
