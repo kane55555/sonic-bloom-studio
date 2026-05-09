@@ -74,6 +74,7 @@ private:
     FxChain fx;
     std::array<std::array<HeldNote, 128>, 16> heldNotes {};
     bool    monoMode = false;
+    bool    fallbackSynthesisEnabled = true;
     std::shared_ptr<const dida::Multisample> activeMultisample;
     juce::String currentInstrumentName;
 };
