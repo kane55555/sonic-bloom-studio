@@ -3,6 +3,7 @@
 #include "Theme.h"
 #include "../Presets/HybridPresetGenerator.h"
 #include "../Presets/PresetManager.h"
+#include "../DSP/SampleLibrary.h"
 
 //==============================================================================
 //  Drag-and-drop user sample importer (Phase 5 — user facing).
@@ -279,6 +280,19 @@ private:
             });
     }
 
+    static juce::String sanitiseForPath(const juce::String& s)
+    {
+        juce::String out;
+        for (auto c : s)
+        {
+            if (juce::CharacterFunctions::isLetterOrDigit(c) || c == '-' || c == '_')
+                out += juce::String::charToString(c);
+            else if (c == ' ')
+                out += "_";
+        }
+        return out.isEmpty() ? juce::String("Sample") : out;
+    }
+
     bool createPresetForRow(Row& row)
     {
         if (presetManager == nullptr) return false;
@@ -289,14 +303,25 @@ private:
         const juce::String category = kCategories[juce::jlimit(1, 5, row.categoryBox.getSelectedId()) - 1];
         const int rootMidi          = juce::jlimit(24, 96, row.rootBox.getSelectedId() - 1);
         const juce::String rootName = midiName(rootMidi);
+        const juce::String safeName = sanitiseForPath(name);
 
-        // Layout: <UserPresets>/../Samples/Imported/<Category>/<file>
+        // Each imported preset gets its OWN instrument folder so SampleLibrary
+        // loads it as a single dedicated multisample. Layout:
+        //   Samples/Imported/<Category>/<SafeName>/<SafeName>_<RootNote>.<ext>
+        //
+        // The note suffix is required: SampleLibrary skips any file whose name
+        // doesn't match the "_C5" / "_F#3" convention. Without this, the
+        // instrument loads empty and the voice falls back to a generic sine.
         auto userPresets = presetManager->getUserPresetDirectory();
         auto studioRoot  = userPresets.getParentDirectory().getParentDirectory(); // ".../DIDITAGAIN STUDIO"
-        auto samplesDir  = studioRoot.getChildFile("Samples").getChildFile("Imported").getChildFile(category);
+        auto samplesDir  = studioRoot.getChildFile("Samples")
+                                     .getChildFile("Imported")
+                                     .getChildFile(category)
+                                     .getChildFile(safeName);
         samplesDir.createDirectory();
 
-        auto destSample = samplesDir.getNonexistentChildFile(row.file.getFileNameWithoutExtension(),
+        const juce::String destStem = safeName + "_" + rootName;
+        auto destSample = samplesDir.getNonexistentChildFile(destStem,
                                                              row.file.getFileExtension(), true);
         if (! row.file.copyFileTo(destSample))
         {
@@ -334,6 +359,8 @@ private:
             return false;
         }
 
+        // Drop any cached multisample so the new folder is picked up immediately.
+        dida::SampleLibrary::invalidateCache();
         presetManager->scanPresetDirectory();
         return true;
     }
