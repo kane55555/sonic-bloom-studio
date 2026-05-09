@@ -10,14 +10,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(MSVC)
     set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "Embedded")
 
-    if(MSVC_VERSION GREATER_EQUAL 1950 AND NOT DIDA_ALLOW_MSVC_2026)
-        message(FATAL_ERROR
-            "MSVC ${MSVC_VERSION} from Visual Studio 18/2026 currently hits an "
-            "internal compiler error in the JUCE/VST3 SDK json.h while building "
-            "DIDITAGAIN_STUDIO_VST3. Delete native/plugin/build and reconfigure "
-            "with Visual Studio 17 2022 instead: cmake -S . -B build -G \"Visual Studio 17 2022\" -A x64 -DJUCE_DIR=C:/JUCE")
-    endif()
-
     # JUCE 8's Sheenbidi sources contain non-ASCII characters; MSVC needs
     # /utf-8 to parse them correctly (otherwise C2065 in ScriptLookup.c).
     add_compile_options(/utf-8)
@@ -72,6 +64,10 @@ juce_add_plugin(DIDITAGAIN_STUDIO
     PLUGIN_MANUFACTURER_CODE Dida
     PLUGIN_CODE Dida
     FORMATS VST3 Standalone
+    # VS 2026/MSVC 14.51 currently ICEs while compiling JUCE's VST3
+    # moduleinfo helper around the VST3 SDK json.h wrapper. Disabling the
+    # automatic manifest skips that helper; hosts can still scan the VST3.
+    VST3_AUTO_MANIFEST FALSE
     IS_SYNTH TRUE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT FALSE

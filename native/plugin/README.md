@@ -49,18 +49,19 @@ native/plugin/
 
 Prerequisites:
 
-- Visual Studio 2022 (Desktop C++ workload)
+- Visual Studio 2026 / MSVC 14.51+ with the Desktop C++ workload
 - CMake 3.22+
 - Git
 - JUCE 7.0.x cloned locally (e.g. `C:\JUCE`)
 
-Do **not** use the Visual Studio 18/2026 Insiders generator for this plugin; its
-MSVC 14.51 compiler currently crashes inside the JUCE/VST3 SDK `json.h` wrapper.
+VS 2026 builds are supported by disabling JUCE's automatic VST3 manifest step in
+CMake. That step compiles/runs JUCE's VST3 helper, which currently triggers an
+MSVC 14.51 internal compiler error around the VST3 SDK `json.h` wrapper.
 
 ```bat
 cd native\plugin
 if exist build rmdir /s /q build
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DJUCE_DIR=C:/JUCE
+cmake -S . -B build -G "Visual Studio 18 2026" -A x64 -DJUCE_DIR=C:/JUCE
 cmake --build build --config Release
 ```
 
