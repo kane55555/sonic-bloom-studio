@@ -13,8 +13,10 @@ static inline void setParamRaw(juce::AudioProcessorParameter* p, float normalise
     if (p != nullptr) p->setValue(normalised);
 }
 
-#define DIDA_PRESET_MANAGER_LOG(message) \
-    juce::Logger::writeToLog(juce::String("[DIDITAGAIN preset-manager] ") + (juce::String() << message))
+static void didaPresetManagerLog(const juce::String& message)
+{
+    juce::Logger::writeToLog(juce::String("[DIDITAGAIN preset-manager] ") + message);
+}
 
 PresetManager::PresetManager(juce::AudioProcessor& proc) : processor(proc)
 {
