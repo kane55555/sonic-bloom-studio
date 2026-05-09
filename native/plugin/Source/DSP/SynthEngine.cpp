@@ -157,6 +157,7 @@ bool SynthEngine::setMaxPolyphony(int n)
         auto* v = new SynthVoice();
         v->prepare(getSampleRate(), 0);
         v->setMultisample(activeMultisample);
+        v->setFallbackSynthesisEnabled(fallbackSynthesisEnabled);
         addVoice(v);
     }
 
@@ -229,6 +230,7 @@ bool SynthEngine::setSampleSource(const juce::String& sourcePath, int rootMidi, 
 
 void SynthEngine::setFallbackSynthesisEnabled(bool enabled)
 {
+    fallbackSynthesisEnabled = enabled;
     forEachSynthVoice([enabled](SynthVoice& v)
     {
         v.setFallbackSynthesisEnabled(enabled);
