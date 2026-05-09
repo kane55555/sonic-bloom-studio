@@ -170,11 +170,11 @@ set_target_properties(DIDITAGAIN_STUDIO PROPERTIES
 if(MSVC)
     target_compile_options(DIDITAGAIN_STUDIO PUBLIC
         /EHsc
-        /MP
         /GL-
         /Gy-
         /Gw-
         /Z7
+        /FS-
         $<$<CONFIG:Release>:/Od>
         $<$<CONFIG:Release>:/Ob0>
     )
@@ -193,12 +193,14 @@ if(MSVC)
             set_target_properties(${dida_format_target} PROPERTIES
                 INTERPROCEDURAL_OPTIMIZATION FALSE
                 INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
+                MSVC_DEBUG_INFORMATION_FORMAT Embedded
             )
             target_compile_options(${dida_format_target} PRIVATE
                 /GL-
                 /Gy-
                 /Gw-
                 /Z7
+                /FS-
             )
             target_link_options(${dida_format_target} PRIVATE
                 /LTCG:OFF
