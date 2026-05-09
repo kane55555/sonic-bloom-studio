@@ -134,13 +134,37 @@ target_sources(DIDITAGAIN_STUDIO PRIVATE
     Source/Licensing/LicenseClient.cpp
     Source/Licensing/AccountState.cpp
     Source/UI/Theme.cpp
-    Source/UI/BrowserComponent.cpp
     Source/UI/KnobLookAndFeel.cpp
     Source/UI/MainSynthPanel.cpp
-    Source/UI/PresetBrowser.cpp
     Source/UI/ParameterPanel.cpp
     Source/UI/AudioCropPanel.cpp
 )
+
+# Compile the preset browser outside the plugin target so this lightweight UI
+# translation unit does not inherit audio-processor/headless module availability.
+add_library(DIDITAGAIN_UI_BROWSER OBJECT
+    Source/UI/BrowserComponent.cpp
+    Source/UI/PresetBrowser.cpp
+)
+
+target_include_directories(DIDITAGAIN_UI_BROWSER PRIVATE Source)
+
+target_compile_definitions(DIDITAGAIN_UI_BROWSER PRIVATE
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+    JUCE_DISPLAY_SPLASH_SCREEN=0
+)
+
+target_link_libraries(DIDITAGAIN_UI_BROWSER
+    PRIVATE
+        juce::juce_core
+        juce::juce_data_structures
+        juce::juce_events
+        juce::juce_graphics
+        juce::juce_gui_basics
+)
+
+target_sources(DIDITAGAIN_STUDIO PRIVATE $<TARGET_OBJECTS:DIDITAGAIN_UI_BROWSER>)
 
 target_include_directories(DIDITAGAIN_STUDIO PRIVATE Source)
 
@@ -155,6 +179,8 @@ target_link_libraries(DIDITAGAIN_STUDIO
     PRIVATE
         juce::juce_audio_basics
         juce::juce_audio_devices
+        juce::juce_audio_formats
+        juce::juce_audio_plugin_client
         juce::juce_audio_processors
         juce::juce_core
         juce::juce_data_structures
