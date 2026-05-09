@@ -10,6 +10,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(MSVC)
     set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "Embedded")
 
+    # JUCE 8's Sheenbidi sources contain non-ASCII characters; MSVC needs
+    # /utf-8 to parse them correctly (otherwise C2065 in ScriptLookup.c).
+    add_compile_options(/utf-8)
+
     # Strip /GL (whole-program optimization) and /LTCG from ALL configs and ALL
     # targets globally, BEFORE add_subdirectory(JUCE). The MSVC ICE in
     # juce_FileChooser.cpp happens during the LTCG "Generating code" pass, so
