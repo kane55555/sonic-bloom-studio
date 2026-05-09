@@ -10,6 +10,7 @@
 #include "UI/SettingsPanel.h"
 #include "UI/AccountPanel.h"
 #include "UI/PresetBrowser.h"
+#include "UI/AudioCropPanel.h"
 #include "DSP/SampleLibrary.h"
 
 // Visible top-level tabs. Everything else lives in the header MENU dropdown.
@@ -25,13 +26,14 @@ public:
 private:
     DiditagainProcessor& processor;
 
-    enum class Tab { Browser, Layers, FX };
+    enum class Tab { Browser, Layers, FX, AudioCrop };
     Tab currentTab = Tab::Browser;
 
     // Visible tabs only
-    juce::TextButton tabBrowser{"BROWSER"};
-    juce::TextButton tabLayers {"LAYERS"};
-    juce::TextButton tabFX     {"FX"};
+    juce::TextButton tabBrowser  {"BROWSER"};
+    juce::TextButton tabLayers   {"LAYERS"};
+    juce::TextButton tabFX       {"FX"};
+    juce::TextButton tabAudioCrop{"AUDIO CROP"};
 
     // Header
     juce::TextButton menuButton{ juce::String::charToString(juce::juce_wchar(0x2630)) }; // ☰
@@ -50,6 +52,7 @@ private:
     std::unique_ptr<ImportReviewPanel> importPanel;
     std::unique_ptr<SettingsPanel>    settingsPanel;
     std::unique_ptr<AccountPanel>     accountPanel;
+    std::unique_ptr<AudioCropPanel>   audioCropPanel;
 
     // Modal overlay state
     juce::Component* overlayPanel = nullptr;

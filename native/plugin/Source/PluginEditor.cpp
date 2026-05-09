@@ -39,6 +39,9 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
 
     presetBrowserPanel = std::make_unique<PresetBrowser>();
     addAndMakeVisible(*presetBrowserPanel);
+
+    audioCropPanel = std::make_unique<AudioCropPanel>();
+    addChildComponent(*audioCropPanel);
     {
         auto& pm = processor.getPresetManager();
         juce::StringArray names, cats;
@@ -88,9 +91,10 @@ void DiditagainEditor::setupTabs()
         btn.setColour(juce::TextButton::textColourOffId, C.textSecondary);
         addAndMakeVisible(btn);
     };
-    setupTab(tabBrowser, Tab::Browser);
-    setupTab(tabLayers,  Tab::Layers);
-    setupTab(tabFX,      Tab::FX);
+    setupTab(tabBrowser,   Tab::Browser);
+    setupTab(tabLayers,    Tab::Layers);
+    setupTab(tabFX,        Tab::FX);
+    setupTab(tabAudioCrop, Tab::AudioCrop);
 
     menuButton.setColour(juce::TextButton::buttonColourId, C.surface);
     menuButton.setColour(juce::TextButton::textColourOffId, C.accentTeal);
@@ -179,6 +183,7 @@ void DiditagainEditor::switchTab(Tab tab)
     if (layerPanel)         layerPanel->setVisible(tab == Tab::Layers);
     if (presetBrowserPanel) presetBrowserPanel->setVisible(tab == Tab::Browser);
     if (fxPanel)            fxPanel->setVisible(tab == Tab::FX && overlayPanel == nullptr);
+    if (audioCropPanel)     audioCropPanel->setVisible(tab == Tab::AudioCrop);
     repaint();
 }
 
@@ -208,7 +213,8 @@ void DiditagainEditor::paint(juce::Graphics& g)
     };
     tabUnder(tabBrowser, currentTab == Tab::Browser);
     tabUnder(tabLayers,  currentTab == Tab::Layers);
-    tabUnder(tabFX,      currentTab == Tab::FX);
+    tabUnder(tabFX,        currentTab == Tab::FX);
+    tabUnder(tabAudioCrop, currentTab == Tab::AudioCrop);
 
     // Macro band background
     if (macroPanel)
@@ -242,9 +248,10 @@ void DiditagainEditor::resized()
 
     // Tabs (centered-ish, left of preset cluster)
     int tabsLeft = 320;
-    tabBrowser.setBounds(tabsLeft + 0 * 90, 18, 80, 26);
-    tabLayers .setBounds(tabsLeft + 1 * 90, 18, 80, 26);
-    tabFX     .setBounds(tabsLeft + 2 * 90, 18, 80, 26);
+    tabBrowser  .setBounds(tabsLeft + 0 * 90, 18, 80, 26);
+    tabLayers   .setBounds(tabsLeft + 1 * 90, 18, 80, 26);
+    tabFX       .setBounds(tabsLeft + 2 * 90, 18, 80, 26);
+    tabAudioCrop.setBounds(tabsLeft + 3 * 90, 18, 100, 26);
 
     const int macroH = 110;
     auto full = juce::Rectangle<int>(8, 64, getWidth() - 16, getHeight() - 72);
@@ -256,6 +263,7 @@ void DiditagainEditor::resized()
     if (layerPanel)         layerPanel->setBounds(content);
     if (presetBrowserPanel) presetBrowserPanel->setBounds(content);
     if (fxPanel)            fxPanel->setBounds(content);
+    if (audioCropPanel)     audioCropPanel->setBounds(content);
 
     // Modal overlay region (smaller, centered)
     auto modal = getLocalBounds().reduced(80, 90).withTrimmedTop(10);
