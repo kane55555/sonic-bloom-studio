@@ -67,7 +67,14 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
         multisample->pickZonesForNote(playedMidi, playedVel, &loZone, &hiZone, zoneXfade);
     }
 
-    loReadPos = hiReadPos = 0.0;
+    // Start at cropStart (in samples) so the user-trimmed region plays first.
+    auto startPos = [this](const dida::SampleZone* z) -> double {
+        if (z == nullptr) return 0.0;
+        const double n = (double) z->buffer.getNumSamples();
+        return juce::jlimit(0.0, n - 2.0, (double) cropStartFrac * n);
+    };
+    loReadPos = startPos(loZone);
+    hiReadPos = startPos(hiZone);
     loFinished = (loZone == nullptr);
     hiFinished = (hiZone == nullptr);
     oscBPhase = subPhase = fmModPhase = 0.0;
@@ -153,7 +160,36 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         if (z == nullptr) return 1.0;
         const double playedHz = midiToHzD(currentMidiNote + (double) pitchOffsetSemis);
         const double rootHz   = midiToHzD((double) z->rootMidi);
-        return (z->sourceSampleRate / sampleRate) * (playedHz / rootHz);
+        const double srRatio  = z->sourceSampleRate / sampleRate;
+        return pitchTracking ? srRatio * (playedHz / rootHz) : srRatio;
+    };
+
+    // Helper: read a zone with crop/loop crossfade respected.
+    auto readWithLoop = [this](const dida::SampleZone& z, double& pos, bool& finished,
+                               float& outL, float& outR)
+    {
+        const double n = (double) z.buffer.getNumSamples();
+        const double cropEnd  = juce::jlimit(2.0, n - 1.0, (double) cropEndFrac  * n);
+        const double loopStart = juce::jlimit(0.0, cropEnd - 2.0, (double) loopStartFrac * n);
+        const double loopEnd   = juce::jlimit(loopStart + 2.0, cropEnd, (double) loopEndFrac * n);
+        const double xfadeSamples = juce::jlimit(0.0, (loopEnd - loopStart) * 0.45,
+                                                 (double) loopCrossfadeMs * 0.001 * sampleRate);
+
+        readZone(z, pos, outL, outR);
+
+        // Equal-power crossfade tail near loopEnd: blend with samples from loopStart
+        if (sampleLooping && ! oneShotMode && xfadeSamples > 1.0
+            && pos > loopEnd - xfadeSamples)
+        {
+            const double into = pos - (loopEnd - xfadeSamples);
+            const double t = juce::jlimit(0.0, 1.0, into / xfadeSamples);
+            const float gIn  = std::sin((float) t * juce::MathConstants<float>::halfPi);
+            const float gOut = std::cos((float) t * juce::MathConstants<float>::halfPi);
+            float bL, bR;
+            readZone(z, loopStart + into, bL, bR);
+            outL = outL * gOut + bL * gIn;
+            outR = outR * gOut + bR * gIn;
+        }
     };
 
     for (int s = startSample; s < startSample + numSamples; ++s)
