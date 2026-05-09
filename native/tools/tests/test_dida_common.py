@@ -57,17 +57,18 @@ class TestVelocityDetection:
         assert detect_velocity("Pad_v127") == 127
 
     def test_velocity_words_extended(self):
-        # New velocity vocabulary requested by user
-        assert detect_velocity("note_sustained") == 95
-        assert detect_velocity("piano_long_held") == 90
-        assert detect_velocity("hat_short") == 110
-        assert detect_velocity("string_stab") == 120
-        assert detect_velocity("bass_low") == 80
-        assert detect_velocity("vox_sistain") == 95
+        # New velocity vocabulary requested by user — word boundaries require
+        # non-word separators (space / dash), not underscores.
+        assert detect_velocity("note sustained") == 95
+        assert detect_velocity("piano long held") == 90
+        assert detect_velocity("hat-short") == 110
+        assert detect_velocity("string stab") == 120
+        assert detect_velocity("bass low") == 80
+        assert detect_velocity("vox sistain") == 95
 
     def test_velocity_classic_dynamics(self):
-        assert detect_velocity("piano_pp") == 35
-        assert detect_velocity("brass_fff") == 127
+        assert detect_velocity("piano pp") == 35
+        assert detect_velocity("brass fff") == 127
 
     def test_velocity_none(self):
         assert detect_velocity("just_a_name") is None
