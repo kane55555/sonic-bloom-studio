@@ -46,6 +46,7 @@ public:
     // Set the active multisample instrument by folder name (under Documents/
     // DIDITAGAIN STUDIO/Samples). Empty name = silence. Returns true on success.
     bool setInstrument(const juce::String& instrumentName);
+    bool setSampleSource(const juce::String& sourcePath, int rootMidi, const juce::String& displayName = {});
     const juce::String& getInstrumentName() const noexcept { return currentInstrumentName; }
 
     // Apply config to every voice (called when APVTS changes).
