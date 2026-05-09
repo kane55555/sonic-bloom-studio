@@ -317,14 +317,12 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         deferredPresetChange.presetSerial = latestPresetSerial;
         deferredPresetChange.ageInBlocks = previousAge;
 
-        juce::String logMessage;
-        logMessage << "queued serial=" << deferredPresetChange.presetSerial
-            << " mono=" << (deferredPresetChange.monoMode ? "true" : "false")
-            << " poly=" << deferredPresetChange.polyphony
-            << " appliedMono=" << (appliedMonoMode ? "true" : "false")
-            << " appliedPoly=" << appliedPolyphony
-            << " midiEvents=" << midiMessages.getNumEvents();
-        didaPresetLog(logMessage);
+        didaPresetLog(juce::String("queued serial=") + juce::String(deferredPresetChange.presetSerial)
+            + " mono=" + (deferredPresetChange.monoMode ? "true" : "false")
+            + " poly=" + juce::String(deferredPresetChange.polyphony)
+            + " appliedMono=" + (appliedMonoMode ? "true" : "false")
+            + " appliedPoly=" + juce::String(appliedPolyphony)
+            + " midiEvents=" + juce::String(midiMessages.getNumEvents()));
     }
 
     // Preset stepping may change mono/poly and requested polyphony every click.
