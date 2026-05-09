@@ -437,16 +437,37 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         v.getModEnv().setSustain(mS);     v.getModEnv().setRelease(mR);
     });
 
-    // ---- FX parameters ----
+    // ---- Macros: each macro modulates one audible parameter so the
+    // performance knobs always do something musical. ----
+    const float m1 = getF("macro1"); // Brightness  -> filter cutoff offset
+    const float m2 = getF("macro2"); // Movement    -> chorus mix
+    const float m3 = getF("macro3"); // Body        -> osc B level
+    const float m4 = getF("macro4"); // Air         -> noise level
+    const float m5 = getF("macro5"); // Shimmer     -> reverb size offset
+    const float m6 = getF("macro6"); // Drive       -> saturation
+    const float m7 = getF("macro7"); // Space       -> reverb mix
+    const float m8 = getF("macro8"); // Width       -> chorus depth
+
+    // ---- FX parameters (with macro modulation, all clamped 0..1) ----
+    auto clamp01 = [](float v) { return juce::jlimit(0.0f, 1.0f, v); };
     auto& fx = synthEngine.getFx();
-    fx.setSaturationDrive(getF("fxDistortionAmount"));
-    fx.setSaturationMix  (getF("fxDistortionAmount") > 0.0001f ? 1.0f : 0.0f);
-    fx.setChorusMix(getF("fxChorusMix"));
+
+    const float driveAmt   = clamp01(getF("fxDistortionAmount") + m6 * 0.6f);
+    fx.setSaturationDrive(driveAmt);
+    fx.setSaturationMix  (driveAmt > 0.0001f ? 1.0f : 0.0f);
+
+    const float chorusMix  = clamp01(getF("fxChorusMix")  + m2 * 0.5f);
+    fx.setChorusMix  (chorusMix);
+    fx.setChorusRate (0.4f + m2 * 1.6f);          // 0.4..2.0 Hz
+    fx.setChorusDepth(juce::jlimit(0.05f, 1.0f, 0.25f + m8 * 0.5f));
+
     fx.setDelayMix(getF("fxDelayMix"));
     fx.setDelayTime(getF("fxDelayTime"));
     fx.setDelayFeedback(getF("fxDelayFeedback"));
-    fx.setReverbMix(getF("fxReverbMix"));
-    fx.setReverbSize(getF("fxReverbSize"));
+
+    fx.setReverbMix (clamp01(getF("fxReverbMix")  + m7 * 0.6f));
+    fx.setReverbSize(clamp01(getF("fxReverbSize") + m5 * 0.5f));
+
     fx.setEqLowDb (getF("eqLow"));
     fx.setEqMidDb (getF("eqMid"));
     fx.setEqHighDb(getF("eqHigh"));
@@ -456,6 +477,18 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     fx.setLimiterCeilingDb(getF("limiterCeiling"));
     fx.setWetHighPassHz(getF("fxWetHighPass"));
     fx.setMasterGainDb(getF("masterGain"));
+
+    // Apply macro 1/3/4 inside the per-voice loop above by re-adjusting
+    // a few key voice params now that the snapshot has been pushed.
+    const float macroCutoff = std::pow(2.0f, (m1 - 0.5f) * 4.0f); // 0.0625..16x
+    const float macroOscB   = clamp01(oscBLevel + m3 * 0.7f);
+    const float macroNoise  = clamp01(noiseLvl  + m4 * 0.5f);
+    synthEngine.forEachSynthVoice([&](SynthVoice& v)
+    {
+        v.setBaseCutoff(juce::jlimit(20.0f, 20000.0f, cutoff * macroCutoff));
+        v.setOscBLevel(macroOscB);
+        v.setNoiseLevel(macroNoise);
+    });
 
     // ---- Render voices + FX (master gain + limiter applied inside FX chain) ----
     synthEngine.renderBlockWithFx(buffer, midiMessages, 0, buffer.getNumSamples());
