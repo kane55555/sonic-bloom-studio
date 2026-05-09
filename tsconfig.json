@@ -5,9 +5,8 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/*": ["./src/*"],
+      "@diditagain/preset-schema": ["./packages/preset-schema/src/index.ts"]
     },
     "skipLibCheck": true,
     "strictNullChecks": false

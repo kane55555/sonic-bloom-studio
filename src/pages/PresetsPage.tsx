@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Music, Upload, Star, Search, AlertCircle, Filter, Layers } from "lucide-react";
-import { ALL_CATEGORIES, type PresetCategory } from "@diditagain/preset-schema";
+import { ALL_CATEGORIES, type PresetCategory } from "../../packages/preset-schema/src";
 
 type IndexEntry = {
   presetId: string;
