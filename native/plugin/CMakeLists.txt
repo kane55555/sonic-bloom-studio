@@ -109,9 +109,6 @@ target_sources(DIDITAGAIN_STUDIO PRIVATE
     Source/PluginEditor.h
 )
 
-set(_dida_audio_processor_runtime "${CMAKE_CURRENT_BINARY_DIR}/DidaJuceAudioProcessorRuntime.cpp")
-file(WRITE "${_dida_audio_processor_runtime}" "#include <juce_audio_processors_headless/juce_audio_processors_headless.cpp>\n#include <juce_audio_processors/juce_audio_processors.cpp>\n")
-target_sources(DIDITAGAIN_STUDIO PRIVATE "${_dida_audio_processor_runtime}")
 
 target_include_directories(DIDITAGAIN_STUDIO PRIVATE
     Source
