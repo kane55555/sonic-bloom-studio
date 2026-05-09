@@ -332,7 +332,10 @@ private:
             return false;
         }
 
-        auto sampleRel = destSample.getRelativePathFrom(studioRoot).replaceCharacter('\\', '/');
+        // Build a "Samples/Imported/<Cat>/<Name>/<File>" relative path that
+        // PresetManager strips back into the SampleLibrary instrument name.
+        auto sampleRel = juce::String("Samples/")
+            + destSample.getRelativePathFrom(samplesRoot).replaceCharacter('\\', '/');
 
         dida::preset::HybridPresetGenerator::Inputs in;
         in.category         = category;
