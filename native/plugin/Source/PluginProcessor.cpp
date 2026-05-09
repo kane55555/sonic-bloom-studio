@@ -401,15 +401,13 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                     synthEngine.setSampleLooping(false);
                 }
 
-                juce::String logMessage;
-                logMessage << "applied serial=" << deferredPresetChange.presetSerial
-                    << " mono=" << (deferredPresetChange.monoMode ? "true" : "false")
-                    << " poly=" << deferredPresetChange.polyphony
-                    << " mutatedVoices=" << (voicePoolNeedsMutation ? "true" : "false")
-                    << " forced=" << (forceApply ? "true" : "false")
-                    << " waitedBlocks=" << deferredPresetChange.ageInBlocks
-                    << " instrument=" << synthEngine.getInstrumentName();
-                didaPresetLog(logMessage);
+                didaPresetLog(juce::String("applied serial=") + juce::String(deferredPresetChange.presetSerial)
+                    + " mono=" + (deferredPresetChange.monoMode ? "true" : "false")
+                    + " poly=" + juce::String(deferredPresetChange.polyphony)
+                    + " mutatedVoices=" + (voicePoolNeedsMutation ? "true" : "false")
+                    + " forced=" + (forceApply ? "true" : "false")
+                    + " waitedBlocks=" + juce::String(deferredPresetChange.ageInBlocks)
+                    + " instrument=" + synthEngine.getInstrumentName());
 
                 deferredPresetChange = {};
             }
