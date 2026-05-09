@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import UsersPage from "./pages/UsersPage";
 import SubscriptionsPage from "./pages/SubscriptionsPage";
 import PresetsPage from "./pages/PresetsPage";
+import PresetAdminPage from "./pages/PresetAdminPage";
 import ActivationsPage from "./pages/ActivationsPage";
 import SecurityPage from "./pages/SecurityPage";
 import AnnouncementsPage from "./pages/AnnouncementsPage";
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/users" element={<UsersPage />} />
             <Route path="/subscriptions" element={<SubscriptionsPage />} />
             <Route path="/presets" element={<PresetsPage />} />
+            <Route path="/presets/admin" element={<PresetAdminPage />} />
             <Route path="/activations" element={<ActivationsPage />} />
             <Route path="/security" element={<SecurityPage />} />
             <Route path="/announcements" element={<AnnouncementsPage />} />
