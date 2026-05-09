@@ -24,14 +24,21 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     addChildComponent(*fxPanel);
 
     importPanel = std::make_unique<ImportReviewPanel>();
+    importPanel->presetManager = &processor.getPresetManager();
     importPanel->onRescan = [this]() {
         processor.getPresetManager().scanPresetDirectory();
         refreshPresetCombo();
     };
+    importPanel->onPresetsCreated = [this]() {
+        processor.getPresetManager().scanPresetDirectory();
+        refreshPresetCombo();
+    };
     importPanel->onOpenInbox = [this]() {
-        auto inbox = processor.getPresetManager().getUserPresetDirectory().getChildFile("_inbox");
-        inbox.createDirectory();
-        inbox.revealToUser();
+        auto userPresets = processor.getPresetManager().getUserPresetDirectory();
+        auto samples = userPresets.getParentDirectory().getParentDirectory()
+                        .getChildFile("Samples").getChildFile("Imported");
+        samples.createDirectory();
+        samples.revealToUser();
     };
     addChildComponent(*importPanel);
 
