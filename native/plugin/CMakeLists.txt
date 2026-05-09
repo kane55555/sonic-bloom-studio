@@ -32,15 +32,25 @@ if(MSVC)
     # targets globally, BEFORE add_subdirectory(JUCE). The MSVC ICE in
     # juce_FileChooser.cpp happens during the LTCG "Generating code" pass, so
     # JUCE's own object libraries must also be compiled without /GL.
+    # ClangCL crashes in "Live DEBUG_VALUE analysis" when /Z7 (CodeView) debug
+    # info is requested in Release. Detect ClangCL and use no debug info; for
+    # MSVC proper, keep /Z7 (embedded) to dodge MSVC 14.51 PDB/type-server ICEs.
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        set(DIDA_DEBUG_FLAG "")
+        set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "" CACHE STRING "" FORCE)
+    else()
+        set(DIDA_DEBUG_FLAG "/Z7")
+    endif()
+
     foreach(flag_var
             CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_RELWITHDEBINFO
             CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_DEBUG
             CMAKE_C_FLAGS CMAKE_C_FLAGS_RELEASE CMAKE_C_FLAGS_RELWITHDEBINFO
             CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_DEBUG)
-        string(REGEX REPLACE "/Z[iI]" "/Z7" ${flag_var} "${${flag_var}}")
+        string(REGEX REPLACE "/Z[iI7]" "" ${flag_var} "${${flag_var}}")
         string(REGEX REPLACE "/GL(-)?" "" ${flag_var} "${${flag_var}}")
         string(REGEX REPLACE "/LTCG(:[A-Za-z]+)?" "" ${flag_var} "${${flag_var}}")
-        set(${flag_var} "${${flag_var}} /Z7 /GL-" CACHE STRING "" FORCE)
+        set(${flag_var} "${${flag_var}} ${DIDA_DEBUG_FLAG} /GL-" CACHE STRING "" FORCE)
     endforeach()
     foreach(flag_var
             CMAKE_EXE_LINKER_FLAGS CMAKE_EXE_LINKER_FLAGS_RELEASE
@@ -171,48 +181,90 @@ set_target_properties(DIDITAGAIN_STUDIO PROPERTIES
 # enabled. Keep DSP/shared code optimized, but compile only the fragile preset
 # TU and thin format wrappers without optimisation/LTCG.
 if(MSVC)
-    target_compile_options(DIDITAGAIN_STUDIO PUBLIC
-        /EHsc
-        /GL-
-        /Gy-
-        /Gw-
-        /Z7
-        $<$<CONFIG:Release>:/Od>
-        $<$<CONFIG:Release>:/Ob0>
-    )
-
-    target_link_options(DIDITAGAIN_STUDIO PUBLIC
-        /LTCG:OFF
-        /DEBUG:NONE
-    )
-
-    set_source_files_properties(Source/Presets/FactoryPresets.cpp PROPERTIES
-        COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-;/Z7"
-    )
-
-    foreach(dida_format_target DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
-        if(TARGET ${dida_format_target})
-            set_target_properties(${dida_format_target} PROPERTIES
-                INTERPROCEDURAL_OPTIMIZATION FALSE
-                INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
-                MSVC_DEBUG_INFORMATION_FORMAT Embedded
-            )
-            target_compile_options(${dida_format_target} PRIVATE
-                /GL-
-                /Gy-
-                /Gw-
-                /Z7
-            )
-            target_link_options(${dida_format_target} PRIVATE
-                /LTCG:OFF
+if(MSVC)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        # ClangCL: NO debug info anywhere — avoids "Live DEBUG_VALUE analysis" ICE.
+        target_compile_options(DIDITAGAIN_STUDIO PUBLIC
+            /EHsc
+            /GL-
+            /Gy-
+            /Gw-
+            $<$<CONFIG:Release>:/Od>
+            $<$<CONFIG:Release>:/Ob0>
+            -g0
+        )
+        target_link_options(DIDITAGAIN_STUDIO PUBLIC
+            /LTCG:OFF
+            /DEBUG:NONE
+        )
+        set_source_files_properties(Source/Presets/FactoryPresets.cpp PROPERTIES
+            COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-;-g0"
+        )
+        set_source_files_properties(Source/Presets/PresetTemplateFactory.cpp PROPERTIES
+            COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-;-g0"
+        )
+        foreach(dida_format_target DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
+            if(TARGET ${dida_format_target})
+                set_target_properties(${dida_format_target} PROPERTIES
+                    INTERPROCEDURAL_OPTIMIZATION FALSE
+                    INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
+                )
+                target_compile_options(${dida_format_target} PRIVATE
+                    /GL- /Gy- /Gw- -g0
+                )
+                target_link_options(${dida_format_target} PRIVATE /LTCG:OFF)
+            endif()
+        endforeach()
+        if(TARGET DIDITAGAIN_STUDIO_VST3)
+            target_compile_options(DIDITAGAIN_STUDIO_VST3 PRIVATE
+                $<$<CONFIG:Release>:/Od>
+                $<$<CONFIG:Release>:/Ob0>
             )
         endif()
-    endforeach()
-
-    if(TARGET DIDITAGAIN_STUDIO_VST3)
-        target_compile_options(DIDITAGAIN_STUDIO_VST3 PRIVATE
+    else()
+        target_compile_options(DIDITAGAIN_STUDIO PUBLIC
+            /EHsc
+            /GL-
+            /Gy-
+            /Gw-
+            /Z7
             $<$<CONFIG:Release>:/Od>
             $<$<CONFIG:Release>:/Ob0>
         )
+
+        target_link_options(DIDITAGAIN_STUDIO PUBLIC
+            /LTCG:OFF
+            /DEBUG:NONE
+        )
+
+        set_source_files_properties(Source/Presets/FactoryPresets.cpp PROPERTIES
+            COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-;/Z7"
+        )
+
+        foreach(dida_format_target DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
+            if(TARGET ${dida_format_target})
+                set_target_properties(${dida_format_target} PROPERTIES
+                    INTERPROCEDURAL_OPTIMIZATION FALSE
+                    INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
+                    MSVC_DEBUG_INFORMATION_FORMAT Embedded
+                )
+                target_compile_options(${dida_format_target} PRIVATE
+                    /GL-
+                    /Gy-
+                    /Gw-
+                    /Z7
+                )
+                target_link_options(${dida_format_target} PRIVATE
+                    /LTCG:OFF
+                )
+            endif()
+        endforeach()
+
+        if(TARGET DIDITAGAIN_STUDIO_VST3)
+            target_compile_options(DIDITAGAIN_STUDIO_VST3 PRIVATE
+                $<$<CONFIG:Release>:/Od>
+                $<$<CONFIG:Release>:/Ob0>
+            )
+        endif()
     endif()
 endif()
