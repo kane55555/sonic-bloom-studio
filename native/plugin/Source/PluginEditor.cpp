@@ -24,7 +24,7 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     importPanel->presetManager = &processor.getPresetManager();
     importPanel->onRescan = [this]() { processor.getPresetManager().scanPresetDirectory(); refreshPresetCombo(); };
     importPanel->onPresetsCreated = [this]() { processor.getPresetManager().scanPresetDirectory(); refreshPresetCombo(); };
-    importPanel->onOpenInbox = [this]() {
+    importPanel->onOpenInbox = []() {
         auto samples = dida::SampleLibrary::getSamplesRoot().getChildFile("Imported");
         samples.createDirectory();
         samples.revealToUser();
