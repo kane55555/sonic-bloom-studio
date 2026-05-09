@@ -186,7 +186,7 @@ namespace {
         if (file.isAbsolutePath() && file.existsAsFile())
             return file;
 
-        auto root = getSamplesRoot();
+        auto root = SampleLibrary::getSamplesRoot();
         if (src.startsWithIgnoreCase("Samples/"))
             return root.getChildFile(src.substring(8));
 
