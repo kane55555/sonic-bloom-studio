@@ -235,6 +235,8 @@ target_link_libraries(DIDITAGAIN_STUDIO
         juce::juce_recommended_warning_flags
 )
 
+dida_strip_juce_headless_module()
+
 if(NOT MSVC)
     target_link_libraries(DIDITAGAIN_STUDIO PUBLIC juce::juce_recommended_config_flags)
 endif()
