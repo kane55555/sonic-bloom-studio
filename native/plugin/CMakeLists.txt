@@ -113,7 +113,28 @@ set(_dida_audio_processor_runtime "${CMAKE_CURRENT_BINARY_DIR}/DidaJuceAudioProc
 file(WRITE "${_dida_audio_processor_runtime}" "#include <juce_audio_processors_headless/juce_audio_processors_headless.cpp>\n#include <juce_audio_processors/juce_audio_processors.cpp>\n")
 target_sources(DIDITAGAIN_STUDIO PRIVATE "${_dida_audio_processor_runtime}")
 
-target_include_directories(DIDITAGAIN_STUDIO PRIVATE Source)
+target_include_directories(DIDITAGAIN_STUDIO PRIVATE
+    Source
+    "${JUCE_DIR}/modules/juce_audio_processors/format_types/VST3_SDK"
+    "${JUCE_DIR}/modules/juce_audio_processors_headless/format_types/VST3_SDK"
+)
+
+# Apply the VST3 SDK include path to the generated VST3 wrapper target as well.
+# The juce_add_plugin VST3 target is created during configure, so defer with a
+# generator-friendly approach: add it after target creation if it exists, and
+# also propagate via the plugin client module target.
+foreach(_dida_vst3_inc_target IN ITEMS DIDITAGAIN_STUDIO_VST3 juce_audio_plugin_client_VST3 juce_vst3_headers)
+    if(TARGET ${_dida_vst3_inc_target})
+        target_include_directories(${_dida_vst3_inc_target} INTERFACE
+            "${JUCE_DIR}/modules/juce_audio_processors/format_types/VST3_SDK"
+            "${JUCE_DIR}/modules/juce_audio_processors_headless/format_types/VST3_SDK"
+        )
+        target_include_directories(${_dida_vst3_inc_target} PRIVATE
+            "${JUCE_DIR}/modules/juce_audio_processors/format_types/VST3_SDK"
+            "${JUCE_DIR}/modules/juce_audio_processors_headless/format_types/VST3_SDK"
+        )
+    endif()
+endforeach()
 
 target_compile_definitions(DIDITAGAIN_STUDIO PUBLIC
     JUCE_WEB_BROWSER=0
