@@ -1,5 +1,4 @@
 #include "HybridPresetApplier.h"
-#include "PresetSchema.h"
 
 namespace dida { namespace preset {
 
