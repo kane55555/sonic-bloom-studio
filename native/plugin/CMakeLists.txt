@@ -5,9 +5,9 @@ if(POLICY CMP0141)
 endif()
 
 # VS 2026/MSVC 14.51 has been crashing in CloseTypeServerPDB/mspdbsrv when
-# JUCE modules use Program Database debug info. Set this before project() so
-# generated .vcxproj files use OldStyle /Z7 embedded debug info instead of /Zi.
-set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "Embedded" CACHE STRING "" FORCE)
+# JUCE modules use Program Database debug info. Keep Release configs free of
+# CodeView debug info; only Debug gets embedded debug data for local debugging.
+set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug>:Embedded>" CACHE STRING "" FORCE)
 
 project(DIDITAGAIN_STUDIO VERSION 1.0.0 LANGUAGES CXX)
 
@@ -22,24 +22,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # The VS 2026 Insider linker has been crashing in PDB/type-server and LTCG
 # passes while building JUCE wrappers, so prefer embedded debug info.
 if(MSVC)
-    set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "Embedded" CACHE STRING "" FORCE)
+    set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug>:Embedded>" CACHE STRING "" FORCE)
 
     # JUCE 8's Sheenbidi sources contain non-ASCII characters; MSVC needs
     # /utf-8 to parse them correctly (otherwise C2065 in ScriptLookup.c).
     add_compile_options(/utf-8)
 
-    # Strip /GL (whole-program optimization) and /LTCG from ALL configs and ALL
-    # targets globally, BEFORE add_subdirectory(JUCE). The MSVC ICE in
-    # juce_FileChooser.cpp happens during the LTCG "Generating code" pass, so
-    # JUCE's own object libraries must also be compiled without /GL.
-    # ClangCL crashes in "Live DEBUG_VALUE analysis" when /Z7 (CodeView) debug
-    # info is requested in Release. Detect ClangCL and use no debug info; for
-    # MSVC proper, keep /Z7 (embedded) to dodge MSVC 14.51 PDB/type-server ICEs.
+    # Strip /GL (whole-program optimization), /LTCG, and CodeView debug flags
+    # from ALL configs and ALL targets globally, BEFORE add_subdirectory(JUCE).
+    # Release ClangCL must not receive debug info flags.
     if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-        set(DIDA_DEBUG_FLAG "")
         set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "" CACHE STRING "" FORCE)
-    else()
-        set(DIDA_DEBUG_FLAG "/Z7")
     endif()
 
     foreach(flag_var
@@ -50,7 +43,7 @@ if(MSVC)
         string(REGEX REPLACE "/Z[iI7]" "" ${flag_var} "${${flag_var}}")
         string(REGEX REPLACE "/GL(-)?" "" ${flag_var} "${${flag_var}}")
         string(REGEX REPLACE "/LTCG(:[A-Za-z]+)?" "" ${flag_var} "${${flag_var}}")
-        set(${flag_var} "${${flag_var}} ${DIDA_DEBUG_FLAG} /GL-" CACHE STRING "" FORCE)
+        set(${flag_var} "${${flag_var}} /GL-" CACHE STRING "" FORCE)
     endforeach()
     foreach(flag_var
             CMAKE_EXE_LINKER_FLAGS CMAKE_EXE_LINKER_FLAGS_RELEASE
@@ -134,13 +127,37 @@ target_sources(DIDITAGAIN_STUDIO PRIVATE
     Source/Licensing/LicenseClient.cpp
     Source/Licensing/AccountState.cpp
     Source/UI/Theme.cpp
-    Source/UI/BrowserComponent.cpp
     Source/UI/KnobLookAndFeel.cpp
     Source/UI/MainSynthPanel.cpp
-    Source/UI/PresetBrowser.cpp
     Source/UI/ParameterPanel.cpp
     Source/UI/AudioCropPanel.cpp
 )
+
+# Compile the preset browser outside the plugin target so this lightweight UI
+# translation unit does not inherit audio-processor/headless module availability.
+add_library(DIDITAGAIN_UI_BROWSER OBJECT
+    Source/UI/BrowserComponent.cpp
+    Source/UI/PresetBrowser.cpp
+)
+
+target_include_directories(DIDITAGAIN_UI_BROWSER PRIVATE Source)
+
+target_compile_definitions(DIDITAGAIN_UI_BROWSER PRIVATE
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+    JUCE_DISPLAY_SPLASH_SCREEN=0
+)
+
+target_link_libraries(DIDITAGAIN_UI_BROWSER
+    PRIVATE
+        juce::juce_core
+        juce::juce_data_structures
+        juce::juce_events
+        juce::juce_graphics
+        juce::juce_gui_basics
+)
+
+target_sources(DIDITAGAIN_STUDIO PRIVATE $<TARGET_OBJECTS:DIDITAGAIN_UI_BROWSER>)
 
 target_include_directories(DIDITAGAIN_STUDIO PRIVATE Source)
 
@@ -155,6 +172,8 @@ target_link_libraries(DIDITAGAIN_STUDIO
     PRIVATE
         juce::juce_audio_basics
         juce::juce_audio_devices
+        juce::juce_audio_formats
+        juce::juce_audio_plugin_client
         juce::juce_audio_processors
         juce::juce_core
         juce::juce_data_structures
@@ -184,7 +203,6 @@ set_target_properties(DIDITAGAIN_STUDIO PROPERTIES
 if(MSVC)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
         # ClangCL: NO debug info anywhere — avoids "Live DEBUG_VALUE analysis" ICE.
-        # clang-cl ignores -g0; use MSVC-style switches and CMake property.
         set_property(TARGET DIDITAGAIN_STUDIO PROPERTY MSVC_DEBUG_INFORMATION_FORMAT "")
         target_compile_options(DIDITAGAIN_STUDIO PUBLIC
             /EHsc
@@ -204,7 +222,7 @@ if(MSVC)
         set_source_files_properties(Source/Presets/PresetTemplateFactory.cpp PROPERTIES
             COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-"
         )
-        foreach(dida_format_target DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
+        foreach(dida_format_target DIDITAGAIN_UI_BROWSER DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
             if(TARGET ${dida_format_target})
                 set_target_properties(${dida_format_target} PROPERTIES
                     INTERPROCEDURAL_OPTIMIZATION FALSE
@@ -214,7 +232,10 @@ if(MSVC)
                 target_compile_options(${dida_format_target} PRIVATE
                     /GL- /Gy- /Gw-
                 )
-                target_link_options(${dida_format_target} PRIVATE /LTCG:OFF /DEBUG:NONE)
+                get_target_property(dida_target_type ${dida_format_target} TYPE)
+                if(NOT dida_target_type STREQUAL "OBJECT_LIBRARY")
+                    target_link_options(${dida_format_target} PRIVATE /LTCG:OFF /DEBUG:NONE)
+                endif()
             endif()
         endforeach()
         if(TARGET DIDITAGAIN_STUDIO_VST3)
@@ -229,7 +250,7 @@ if(MSVC)
             /GL-
             /Gy-
             /Gw-
-            /Z7
+            $<$<CONFIG:Debug>:/Z7>
             $<$<CONFIG:Release>:/Od>
             $<$<CONFIG:Release>:/Ob0>
         )
@@ -240,25 +261,28 @@ if(MSVC)
         )
 
         set_source_files_properties(Source/Presets/FactoryPresets.cpp PROPERTIES
-            COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-;/Z7"
+            COMPILE_OPTIONS "$<$<CONFIG:Release>:/Od>;$<$<CONFIG:Release>:/Ob0>;/GL-;/Gy-;/Gw-;$<$<CONFIG:Debug>:/Z7>"
         )
 
-        foreach(dida_format_target DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
+        foreach(dida_format_target DIDITAGAIN_UI_BROWSER DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
             if(TARGET ${dida_format_target})
                 set_target_properties(${dida_format_target} PROPERTIES
                     INTERPROCEDURAL_OPTIMIZATION FALSE
                     INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
-                    MSVC_DEBUG_INFORMATION_FORMAT Embedded
+                    MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug>:Embedded>"
                 )
                 target_compile_options(${dida_format_target} PRIVATE
                     /GL-
                     /Gy-
                     /Gw-
-                    /Z7
+                    $<$<CONFIG:Debug>:/Z7>
                 )
-                target_link_options(${dida_format_target} PRIVATE
-                    /LTCG:OFF
-                )
+                get_target_property(dida_target_type ${dida_format_target} TYPE)
+                if(NOT dida_target_type STREQUAL "OBJECT_LIBRARY")
+                    target_link_options(${dida_format_target} PRIVATE
+                        /LTCG:OFF
+                    )
+                endif()
             endif()
         endforeach()
 

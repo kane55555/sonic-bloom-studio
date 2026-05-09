@@ -2,8 +2,8 @@
 //==============================================================================
 //  PresetBrowser.h — Categorised preset browser with search + tag filter.
 //
-//  Lightweight header: pulls in only juce_gui_basics/juce_core, no
-//  JuceHeader.h, no audio-processor headers. Implementation lives in .cpp.
+//  Lightweight header: pulls in only juce_gui_basics/juce_core.
+//  Implementation lives in .cpp.
 //==============================================================================
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <juce_core/juce_core.h>
