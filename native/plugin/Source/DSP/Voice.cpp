@@ -165,7 +165,7 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
     };
 
     // Helper: read a zone with crop/loop crossfade respected.
-    auto readWithLoop = [this](const dida::SampleZone& z, double& pos, bool& finished,
+    auto readWithLoop = [this](const dida::SampleZone& z, double& pos, [[maybe_unused]] bool& finished,
                                float& outL, float& outR)
     {
         const double n = (double) z.buffer.getNumSamples();
