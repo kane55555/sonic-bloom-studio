@@ -1,145 +1,51 @@
 cmake_minimum_required(VERSION 3.22)
 
-if(POLICY CMP0141)
-    cmake_policy(SET CMP0141 NEW)
-endif()
-
-# VS 2026/MSVC 14.51 has been crashing in CloseTypeServerPDB/mspdbsrv when
-# JUCE modules use Program Database debug info. Set this before project() so
-# generated .vcxproj files use OldStyle /Z7 embedded debug info instead of /Zi.
-set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "Embedded" CACHE STRING "" FORCE)
-
-project(DIDITAGAIN_STUDIO VERSION 1.0.0 LANGUAGES CXX)
+project(DIDITAGAIN_STUDIO VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Visual Studio 18/2026 Insider's MSVC 14.51 has previously hit internal
-# compiler errors inside JUCE. Keep the standard MSVC generator/toolchain as the
-# default and capture the first real compiler error if one appears.
-
-# Keep MSVC preview/stable toolchains away from shared PDB/type-server paths.
-# The VS 2026 Insider linker has been crashing in PDB/type-server and LTCG
-# passes while building JUCE wrappers, so prefer embedded debug info.
-if(MSVC)
-    set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "Embedded" CACHE STRING "" FORCE)
-
-    # JUCE 8's Sheenbidi sources contain non-ASCII characters; MSVC needs
-    # /utf-8 to parse them correctly (otherwise C2065 in ScriptLookup.c).
-    add_compile_options(/utf-8)
-
-    # Strip /GL (whole-program optimization) and /LTCG from ALL configs and ALL
-    # targets globally, BEFORE add_subdirectory(JUCE). The MSVC ICE in
-    # juce_FileChooser.cpp happens during the LTCG "Generating code" pass, so
-    # JUCE's own object libraries must also be compiled without /GL.
-    # ClangCL crashes in "Live DEBUG_VALUE analysis" when /Z7 (CodeView) debug
-    # info is requested in Release. Detect ClangCL and use no debug info; for
-    # MSVC proper, keep /Z7 (embedded) to dodge MSVC 14.51 PDB/type-server ICEs.
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-        set(DIDA_DEBUG_FLAG "")
-        set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "" CACHE STRING "" FORCE)
-    else()
-        set(DIDA_DEBUG_FLAG "/Z7")
-    endif()
-
-    foreach(flag_var
-            CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_RELWITHDEBINFO
-            CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_DEBUG
-            CMAKE_C_FLAGS CMAKE_C_FLAGS_RELEASE CMAKE_C_FLAGS_RELWITHDEBINFO
-            CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_DEBUG)
-        string(REGEX REPLACE "/Z[iI7]" "" ${flag_var} "${${flag_var}}")
-        string(REGEX REPLACE "/GL(-)?" "" ${flag_var} "${${flag_var}}")
-        string(REGEX REPLACE "/LTCG(:[A-Za-z]+)?" "" ${flag_var} "${${flag_var}}")
-        set(${flag_var} "${${flag_var}} ${DIDA_DEBUG_FLAG} /GL-" CACHE STRING "" FORCE)
-    endforeach()
-    foreach(flag_var
-            CMAKE_EXE_LINKER_FLAGS CMAKE_EXE_LINKER_FLAGS_RELEASE
-            CMAKE_SHARED_LINKER_FLAGS CMAKE_SHARED_LINKER_FLAGS_RELEASE
-            CMAKE_MODULE_LINKER_FLAGS CMAKE_MODULE_LINKER_FLAGS_RELEASE
-            CMAKE_STATIC_LINKER_FLAGS CMAKE_STATIC_LINKER_FLAGS_RELEASE)
-        string(REGEX REPLACE "/LTCG(:[A-Za-z]+)?" "" ${flag_var} "${${flag_var}}")
-        set(${flag_var} "${${flag_var}} /LTCG:OFF" CACHE STRING "" FORCE)
-    endforeach()
-
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE OFF)
+# Locate JUCE. The JUCE_DIR variable can be passed via -DJUCE_DIR=... or the
+# environment.  Defaults to a sibling JUCE checkout, which matches how the
+# legacy plugin was wired up.
+if(NOT DEFINED JUCE_DIR AND DEFINED ENV{JUCE_DIR})
+    set(JUCE_DIR "$ENV{JUCE_DIR}")
 endif()
 
-# --- JUCE ---
-# Set JUCE_DIR to your local JUCE installation path
-# e.g. cmake -DJUCE_DIR=C:/JUCE ..
 if(NOT DEFINED JUCE_DIR)
-    if(EXISTS "C:/JUCE/CMakeLists.txt")
-        set(JUCE_DIR "C:/JUCE" CACHE PATH "Path to JUCE framework")
-    else()
-        set(JUCE_DIR "${CMAKE_SOURCE_DIR}/../../third_party/JUCE" CACHE PATH "Path to JUCE framework")
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../JUCE/CMakeLists.txt")
+        set(JUCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../JUCE")
+    elseif(EXISTS "C:/JUCE/CMakeLists.txt")
+        set(JUCE_DIR "C:/JUCE")
     endif()
 endif()
 
-add_subdirectory(${JUCE_DIR} ${CMAKE_BINARY_DIR}/juce EXCLUDE_FROM_ALL)
+if(NOT DEFINED JUCE_DIR OR NOT EXISTS "${JUCE_DIR}/CMakeLists.txt")
+    message(FATAL_ERROR "JUCE_DIR is not set or invalid. Pass -DJUCE_DIR=<path-to-JUCE>.")
+endif()
 
-# --- VST3 SDK ---
-# Typically bundled with JUCE, but if separate:
-# set(VST3_SDK_DIR "C:/VST_SDK/VST3_SDK")
+add_subdirectory("${JUCE_DIR}" JUCE EXCLUDE_FROM_ALL)
 
 juce_add_plugin(DIDITAGAIN_STUDIO
-    PRODUCT_NAME "DIDITAGAIN STUDIO"
-    COMPANY_NAME "DIDITAGAIN"
-    BUNDLE_ID "com.diditagain.studio"
+    PRODUCT_NAME            "DIDITAGAIN STUDIO"
+    COMPANY_NAME            "DIDITAGAIN"
+    BUNDLE_ID               com.diditagain.studio
     PLUGIN_MANUFACTURER_CODE Dida
-    PLUGIN_CODE Dida
-    FORMATS VST3 Standalone
-    # VS 2026/MSVC 14.51 currently ICEs while compiling JUCE's VST3
-    # moduleinfo helper around the VST3 SDK json.h wrapper. Disabling the
-    # automatic manifest skips that helper; hosts can still scan the VST3.
-    VST3_AUTO_MANIFEST FALSE
-    IS_SYNTH TRUE
-    NEEDS_MIDI_INPUT TRUE
-    NEEDS_MIDI_OUTPUT FALSE
-    IS_MIDI_EFFECT FALSE
+    PLUGIN_CODE             Dida
+    FORMATS                 VST3 Standalone
+    IS_SYNTH                TRUE
+    NEEDS_MIDI_INPUT        TRUE
+    NEEDS_MIDI_OUTPUT       FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS TRUE
-    # Disabled: auto-copy to "C:\Program Files\Common Files\VST3" requires
-    # an elevated (admin) MSBuild. Use the manual xcopy step from the build
-    # instructions instead, or run cmake/MSBuild from an Administrator shell.
     COPY_PLUGIN_AFTER_BUILD FALSE
 )
 
-juce_generate_juce_header(DIDITAGAIN_STUDIO)
-
 target_sources(DIDITAGAIN_STUDIO PRIVATE
     Source/PluginProcessor.cpp
+    Source/PluginProcessor.h
     Source/PluginEditor.cpp
-    Source/DSP/SynthEngine.cpp
-    Source/DSP/Voice.cpp
-    Source/DSP/Oscillator.cpp
-    Source/DSP/FilterBlock.cpp
-    Source/DSP/Envelope.cpp
-    Source/DSP/LFO.cpp
-    Source/DSP/ModMatrix.cpp
-    Source/DSP/FxChain.cpp
-    Source/DSP/Saturation.cpp
-    Source/DSP/ChorusBlock.cpp
-    Source/DSP/DelayBlock.cpp
-    Source/DSP/ReverbBlock.cpp
-    Source/DSP/UtilityDSP.cpp
-    Source/DSP/SampleLibrary.cpp
-    Source/Presets/PresetManager.cpp
-    Source/Presets/FactoryPresets.cpp
-    Source/Presets/PresetMigration.cpp
-    Source/Presets/PresetIndex.cpp
-    Source/Presets/PresetTemplateFactory.cpp
-    Source/Presets/HybridPresetGenerator.cpp
-    Source/Presets/HybridPresetApplier.cpp
-    Source/Presets/MacroMapper.cpp
-    Source/Licensing/LicenseClient.cpp
-    Source/Licensing/AccountState.cpp
-    Source/UI/Theme.cpp
-    Source/UI/BrowserComponent.cpp
-    Source/UI/KnobLookAndFeel.cpp
-    Source/UI/MainSynthPanel.cpp
-    Source/UI/PresetBrowser.cpp
-    Source/UI/ParameterPanel.cpp
-    Source/UI/AudioCropPanel.cpp
+    Source/PluginEditor.h
 )
 
 target_include_directories(DIDITAGAIN_STUDIO PRIVATE Source)
@@ -155,7 +61,10 @@ target_link_libraries(DIDITAGAIN_STUDIO
     PRIVATE
         juce::juce_audio_basics
         juce::juce_audio_devices
+        juce::juce_audio_formats
+        juce::juce_audio_plugin_client
         juce::juce_audio_processors
+        juce::juce_audio_utils
         juce::juce_core
         juce::juce_data_structures
         juce::juce_dsp
@@ -164,109 +73,7 @@ target_link_libraries(DIDITAGAIN_STUDIO
         juce::juce_gui_basics
         juce::juce_gui_extra
     PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags
 )
-
-if(NOT MSVC)
-    target_link_libraries(DIDITAGAIN_STUDIO PUBLIC juce::juce_recommended_config_flags)
-endif()
-
-# Disable LTO — MSVC ICE on FactoryPresets.cpp raw-string literals during link-time codegen
-set_target_properties(DIDITAGAIN_STUDIO PROPERTIES
-    INTERPROCEDURAL_OPTIMIZATION FALSE
-    INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
-)
-
-# VS 2026 Insiders currently ICEs in Release on both the huge embedded preset
-# translation unit and JUCE's generated VST3 wrapper when aggressive codegen is
-# enabled. Keep DSP/shared code optimized, but compile only the fragile preset
-# TU and thin format wrappers without optimisation/LTCG.
-if(MSVC)
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-        # ClangCL: NO debug info anywhere — avoids "Live DEBUG_VALUE analysis" ICE.
-        # clang-cl ignores -g0; use MSVC-style switches and CMake property.
-        set_property(TARGET DIDITAGAIN_STUDIO PROPERTY MSVC_DEBUG_INFORMATION_FORMAT "")
-        target_compile_options(DIDITAGAIN_STUDIO PUBLIC
-            /EHsc
-            /GL-
-            /Gy-
-            /Gw-
-            $<$<CONFIG:Release>:/Od>
-            $<$<CONFIG:Release>:/Ob0>
-        )
-        target_link_options(DIDITAGAIN_STUDIO PUBLIC
-            /LTCG:OFF
-            /DEBUG:NONE
-        )
-        set_source_files_properties(Source/Presets/FactoryPresets.cpp PROPERTIES
-            COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-"
-        )
-        set_source_files_properties(Source/Presets/PresetTemplateFactory.cpp PROPERTIES
-            COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-"
-        )
-        foreach(dida_format_target DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
-            if(TARGET ${dida_format_target})
-                set_target_properties(${dida_format_target} PROPERTIES
-                    INTERPROCEDURAL_OPTIMIZATION FALSE
-                    INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
-                    MSVC_DEBUG_INFORMATION_FORMAT ""
-                )
-                target_compile_options(${dida_format_target} PRIVATE
-                    /GL- /Gy- /Gw-
-                )
-                target_link_options(${dida_format_target} PRIVATE /LTCG:OFF /DEBUG:NONE)
-            endif()
-        endforeach()
-        if(TARGET DIDITAGAIN_STUDIO_VST3)
-            target_compile_options(DIDITAGAIN_STUDIO_VST3 PRIVATE
-                $<$<CONFIG:Release>:/Od>
-                $<$<CONFIG:Release>:/Ob0>
-            )
-        endif()
-    else()
-        target_compile_options(DIDITAGAIN_STUDIO PUBLIC
-            /EHsc
-            /GL-
-            /Gy-
-            /Gw-
-            /Z7
-            $<$<CONFIG:Release>:/Od>
-            $<$<CONFIG:Release>:/Ob0>
-        )
-
-        target_link_options(DIDITAGAIN_STUDIO PUBLIC
-            /LTCG:OFF
-            /DEBUG:NONE
-        )
-
-        set_source_files_properties(Source/Presets/FactoryPresets.cpp PROPERTIES
-            COMPILE_OPTIONS "/Od;/Ob0;/GL-;/Gy-;/Gw-;/Z7"
-        )
-
-        foreach(dida_format_target DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 DIDITAGAIN_STUDIO_Standalone)
-            if(TARGET ${dida_format_target})
-                set_target_properties(${dida_format_target} PROPERTIES
-                    INTERPROCEDURAL_OPTIMIZATION FALSE
-                    INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
-                    MSVC_DEBUG_INFORMATION_FORMAT Embedded
-                )
-                target_compile_options(${dida_format_target} PRIVATE
-                    /GL-
-                    /Gy-
-                    /Gw-
-                    /Z7
-                )
-                target_link_options(${dida_format_target} PRIVATE
-                    /LTCG:OFF
-                )
-            endif()
-        endforeach()
-
-        if(TARGET DIDITAGAIN_STUDIO_VST3)
-            target_compile_options(DIDITAGAIN_STUDIO_VST3 PRIVATE
-                $<$<CONFIG:Release>:/Od>
-                $<$<CONFIG:Release>:/Ob0>
-            )
-        endif()
-    endif()
-endif()
