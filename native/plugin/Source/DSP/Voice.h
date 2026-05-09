@@ -53,6 +53,7 @@ public:
 
     void setMultisample(std::shared_ptr<const dida::Multisample> ms) noexcept { multisample = std::move(ms); }
     void setFallbackSynthesisEnabled(bool enabled) noexcept { fallbackSynthesisEnabled = enabled; }
+    void setSampleLooping(bool shouldLoop) noexcept { sampleLooping = shouldLoop; }
 
     // ---- Per-voice configuration ----
     void setEngineMode(EngineMode m)      noexcept { engineMode = m; }
@@ -156,6 +157,7 @@ private:
 
     double sineFallbackPhase = 0.0;
     bool fallbackSynthesisEnabled = true;
+    bool sampleLooping = false;
     double sampleRate = 44100.0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SynthVoice)

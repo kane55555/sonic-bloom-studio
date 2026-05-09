@@ -243,3 +243,11 @@ void SynthEngine::setFallbackSynthesisEnabled(bool enabled)
         v.setFallbackSynthesisEnabled(enabled);
     });
 }
+
+void SynthEngine::setSampleLooping(bool shouldLoop)
+{
+    forEachSynthVoice([shouldLoop](SynthVoice& v)
+    {
+        v.setSampleLooping(shouldLoop);
+    });
+}
