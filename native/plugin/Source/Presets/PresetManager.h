@@ -24,6 +24,7 @@ public:
     void scanPresetDirectory();
     void loadPreset(int index);
     void loadPresetFromFile(const juce::File& file);
+    int findPresetIndexByFile(const juce::File& file) const;
     void saveCurrentPreset(const juce::String& name, const juce::String& category);
     void exportPreset(const juce::File& destination);
 
