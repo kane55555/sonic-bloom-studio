@@ -2,8 +2,11 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 #include "UI/MainSynthPanel.h"
+#include "UI/LayerEditor.h"
+#include "UI/MacroPanel.h"
 #include "UI/ModPanel.h"
 #include "UI/FxPanel.h"
+#include "UI/ImportReviewPanel.h"
 #include "UI/SettingsPanel.h"
 #include "UI/AccountPanel.h"
 #include "UI/PresetBrowser.h"
