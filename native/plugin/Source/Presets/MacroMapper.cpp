@@ -56,7 +56,9 @@ void MacroMapper::buildFrom(const HybridPresetV2& preset, juce::AudioProcessor& 
                         rt.paramID = pid;
                         rt.minNorm = juce::jlimit(0.0f, 1.0f, r->convertTo0to1(t.min));
                         rt.maxNorm = juce::jlimit(0.0f, 1.0f, r->convertTo0to1(t.max));
-                        if (rt.maxNorm < rt.minNorm) std::swap(rt.minNorm, rt.maxNorm);
+                        // NOTE: we deliberately don't swap min/max — inverted
+                        // ranges (e.g. Darkness mapping cutoff 12000->1500) are
+                        // valid and produce a useful inverse macro sweep.
                         b.targets.push_back(rt);
                     }
                 }
