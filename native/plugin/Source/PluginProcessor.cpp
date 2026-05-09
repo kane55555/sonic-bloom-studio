@@ -18,11 +18,9 @@ DiditagainProcessor::DiditagainProcessor()
     {
         presetLoadRequested.store(true, std::memory_order_release);
         presetLoadSerial.fetch_add(1, std::memory_order_acq_rel);
-        juce::String logMessage;
-        logMessage << "load requested serial=" << presetLoadSerial.load(std::memory_order_acquire)
-            << " index=" << presetManager.getCurrentPresetIndex()
-            << " name=" << presetManager.getPresetName(presetManager.getCurrentPresetIndex());
-        didaPresetLog(logMessage);
+        didaPresetLog(juce::String("load requested serial=") + juce::String(presetLoadSerial.load(std::memory_order_acquire))
+            + " index=" + juce::String(presetManager.getCurrentPresetIndex())
+            + " name=" + presetManager.getPresetName(presetManager.getCurrentPresetIndex()));
     };
 }
 
@@ -319,14 +317,12 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         deferredPresetChange.presetSerial = latestPresetSerial;
         deferredPresetChange.ageInBlocks = previousAge;
 
-        juce::String logMessage;
-        logMessage << "queued serial=" << deferredPresetChange.presetSerial
-            << " mono=" << (deferredPresetChange.monoMode ? "true" : "false")
-            << " poly=" << deferredPresetChange.polyphony
-            << " appliedMono=" << (appliedMonoMode ? "true" : "false")
-            << " appliedPoly=" << appliedPolyphony
-            << " midiEvents=" << midiMessages.getNumEvents();
-        didaPresetLog(logMessage);
+        didaPresetLog(juce::String("queued serial=") + juce::String(deferredPresetChange.presetSerial)
+            + " mono=" + (deferredPresetChange.monoMode ? "true" : "false")
+            + " poly=" + juce::String(deferredPresetChange.polyphony)
+            + " appliedMono=" + (appliedMonoMode ? "true" : "false")
+            + " appliedPoly=" + juce::String(appliedPolyphony)
+            + " midiEvents=" + juce::String(midiMessages.getNumEvents()));
     }
 
     // Preset stepping may change mono/poly and requested polyphony every click.
@@ -350,10 +346,8 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             // Hard-stop everything so mutation/reset is safe.
             synthEngine.allNotesOff(0, false);
             synthEngine.forEachSynthVoice([](SynthVoice& v) { v.resetNote(); });
-            juce::String logMessage;
-            logMessage << "force-apply silencing voices serial=" << deferredPresetChange.presetSerial
-                << " waitedBlocks=" << deferredPresetChange.ageInBlocks;
-            didaPresetLog(logMessage);
+            didaPresetLog(juce::String("force-apply silencing voices serial=") + juce::String(deferredPresetChange.presetSerial)
+                + " waitedBlocks=" + juce::String(deferredPresetChange.ageInBlocks));
         }
 
         if (canApplyVoiceMutation || sameVoicePool || forceApply)
@@ -407,28 +401,24 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                     synthEngine.setSampleLooping(false);
                 }
 
-                juce::String logMessage;
-                logMessage << "applied serial=" << deferredPresetChange.presetSerial
-                    << " mono=" << (deferredPresetChange.monoMode ? "true" : "false")
-                    << " poly=" << deferredPresetChange.polyphony
-                    << " mutatedVoices=" << (voicePoolNeedsMutation ? "true" : "false")
-                    << " forced=" << (forceApply ? "true" : "false")
-                    << " waitedBlocks=" << deferredPresetChange.ageInBlocks
-                    << " instrument=" << synthEngine.getInstrumentName();
-                didaPresetLog(logMessage);
+                didaPresetLog(juce::String("applied serial=") + juce::String(deferredPresetChange.presetSerial)
+                    + " mono=" + (deferredPresetChange.monoMode ? "true" : "false")
+                    + " poly=" + juce::String(deferredPresetChange.polyphony)
+                    + " mutatedVoices=" + (voicePoolNeedsMutation ? "true" : "false")
+                    + " forced=" + (forceApply ? "true" : "false")
+                    + " waitedBlocks=" + juce::String(deferredPresetChange.ageInBlocks)
+                    + " instrument=" + synthEngine.getInstrumentName());
 
                 deferredPresetChange = {};
             }
         }
         else if ((++debugBlockCounter % 128) == 0)
         {
-            juce::String logMessage;
-            logMessage << "waiting serial=" << deferredPresetChange.presetSerial
-                << " blocks=" << deferredPresetChange.ageInBlocks
-                << " heldNotes=" << synthEngine.getHeldNoteCount()
-                << " activeVoices=" << synthEngine.getActiveVoiceCount()
-                << " midiEvents=" << midiMessages.getNumEvents();
-            didaPresetLog(logMessage);
+            didaPresetLog(juce::String("waiting serial=") + juce::String(deferredPresetChange.presetSerial)
+                + " blocks=" + juce::String(deferredPresetChange.ageInBlocks)
+                + " heldNotes=" + juce::String(synthEngine.getHeldNoteCount())
+                + " activeVoices=" + juce::String(synthEngine.getActiveVoiceCount())
+                + " midiEvents=" + juce::String(midiMessages.getNumEvents()));
         }
     }
 
