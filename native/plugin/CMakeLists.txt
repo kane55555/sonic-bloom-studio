@@ -71,6 +71,56 @@ endif()
 
 add_subdirectory(${JUCE_DIR} ${CMAKE_BINARY_DIR}/juce EXCLUDE_FROM_ALL)
 
+function(dida_strip_headless_property target_name property_name)
+    get_target_property(dida_values ${target_name} ${property_name})
+    if(dida_values AND NOT dida_values STREQUAL "dida_values-NOTFOUND")
+        set(dida_filtered ${dida_values})
+        list(FILTER dida_filtered EXCLUDE REGEX "juce_audio_processors_headless|JUCE_MODULE_AVAILABLE_juce_audio_processors_headless|juce_AudioProcessorGraph|AudioProcessorGraph")
+        set_target_properties(${target_name} PROPERTIES ${property_name} "${dida_filtered}")
+    endif()
+endfunction()
+
+function(dida_strip_headless_from_target target_name)
+    if(TARGET ${target_name})
+        get_target_property(dida_aliased_target ${target_name} ALIASED_TARGET)
+        if(dida_aliased_target)
+            set(target_name ${dida_aliased_target})
+        endif()
+        foreach(dida_property
+                INTERFACE_LINK_LIBRARIES LINK_LIBRARIES
+                INTERFACE_INCLUDE_DIRECTORIES INCLUDE_DIRECTORIES
+                INTERFACE_SYSTEM_INCLUDE_DIRECTORIES SYSTEM_INCLUDE_DIRECTORIES
+                INTERFACE_COMPILE_DEFINITIONS COMPILE_DEFINITIONS
+                INTERFACE_COMPILE_OPTIONS COMPILE_OPTIONS
+                INTERFACE_SOURCES SOURCES)
+            dida_strip_headless_property(${target_name} ${dida_property})
+        endforeach()
+    endif()
+endfunction()
+
+function(dida_strip_headless_from_directory directory_name)
+    get_property(dida_targets DIRECTORY "${directory_name}" PROPERTY BUILDSYSTEM_TARGETS)
+    foreach(dida_target IN LISTS dida_targets)
+        dida_strip_headless_from_target(${dida_target})
+    endforeach()
+
+    get_property(dida_subdirectories DIRECTORY "${directory_name}" PROPERTY SUBDIRECTORIES)
+    foreach(dida_subdirectory IN LISTS dida_subdirectories)
+        dida_strip_headless_from_directory("${dida_subdirectory}")
+    endforeach()
+endfunction()
+
+function(dida_strip_juce_headless_module)
+    dida_strip_headless_from_directory("${CMAKE_SOURCE_DIR}")
+    dida_strip_headless_from_directory("${JUCE_DIR}")
+    dida_strip_headless_from_target(juce_audio_processors)
+    dida_strip_headless_from_target(juce::juce_audio_processors)
+    dida_strip_headless_from_target(juce_audio_plugin_client)
+    dida_strip_headless_from_target(juce::juce_audio_plugin_client)
+endfunction()
+
+dida_strip_juce_headless_module()
+
 # --- VST3 SDK ---
 # Typically bundled with JUCE, but if separate:
 # set(VST3_SDK_DIR "C:/VST_SDK/VST3_SDK")
