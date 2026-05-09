@@ -39,6 +39,9 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
 
     presetBrowserPanel = std::make_unique<PresetBrowser>();
     addAndMakeVisible(*presetBrowserPanel);
+
+    audioCropPanel = std::make_unique<AudioCropPanel>();
+    addChildComponent(*audioCropPanel);
     {
         auto& pm = processor.getPresetManager();
         juce::StringArray names, cats;
