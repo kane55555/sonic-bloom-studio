@@ -89,6 +89,10 @@ target_sources(DIDITAGAIN_STUDIO PRIVATE
     Source/DSP/SampleLibrary.cpp
     Source/Presets/PresetManager.cpp
     Source/Presets/FactoryPresets.cpp
+    Source/Presets/PresetMigration.cpp
+    Source/Presets/PresetIndex.cpp
+    Source/Presets/PresetTemplateFactory.cpp
+    Source/Presets/HybridPresetGenerator.cpp
     Source/Licensing/LicenseClient.cpp
     Source/Licensing/AccountState.cpp
     Source/UI/Theme.cpp
