@@ -31,6 +31,7 @@ const App = () => (
             <Route path="/subscriptions" element={<SubscriptionsPage />} />
             <Route path="/presets" element={<PresetsPage />} />
             <Route path="/presets/admin" element={<PresetAdminPage />} />
+            <Route path="/samples" element={<SampleLibraryPage />} />
             <Route path="/activations" element={<ActivationsPage />} />
             <Route path="/security" element={<SecurityPage />} />
             <Route path="/announcements" element={<AnnouncementsPage />} />
