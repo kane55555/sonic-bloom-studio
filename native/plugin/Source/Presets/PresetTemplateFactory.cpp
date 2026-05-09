@@ -70,7 +70,7 @@ HybridPresetV2 PresetTemplateFactory::build(const juce::String& category,
     }
     else if (category == "Bass808")
     {
-        p.layers.push_back(sampleL(sampleRelPath, 36, "C2", 0.85f,
+        p.layers.push_back(sampleL(sampleRelPath, rootMidi, rootNote, 0.85f,
                                    e(0.001f,1.0f,0.85f,0.8f), lpf(4500.0f, 0.10f, 0.10f)));
         p.layers.push_back(oscL("layer_2","Sine Sub","sine",0,0,0.30f,true,e(0.001f,1.0f,0.85f,0.8f)));
         p.layers.push_back(noiseL("layer_3", false, 0.0f, e(0.001f,0.05f,0.0f,0.02f)));
@@ -81,7 +81,7 @@ HybridPresetV2 PresetTemplateFactory::build(const juce::String& category,
     }
     else if (category == "FXRisers")
     {
-        auto L1 = sampleL(sampleRelPath, 60, "C4", 0.85f,
+        auto L1 = sampleL(sampleRelPath, rootMidi, rootNote, 0.85f,
                           e(0.001f,4.0f,0.0f,3.0f), lpf(14000.0f));
         L1.pitchTracking = false; L1.oneShotMode = true;
         p.layers.push_back(L1);
