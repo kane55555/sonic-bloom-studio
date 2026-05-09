@@ -38,6 +38,7 @@ public:
     const juce::String& getRequestedSampleSource() const noexcept { return requestedSampleSource; }
     int getRequestedSampleRootMidi() const noexcept { return requestedSampleRootMidi; }
     const juce::String& getRequestedSampleDisplayName() const noexcept { return requestedSampleDisplayName; }
+    bool isCurrentPresetSampleSourceDriven() const noexcept { return requestedSampleSource.isNotEmpty(); }
 
     void toggleFavorite(int index);
     std::vector<int> searchByTag(const juce::String& tag) const;
