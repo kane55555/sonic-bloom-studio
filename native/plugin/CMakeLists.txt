@@ -63,12 +63,7 @@ endif()
 
 if(TARGET juce_audio_processors)
     set_property(TARGET juce_audio_processors PROPERTY INTERFACE_SOURCES "")
-
-    get_target_property(_dida_processors_links juce_audio_processors INTERFACE_LINK_LIBRARIES)
-    if(_dida_processors_links)
-        list(REMOVE_ITEM _dida_processors_links juce_audio_processors_headless juce::juce_audio_processors_headless)
-        set_property(TARGET juce_audio_processors PROPERTY INTERFACE_LINK_LIBRARIES "${_dida_processors_links}")
-    endif()
+    set_property(TARGET juce_audio_processors PROPERTY INTERFACE_LINK_LIBRARIES "juce_gui_extra")
 endif()
 
 foreach(_dida_forbidden_headers IN ITEMS juce_lilv_headers juce_ara_headers)
