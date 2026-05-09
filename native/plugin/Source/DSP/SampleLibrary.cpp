@@ -255,8 +255,6 @@ std::shared_ptr<const Multisample> SampleLibrary::loadInstrument(const juce::Str
     auto ms = std::make_shared<Multisample>();
     ms->instrumentName = name;
 
-    auto& fm = formatManager();
-
     for (auto& file : files)
     {
         std::unique_ptr<juce::AudioFormatReader> reader(fm.createReaderFor(file));
