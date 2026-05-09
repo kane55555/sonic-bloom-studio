@@ -8,14 +8,32 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     setResizeLimits(960, 640, 1920, 1200);
 
     // --- Build content panels ---
+    layerPanel = std::make_unique<LayerEditor>(processor.getAPVTS());
+    addAndMakeVisible(*layerPanel);
+
+    macroPanel = std::make_unique<MacroPanel>(processor.getAPVTS());
+    addAndMakeVisible(*macroPanel); // macros stay visible across tabs
+
     synthPanel = std::make_unique<MainSynthPanel>(processor.getAPVTS());
-    addAndMakeVisible(*synthPanel);
+    addChildComponent(*synthPanel);
 
     modPanel = std::make_unique<ModPanel>(processor.getAPVTS());
     addChildComponent(*modPanel);
 
     fxPanel = std::make_unique<FxPanel>(processor.getAPVTS());
     addChildComponent(*fxPanel);
+
+    importPanel = std::make_unique<ImportReviewPanel>();
+    importPanel->onRescan = [this]() {
+        processor.getPresetManager().scanPresetDirectory();
+        refreshPresetCombo();
+    };
+    importPanel->onOpenInbox = [this]() {
+        auto inbox = processor.getPresetManager().getUserPresetDirectory().getChildFile("_inbox");
+        inbox.createDirectory();
+        inbox.revealToUser();
+    };
+    addChildComponent(*importPanel);
 
     settingsPanel = std::make_unique<SettingsPanel>(processor.getAPVTS());
     addChildComponent(*settingsPanel);
@@ -42,7 +60,7 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     }
 
     setupTabs();
-    switchTab(Tab::Synth);
+    switchTab(Tab::Layers);
 
     // setSize() fires resized() before the child controls above exist. Some
     // hosts (including FL Studio) won't immediately send another resize event,
