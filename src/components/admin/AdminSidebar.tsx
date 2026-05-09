@@ -1,12 +1,13 @@
 import { NavLink } from "react-router-dom";
-import { Users, CreditCard, Music, Shield, Monitor, Bell, LayoutDashboard, Settings, Scissors } from "lucide-react";
+import { Users, CreditCard, Music, Shield, Monitor, Bell, LayoutDashboard, Settings, Scissors, FileAudio } from "lucide-react";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/users", icon: Users, label: "Users" },
   { to: "/subscriptions", icon: CreditCard, label: "Subscriptions" },
   { to: "/presets", icon: Music, label: "Preset Packs" },
-  { to: "/samples", icon: Scissors, label: "Sample Library" },
+  { to: "/factory-samples", icon: FileAudio, label: "Factory One-Shots" },
+  { to: "/samples", icon: Scissors, label: "User Samples" },
   { to: "/activations", icon: Monitor, label: "Activations" },
   { to: "/security", icon: Shield, label: "Security" },
   { to: "/announcements", icon: Bell, label: "Announcements" },

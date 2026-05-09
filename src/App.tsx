@@ -14,6 +14,7 @@ import SecurityPage from "./pages/SecurityPage";
 import AnnouncementsPage from "./pages/AnnouncementsPage";
 import SettingsPage from "./pages/SettingsPage";
 import SampleLibraryPage from "./pages/SampleLibraryPage";
+import FactorySamplesPage from "./pages/FactorySamplesPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/presets" element={<PresetsPage />} />
             <Route path="/presets/admin" element={<PresetAdminPage />} />
             <Route path="/samples" element={<SampleLibraryPage />} />
+            <Route path="/factory-samples" element={<FactorySamplesPage />} />
             <Route path="/activations" element={<ActivationsPage />} />
             <Route path="/security" element={<SecurityPage />} />
             <Route path="/announcements" element={<AnnouncementsPage />} />
