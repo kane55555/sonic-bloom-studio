@@ -91,9 +91,10 @@ void DiditagainEditor::setupTabs()
         btn.setColour(juce::TextButton::textColourOffId, C.textSecondary);
         addAndMakeVisible(btn);
     };
-    setupTab(tabBrowser, Tab::Browser);
-    setupTab(tabLayers,  Tab::Layers);
-    setupTab(tabFX,      Tab::FX);
+    setupTab(tabBrowser,   Tab::Browser);
+    setupTab(tabLayers,    Tab::Layers);
+    setupTab(tabFX,        Tab::FX);
+    setupTab(tabAudioCrop, Tab::AudioCrop);
 
     menuButton.setColour(juce::TextButton::buttonColourId, C.surface);
     menuButton.setColour(juce::TextButton::textColourOffId, C.accentTeal);
