@@ -170,12 +170,16 @@ void PresetManager::loadPreset(int index)
 {
     if (index < 0 || index >= static_cast<int>(presets.size()))
     {
-        DIDA_PRESET_MANAGER_LOG("ignored invalid index=" << index << " count=" << static_cast<int>(presets.size()));
+        juce::String logMessage;
+        logMessage << "ignored invalid index=" << index << " count=" << static_cast<int>(presets.size());
+        didaPresetManagerLog(logMessage);
         return;
     }
 
     currentIndex = index;
-    DIDA_PRESET_MANAGER_LOG("load index=" << index << " name=" << presets[index].name << " file=" << presets[index].filePath);
+    juce::String logMessage;
+    logMessage << "load index=" << index << " name=" << presets[index].name << " file=" << presets[index].filePath;
+    didaPresetManagerLog(logMessage);
     juce::File file(presets[index].filePath);
     loadPresetFromFile(file);
 }
@@ -184,14 +188,14 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
 {
     if (!validatePresetFile(file))
     {
-        DIDA_PRESET_MANAGER_LOG("validation failed file=" << file.getFullPathName());
+        didaPresetManagerLog(juce::String("validation failed file=") + file.getFullPathName());
         return;
     }
 
     auto json = juce::JSON::parse(file);
     if (! json.isObject())
     {
-        DIDA_PRESET_MANAGER_LOG("parse failed file=" << file.getFullPathName());
+        didaPresetManagerLog(juce::String("parse failed file=") + file.getFullPathName());
         return;
     }
 
@@ -223,10 +227,12 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
             macroMapper.buildFrom(p, processor);
 
             if (onPresetLoaded) onPresetLoaded();
-            DIDA_PRESET_MANAGER_LOG("loaded v2 preset name=" << p.name
+            juce::String logMessage;
+            logMessage << "loaded v2 preset name=" << p.name
                 << " category=" << p.category
                 << " layers=" << (int) p.layers.size()
-                << " loop=" << (requestedSampleLooping ? "true" : "false"));
+                << " loop=" << (requestedSampleLooping ? "true" : "false");
+            didaPresetManagerLog(logMessage);
             return;
         }
     }
@@ -324,10 +330,12 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
     if (onPresetLoaded)
         onPresetLoaded();
 
-    DIDA_PRESET_MANAGER_LOG("loaded file=" << file.getFileName()
+    juce::String logMessage;
+    logMessage << "loaded file=" << file.getFileName()
         << " playMode=" << json.getProperty(key::playMode, "<missing>").toString()
         << " mono=" << json.getProperty(key::mono, "<missing>").toString()
-        << " polyphony=" << json.getProperty(key::polyphony, "<missing>").toString());
+        << " polyphony=" << json.getProperty(key::polyphony, "<missing>").toString();
+    didaPresetManagerLog(logMessage);
 }
 
 void PresetManager::saveCurrentPreset(const juce::String& name, const juce::String& category)
