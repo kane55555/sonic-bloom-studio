@@ -26,13 +26,14 @@ public:
 private:
     DiditagainProcessor& processor;
 
-    enum class Tab { Browser, Layers, FX };
+    enum class Tab { Browser, Layers, FX, AudioCrop };
     Tab currentTab = Tab::Browser;
 
     // Visible tabs only
-    juce::TextButton tabBrowser{"BROWSER"};
-    juce::TextButton tabLayers {"LAYERS"};
-    juce::TextButton tabFX     {"FX"};
+    juce::TextButton tabBrowser  {"BROWSER"};
+    juce::TextButton tabLayers   {"LAYERS"};
+    juce::TextButton tabFX       {"FX"};
+    juce::TextButton tabAudioCrop{"AUDIO CROP"};
 
     // Header
     juce::TextButton menuButton{ juce::String::charToString(juce::juce_wchar(0x2630)) }; // ☰
