@@ -183,7 +183,7 @@ namespace {
         if (src.isEmpty()) return {};
 
         auto file = juce::File(src);
-        if (file.isAbsolutePath() && file.existsAsFile())
+        if (juce::File::isAbsolutePath(src) && file.existsAsFile())
             return file;
 
         auto root = SampleLibrary::getSamplesRoot();
