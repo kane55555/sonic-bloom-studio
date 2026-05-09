@@ -5,9 +5,9 @@ if(POLICY CMP0141)
 endif()
 
 # VS 2026/MSVC 14.51 has been crashing in CloseTypeServerPDB/mspdbsrv when
-# JUCE modules use Program Database debug info. Set this before project() so
-# generated .vcxproj files use OldStyle /Z7 embedded debug info instead of /Zi.
-set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "Embedded" CACHE STRING "" FORCE)
+# JUCE modules use Program Database debug info. Keep Release configs free of
+# CodeView debug info; only Debug gets embedded debug data for local debugging.
+set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug>:Embedded>" CACHE STRING "" FORCE)
 
 project(DIDITAGAIN_STUDIO VERSION 1.0.0 LANGUAGES CXX)
 
@@ -22,24 +22,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # The VS 2026 Insider linker has been crashing in PDB/type-server and LTCG
 # passes while building JUCE wrappers, so prefer embedded debug info.
 if(MSVC)
-    set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "Embedded" CACHE STRING "" FORCE)
+    set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug>:Embedded>" CACHE STRING "" FORCE)
 
     # JUCE 8's Sheenbidi sources contain non-ASCII characters; MSVC needs
     # /utf-8 to parse them correctly (otherwise C2065 in ScriptLookup.c).
     add_compile_options(/utf-8)
 
-    # Strip /GL (whole-program optimization) and /LTCG from ALL configs and ALL
-    # targets globally, BEFORE add_subdirectory(JUCE). The MSVC ICE in
-    # juce_FileChooser.cpp happens during the LTCG "Generating code" pass, so
-    # JUCE's own object libraries must also be compiled without /GL.
-    # ClangCL crashes in "Live DEBUG_VALUE analysis" when /Z7 (CodeView) debug
-    # info is requested in Release. Detect ClangCL and use no debug info; for
-    # MSVC proper, keep /Z7 (embedded) to dodge MSVC 14.51 PDB/type-server ICEs.
+    # Strip /GL (whole-program optimization), /LTCG, and CodeView debug flags
+    # from ALL configs and ALL targets globally, BEFORE add_subdirectory(JUCE).
+    # Release ClangCL must not receive debug info flags.
     if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-        set(DIDA_DEBUG_FLAG "")
         set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "" CACHE STRING "" FORCE)
-    else()
-        set(DIDA_DEBUG_FLAG "/Z7")
     endif()
 
     foreach(flag_var
@@ -50,7 +43,7 @@ if(MSVC)
         string(REGEX REPLACE "/Z[iI7]" "" ${flag_var} "${${flag_var}}")
         string(REGEX REPLACE "/GL(-)?" "" ${flag_var} "${${flag_var}}")
         string(REGEX REPLACE "/LTCG(:[A-Za-z]+)?" "" ${flag_var} "${${flag_var}}")
-        set(${flag_var} "${${flag_var}} ${DIDA_DEBUG_FLAG} /GL-" CACHE STRING "" FORCE)
+        set(${flag_var} "${${flag_var}} /GL-" CACHE STRING "" FORCE)
     endforeach()
     foreach(flag_var
             CMAKE_EXE_LINKER_FLAGS CMAKE_EXE_LINKER_FLAGS_RELEASE
