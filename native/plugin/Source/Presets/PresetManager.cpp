@@ -225,6 +225,16 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
                     break;
                 }
             }
+            if (requestedSampleSource.isEmpty() && p.hasSourceImport && p.sourceSamplePath.isNotEmpty())
+            {
+                requestedSampleSource = p.sourceSamplePath.replace("\\", "/");
+                requestedSampleRootMidi = juce::jlimit(0, 127, p.sourceRootMidi);
+                requestedSampleDisplayName = p.name;
+                setParam(processor, "oscALevel", 1.0);
+                setParam(processor, "oscBLevel", 0.0);
+                setParam(processor, "subOscEnabled", false);
+                setParam(processor, "noiseLevel", 0.0);
+            }
             setParam(processor, "filter1Cutoff",      p.globalFilter.cutoff);
             setParam(processor, "filter1Resonance",   p.globalFilter.resonance);
             setParam(processor, "fxReverbMix",        p.effects.reverbMix);
