@@ -74,12 +74,15 @@ bool HybridPresetApplier::shouldLoopForCategory(const juce::String& category,
     if (layerLoop)   return true;
 
     const auto c = category;
-    if (c == "DarkPads" || c == "Textures") return true;
-    if (c == "ChoirsVox")                    return true;  // sustained vocal pad behavior
-    if (c == "AlienLeads")                   return true;
-    if (c == "Bass808")                      return false; // unless layerLoop
-    if (c == "DrillBells" || c == "Plucks" || c == "PainPianos" || c == "Guitars") return false;
-    if (c == "FXRisers")                     return false;
+    // Melodic / sustained categories autoloop by default.
+    if (c == "DrillBells" || c == "PainPianos" || c == "ChoirsVox"
+        || c == "Guitars"   || c == "DarkPads"  || c == "AlienLeads"
+        || c == "Textures")
+        return true;
+    if (c == "Bass808")  return false; // unless layerLoop / detected loop points
+    if (c == "Plucks")   return false; // typically short
+    if (c == "FXRisers") return false;
+    if (c == "Uncategorized") return true; // melodic-friendly default
     return false;
 }
 
