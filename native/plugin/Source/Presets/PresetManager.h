@@ -3,6 +3,7 @@
 #include <functional>
 #include <vector>
 #include <string>
+#include "MacroMapper.h"
 
 struct PresetInfo
 {
@@ -41,6 +42,11 @@ public:
     const juce::String& getRequestedSampleDisplayName() const noexcept { return requestedSampleDisplayName; }
     bool isCurrentPresetSampleSourceDriven() const noexcept { return requestedSampleSource.isNotEmpty(); }
 
+    // V2 preset extras.
+    bool getRequestedSampleLooping() const noexcept { return requestedSampleLooping; }
+    const juce::String& getRequestedCategory() const noexcept { return requestedCategory; }
+    dida::preset::MacroMapper& getMacroMapper() noexcept { return macroMapper; }
+
     void toggleFavorite(int index);
     std::vector<int> searchByTag(const juce::String& tag) const;
     std::vector<int> searchByName(const juce::String& query) const;
@@ -59,6 +65,9 @@ private:
     juce::String requestedSampleSource;
     juce::String requestedSampleDisplayName;
     int requestedSampleRootMidi = 60;
+    bool requestedSampleLooping = false;
+    juce::String requestedCategory;
+    dida::preset::MacroMapper macroMapper;
 
     void loadFactoryPresets();
     void loadUserPresets();

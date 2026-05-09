@@ -3,6 +3,7 @@
 #include "FactoryPresets.h"
 #include "HybridPresetV2.h"
 #include "PresetMigration.h"
+#include "HybridPresetApplier.h"
 #include "../DSP/SampleLibrary.h"
 
 // JUCE made AudioParameterChoice::setValue() private to discourage direct
@@ -206,50 +207,31 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
             requestedSampleSource = {};
             requestedSampleDisplayName = {};
             requestedSampleRootMidi = 60;
-            for (auto& L : p.layers)
+            requestedSampleLooping = false;
+            requestedCategory = p.category;
+
+            auto applied = HybridPresetApplier::apply(p, processor);
+            if (applied.hasSample)
             {
-                if (L.type == LayerType::Sample && L.enabled && L.source.isNotEmpty())
-                {
-                    auto src = L.source.replace("\\", "/");
-                    requestedSampleSource = src;
-                    requestedSampleRootMidi = juce::jlimit(0, 127, L.rootMidi);
-                    requestedSampleDisplayName = p.name;
-                    setParam(processor, "env1Attack",  L.ampEnv.attack);
-                    setParam(processor, "env1Decay",   L.ampEnv.decay);
-                    setParam(processor, "env1Sustain", L.ampEnv.sustain);
-                    setParam(processor, "env1Release", L.ampEnv.release);
-                    setParam(processor, "oscALevel",   L.volume);
-                    setParam(processor, "oscBLevel",   0.0);
-                    setParam(processor, "subOscEnabled", false);
-                    setParam(processor, "noiseLevel",  0.0);
-                    break;
-                }
+                requestedSampleSource      = applied.sampleSource;
+                requestedSampleRootMidi    = applied.sampleRootMidi;
+                requestedSampleDisplayName = applied.displayName;
+                requestedSampleLooping     = applied.shouldLoop;
             }
-            if (requestedSampleSource.isEmpty() && p.hasSourceImport && p.sourceSamplePath.isNotEmpty())
-            {
-                requestedSampleSource = p.sourceSamplePath.replace("\\", "/");
-                requestedSampleRootMidi = juce::jlimit(0, 127, p.sourceRootMidi);
-                requestedSampleDisplayName = p.name;
-                setParam(processor, "oscALevel", 1.0);
-                setParam(processor, "oscBLevel", 0.0);
-                setParam(processor, "subOscEnabled", false);
-                setParam(processor, "noiseLevel", 0.0);
-            }
-            setParam(processor, "filter1Cutoff",      p.globalFilter.cutoff);
-            setParam(processor, "filter1Resonance",   p.globalFilter.resonance);
-            setParam(processor, "fxReverbMix",        p.effects.reverbMix);
-            setParam(processor, "fxReverbSize",       p.effects.reverbSize);
-            setParam(processor, "fxDelayMix",         p.effects.delayMix);
-            setParam(processor, "fxDelayFeedback",    p.effects.delayFb);
-            setParam(processor, "fxChorusMix",        p.effects.chorusMix);
-            setParam(processor, "fxDistortionAmount", p.effects.satDrive);
+            macroMapper.buildFrom(p, processor);
+
             if (onPresetLoaded) onPresetLoaded();
             DIDA_PRESET_MANAGER_LOG("loaded v2 preset name=" << p.name
                 << " category=" << p.category
-                << " layers=" << (int) p.layers.size());
+                << " layers=" << (int) p.layers.size()
+                << " loop=" << (requestedSampleLooping ? "true" : "false"));
             return;
         }
     }
+    // V1 path resets V2-only state too.
+    requestedSampleLooping = false;
+    requestedCategory = {};
+    macroMapper.clear();
 
     // Sampler instrument (legacy)
     requestedInstrument = {};

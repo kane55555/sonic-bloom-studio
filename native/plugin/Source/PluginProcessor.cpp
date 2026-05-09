@@ -383,10 +383,10 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                     synthEngine.setSampleSource(requestedSample,
                                                 presetManager.getRequestedSampleRootMidi(),
                                                 presetManager.getRequestedSampleDisplayName());
-                    // Imported sounds = sustained, pitched instruments. Loop the
-                    // sample so holding a key produces a continuous tone instead
-                    // of a one-shot trigger.
-                    synthEngine.setSampleLooping(true);
+                    // Looping decision now comes from the V2 preset (category +
+                    // oneShotMode + per-layer loop flag). Bells/808s/plucks no
+                    // longer get force-looped into a sustained drone.
+                    synthEngine.setSampleLooping(presetManager.getRequestedSampleLooping());
                 }
                 else if (requested.isNotEmpty() && requested != synthEngine.getInstrumentName())
                 {
@@ -457,36 +457,45 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         v.getModEnv().setSustain(mS);     v.getModEnv().setRelease(mR);
     });
 
-    // ---- Macros: each macro modulates one audible parameter so the
-    // performance knobs always do something musical. ----
-    const float m1 = getF("macro1"); // Brightness  -> filter cutoff offset
-    const float m2 = getF("macro2"); // Movement    -> chorus mix
-    const float m3 = getF("macro3"); // Body        -> osc B level
-    const float m4 = getF("macro4"); // Air         -> noise level
-    const float m5 = getF("macro5"); // Shimmer     -> reverb size offset
-    const float m6 = getF("macro6"); // Drive       -> saturation
-    const float m7 = getF("macro7"); // Space       -> reverb mix
-    const float m8 = getF("macro8"); // Width       -> chorus depth
+    // ---- Preset-driven macro mapping (V2 macro targets). When a preset
+    // declares macro targets, push macroN values to those APVTS params and
+    // skip the legacy hardcoded macro behavior so we don't double-modulate. ----
+    auto& macroMapper = presetManager.getMacroMapper();
+    const bool presetMacrosActive = ! macroMapper.isEmpty();
+    macroMapper.apply(*this);
+
+    const float m1 = getF("macro1");
+    const float m2 = getF("macro2");
+    const float m3 = getF("macro3");
+    const float m4 = getF("macro4");
+    const float m5 = getF("macro5");
+    const float m6 = getF("macro6");
+    const float m7 = getF("macro7");
+    const float m8 = getF("macro8");
 
     // ---- FX parameters (with macro modulation, all clamped 0..1) ----
     auto clamp01 = [](float v) { return juce::jlimit(0.0f, 1.0f, v); };
     auto& fx = synthEngine.getFx();
 
-    const float driveAmt   = clamp01(getF("fxDistortionAmount") + m6 * 0.6f);
+    const float driveAmt   = presetMacrosActive ? clamp01(getF("fxDistortionAmount"))
+                                                : clamp01(getF("fxDistortionAmount") + m6 * 0.6f);
     fx.setSaturationDrive(driveAmt);
     fx.setSaturationMix  (driveAmt > 0.0001f ? 1.0f : 0.0f);
 
-    const float chorusMix  = clamp01(getF("fxChorusMix")  + m2 * 0.5f);
+    const float chorusMix  = presetMacrosActive ? clamp01(getF("fxChorusMix"))
+                                                : clamp01(getF("fxChorusMix") + m2 * 0.5f);
     fx.setChorusMix  (chorusMix);
-    fx.setChorusRate (0.4f + m2 * 1.6f);          // 0.4..2.0 Hz
-    fx.setChorusDepth(juce::jlimit(0.05f, 1.0f, 0.25f + m8 * 0.5f));
+    fx.setChorusRate (presetMacrosActive ? 0.6f : (0.4f + m2 * 1.6f));
+    fx.setChorusDepth(juce::jlimit(0.05f, 1.0f, presetMacrosActive ? 0.35f : 0.25f + m8 * 0.5f));
 
     fx.setDelayMix(getF("fxDelayMix"));
     fx.setDelayTime(getF("fxDelayTime"));
     fx.setDelayFeedback(getF("fxDelayFeedback"));
 
-    fx.setReverbMix (clamp01(getF("fxReverbMix")  + m7 * 0.6f));
-    fx.setReverbSize(clamp01(getF("fxReverbSize") + m5 * 0.5f));
+    fx.setReverbMix (presetMacrosActive ? clamp01(getF("fxReverbMix"))
+                                        : clamp01(getF("fxReverbMix")  + m7 * 0.6f));
+    fx.setReverbSize(presetMacrosActive ? clamp01(getF("fxReverbSize"))
+                                        : clamp01(getF("fxReverbSize") + m5 * 0.5f));
 
     fx.setEqLowDb (getF("eqLow"));
     fx.setEqMidDb (getF("eqMid"));
@@ -498,17 +507,19 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     fx.setWetHighPassHz(getF("fxWetHighPass"));
     fx.setMasterGainDb(getF("masterGain"));
 
-    // Apply macro 1/3/4 inside the per-voice loop above by re-adjusting
-    // a few key voice params now that the snapshot has been pushed.
-    const float macroCutoff = std::pow(2.0f, (m1 - 0.5f) * 4.0f); // 0.0625..16x
-    const float macroOscB   = clamp01(oscBLevel + m3 * 0.7f);
-    const float macroNoise  = clamp01(noiseLvl  + m4 * 0.5f);
-    synthEngine.forEachSynthVoice([&](SynthVoice& v)
+    if (! presetMacrosActive)
     {
-        v.setBaseCutoff(juce::jlimit(20.0f, 20000.0f, cutoff * macroCutoff));
-        v.setOscBLevel(macroOscB);
-        v.setNoiseLevel(macroNoise);
-    });
+        // Legacy hardcoded macros — only when preset has no V2 macro targets.
+        const float macroCutoff = std::pow(2.0f, (m1 - 0.5f) * 4.0f);
+        const float macroOscB   = clamp01(oscBLevel + m3 * 0.7f);
+        const float macroNoise  = clamp01(noiseLvl  + m4 * 0.5f);
+        synthEngine.forEachSynthVoice([&](SynthVoice& v)
+        {
+            v.setBaseCutoff(juce::jlimit(20.0f, 20000.0f, cutoff * macroCutoff));
+            v.setOscBLevel(macroOscB);
+            v.setNoiseLevel(macroNoise);
+        });
+    }
 
     // ---- Render voices + FX (master gain + limiter applied inside FX chain) ----
     synthEngine.renderBlockWithFx(buffer, midiMessages, 0, buffer.getNumSamples());

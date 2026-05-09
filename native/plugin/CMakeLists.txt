@@ -96,6 +96,8 @@ target_sources(DIDITAGAIN_STUDIO PRIVATE
     Source/Presets/PresetIndex.cpp
     Source/Presets/PresetTemplateFactory.cpp
     Source/Presets/HybridPresetGenerator.cpp
+    Source/Presets/HybridPresetApplier.cpp
+    Source/Presets/MacroMapper.cpp
     Source/Licensing/LicenseClient.cpp
     Source/Licensing/AccountState.cpp
     Source/UI/Theme.cpp

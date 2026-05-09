@@ -7,21 +7,21 @@ HybridPresetV2 HybridPresetGenerator::generate(const Inputs& in)
 {
     auto p = PresetTemplateFactory::build(in.category, in.presetName,
                                           in.sampleRelPath, in.rootMidi, in.rootNote);
+    // Layer 1 holds the imported sample path / root note. We respect caller-
+    // supplied pitchTracking / oneShotMode but otherwise leave the template's
+    // volume + filter + envelope intact so it sounds like the category preset,
+    // not a raw sampler.
     if (! p.layers.empty())
     {
         auto& L = p.layers[0];
         L.source        = in.sampleRelPath;
         L.rootNote      = in.rootNote;
         L.rootMidi      = in.rootMidi;
-        L.volume        = 1.0f;
         L.pitchTracking = in.pitchTracking;
         L.oneShotMode   = in.oneShotMode;
     }
-    for (size_t i = 1; i < p.layers.size(); ++i)
-    {
-        p.layers[i].enabled = false;
-        p.layers[i].volume = 0.0f;
-    }
+    // Support layers (2-4) keep their template-driven enabled/volume values.
+    // This is the difference between "imported = sampler" and "imported = full hybrid preset".
     p.hasSourceImport         = true;
     p.sourceOriginalFileName  = in.originalFileName;
     p.sourceSamplePath        = in.sampleRelPath;
