@@ -20,7 +20,7 @@ PresetBrowser::PresetBrowser()
     browser->onPresetSelected = [this](int row)
     {
         if (onPresetSelected && row >= 0 && row < allIndices.size())
-            onPresetSelected(allIndices[row]);
+            onPresetSelected(juce::String(allIndices[row]));
     };
 }
 

@@ -47,10 +47,12 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
         juce::StringArray names, cats;
         for (int i = 0; i < pm.getNumPresets(); ++i) { names.add(pm.getPresetName(i)); cats.add("All"); }
         presetBrowserPanel->setPresets(names, cats);
-        presetBrowserPanel->onPresetSelected = [this](int idx) {
+        presetBrowserPanel->onPresetSelected = [this](const juce::String& presetId) {
+            const int idx = presetId.getIntValue();
             processor.getPresetManager().loadPreset(idx);
             presetSelector.setSelectedId(idx + 1, juce::dontSendNotification);
         };
+        presetBrowserPanel->onRefreshRequested = [this]() { refreshPresetCombo(); };
     }
 
     overlayClose.setColour(juce::TextButton::buttonColourId, Theme::getColors().surfaceElevated);
