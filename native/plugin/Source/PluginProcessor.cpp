@@ -377,6 +377,7 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                 // Swap the active multisample instrument requested by the preset.
                 const auto& requestedSample = presetManager.getRequestedSampleSource();
                 const auto& requested = presetManager.getRequestedInstrument();
+                synthEngine.setFallbackSynthesisEnabled(requestedSample.isEmpty());
                 if (requestedSample.isNotEmpty())
                     synthEngine.setSampleSource(requestedSample,
                                                 presetManager.getRequestedSampleRootMidi(),
