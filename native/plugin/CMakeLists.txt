@@ -203,7 +203,6 @@ set_target_properties(DIDITAGAIN_STUDIO PROPERTIES
 if(MSVC)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
         # ClangCL: NO debug info anywhere — avoids "Live DEBUG_VALUE analysis" ICE.
-        # clang-cl ignores -g0; use MSVC-style switches and CMake property.
         set_property(TARGET DIDITAGAIN_STUDIO PROPERTY MSVC_DEBUG_INFORMATION_FORMAT "")
         target_compile_options(DIDITAGAIN_STUDIO PUBLIC
             /EHsc
