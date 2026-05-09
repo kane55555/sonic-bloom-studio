@@ -40,3 +40,17 @@ presets remain audible during preset switching.
 For each macro, every target's `path` is split on `.` and resolved against
 the in-memory preset. The target value is `min + value * (max - min)`,
 written back at audio-rate (smoothed) by the engine.
+
+## Update — V2 applier + macro mapper
+
+As of this pass, `HybridPresetV2` presets no longer collapse to a single
+sample layer at load time. `Presets/HybridPresetApplier` maps every
+layer (sample, osc body, noise, sub/shimmer), the global filter, FX,
+and category-specific mono/glide settings onto APVTS parameters. The
+imported sample is still Layer 1 and still plays chromatically across
+the keyboard, but the support layers are audible by default — so an
+imported bell becomes a "Drill Bell" instrument rather than a bare
+sampler.
+
+See `docs/IMPORTED_PRESET_PLAYBACK.md` for the full pipeline and the
+per-category looping rules used by `shouldLoopForCategory`.
