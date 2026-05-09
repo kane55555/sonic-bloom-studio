@@ -379,6 +379,16 @@ juce::String PresetManager::getPresetName(int index) const
     return "Init";
 }
 
+int PresetManager::findPresetIndexByFile(const juce::File& file) const
+{
+    const auto target = file.getFullPathName();
+    for (int i = 0; i < static_cast<int>(presets.size()); ++i)
+        if (juce::File(presets[i].filePath).getFullPathName() == target)
+            return i;
+
+    return -1;
+}
+
 void PresetManager::toggleFavorite(int index)
 {
     if (index >= 0 && index < static_cast<int>(presets.size()))
