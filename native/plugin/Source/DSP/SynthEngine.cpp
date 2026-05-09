@@ -207,7 +207,8 @@ bool SynthEngine::setInstrument(const juce::String& instrumentName)
 
 bool SynthEngine::setSampleSource(const juce::String& sourcePath, int rootMidi, const juce::String& displayName)
 {
-    const auto sourceName = sourcePath.isEmpty() ? juce::String() : (juce::String("sample:") + sourcePath);
+    const auto sourceName = sourcePath.isEmpty() ? juce::String()
+        : (juce::String("sample:") + sourcePath + ":" + juce::String(rootMidi));
     if (sourceName == currentInstrumentName && activeMultisample != nullptr)
         return true;
 
