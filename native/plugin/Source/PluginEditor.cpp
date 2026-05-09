@@ -192,12 +192,23 @@ void DiditagainEditor::setupTabs()
 void DiditagainEditor::switchTab(Tab tab)
 {
     currentTab = tab;
+    if (layerPanel)         layerPanel->setVisible(tab == Tab::Layers);
     if (synthPanel)         synthPanel->setVisible(tab == Tab::Synth);
     if (presetBrowserPanel) presetBrowserPanel->setVisible(tab == Tab::Browser);
     if (modPanel)           modPanel->setVisible(tab == Tab::Mod);
     if (fxPanel)            fxPanel->setVisible(tab == Tab::FX);
+    if (importPanel)        importPanel->setVisible(tab == Tab::Import);
     if (settingsPanel)      settingsPanel->setVisible(tab == Tab::Settings);
     if (accountPanel)       accountPanel->setVisible(tab == Tab::Account);
+
+    const bool deep = advancedMode;
+    tabSynth.setEnabled(deep);
+    tabMod.setEnabled(deep);
+    tabFX.setEnabled(deep);
+    tabSynth.setAlpha(deep ? 1.0f : 0.4f);
+    tabMod.setAlpha(deep ? 1.0f : 0.4f);
+    tabFX.setAlpha(deep ? 1.0f : 0.4f);
+
     repaint();
 }
 
@@ -205,19 +216,20 @@ void DiditagainEditor::paint(juce::Graphics& g)
 {
     g.fillAll(juce::Colour(0xff0B0D10));
 
-    // Header
     g.setColour(juce::Colour(0xff151922));
     g.fillRect(0, 0, getWidth(), 50);
     g.setColour(juce::Colour(0xff8b5cf6));
     g.setFont(juce::Font(18.0f).boldened());
-    g.drawText("DIDITAGAIN STUDIO", 15, 0, 250, 50, juce::Justification::centredLeft);
+    g.drawText("DIDITAGAIN STUDIO", 15, 0, 240, 50, juce::Justification::centredLeft);
+    g.setColour(juce::Colour(0xff8a93a6));
+    g.setFont(juce::Font(11.0f));
+    g.drawText("Hybrid 4-Layer Workstation v2", 15, 28, 260, 16, juce::Justification::centredLeft);
 
-    // Active tab pill
     auto tabBounds = [this](Tab t) -> juce::Rectangle<int> {
         int idx = static_cast<int>(t);
-        return { 280 + idx * 90, 12, 82, 26 };
+        return { 260 + idx * 78, 12, 72, 26 };
     };
-    for (int i = 0; i < 6; ++i)
+    for (int i = 0; i < 8; ++i)
     {
         Tab t = static_cast<Tab>(i);
         if (t == currentTab)
@@ -227,9 +239,14 @@ void DiditagainEditor::paint(juce::Graphics& g)
         }
     }
 
-    // Sub-bar background
     g.setColour(juce::Colour(0xff0F1118));
     g.fillRect(0, 50, getWidth(), 40);
+
+    if (macroPanel)
+    {
+        g.setColour(juce::Colour(0xff10131a));
+        g.fillRect(macroPanel->getBounds().expanded(0, 4));
+    }
 }
 
 void DiditagainEditor::resized()
@@ -241,15 +258,23 @@ void DiditagainEditor::resized()
     savePreset.setBounds(pw - 75, 56, 60, 28);
 
     cycleTestButton.setBounds(pw - 470, 56, 110, 28);
+    modeToggle.setBounds(pw - 590, 56, 110, 28);
 
-    tabBrowser.setBounds(280, 12, 82, 26);
-    tabSynth.setBounds(370, 12, 82, 26);
-    tabMod.setBounds(460, 12, 82, 26);
-    tabFX.setBounds(550, 12, 82, 26);
-    tabSettings.setBounds(640, 12, 82, 26);
-    tabAccount.setBounds(730, 12, 82, 26);
+    tabBrowser .setBounds(260 + 0 * 78, 12, 72, 26);
+    tabLayers  .setBounds(260 + 1 * 78, 12, 72, 26);
+    tabSynth   .setBounds(260 + 2 * 78, 12, 72, 26);
+    tabMod     .setBounds(260 + 3 * 78, 12, 72, 26);
+    tabFX      .setBounds(260 + 4 * 78, 12, 72, 26);
+    tabImport  .setBounds(260 + 5 * 78, 12, 72, 26);
+    tabSettings.setBounds(260 + 6 * 78, 12, 72, 26);
+    tabAccount .setBounds(260 + 7 * 78, 12, 72, 26);
 
-    auto content = juce::Rectangle<int>(8, 96, getWidth() - 16, getHeight() - 104);
+    const int macroH = 110;
+    auto full = juce::Rectangle<int>(8, 96, getWidth() - 16, getHeight() - 104);
+    auto macroArea = full.removeFromBottom(macroH);
+    if (macroPanel) macroPanel->setBounds(macroArea);
+
+    auto content = full.withTrimmedBottom(6);
 
     if (cycleTestLog.isVisible())
     {
@@ -257,10 +282,12 @@ void DiditagainEditor::resized()
         cycleTestLog.setBounds(content.removeFromBottom(logH).reduced(2));
     }
 
+    if (layerPanel)         layerPanel->setBounds(content);
     if (synthPanel)         synthPanel->setBounds(content);
     if (presetBrowserPanel) presetBrowserPanel->setBounds(content);
     if (modPanel)           modPanel->setBounds(content);
     if (fxPanel)            fxPanel->setBounds(content);
+    if (importPanel)        importPanel->setBounds(content);
     if (settingsPanel)      settingsPanel->setBounds(content);
     if (accountPanel)       accountPanel->setBounds(content);
 }
