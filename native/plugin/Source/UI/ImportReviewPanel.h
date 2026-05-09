@@ -312,12 +312,14 @@ private:
         // The note suffix is required: SampleLibrary skips any file whose name
         // doesn't match the "_C5" / "_F#3" convention. Without this, the
         // instrument loads empty and the voice falls back to a generic sine.
-        auto userPresets = presetManager->getUserPresetDirectory();
-        auto studioRoot  = userPresets.getParentDirectory().getParentDirectory(); // ".../DIDITAGAIN STUDIO"
-        auto samplesDir  = studioRoot.getChildFile("Samples")
-                                     .getChildFile("Imported")
-                                     .getChildFile(category)
-                                     .getChildFile(safeName);
+        // Samples MUST live under the same root SampleLibrary reads from
+        // (Documents/DIDITAGAIN STUDIO/Samples), NOT under the user-preset
+        // folder (which is in AppData on Windows). Mismatch = silent fallback.
+        auto samplesRoot = dida::SampleLibrary::getSamplesRoot();
+        samplesRoot.createDirectory();
+        auto samplesDir  = samplesRoot.getChildFile("Imported")
+                                      .getChildFile(category)
+                                      .getChildFile(safeName);
         samplesDir.createDirectory();
 
         const juce::String destStem = safeName + "_" + rootName;
@@ -330,7 +332,10 @@ private:
             return false;
         }
 
-        auto sampleRel = destSample.getRelativePathFrom(studioRoot).replaceCharacter('\\', '/');
+        // Build a "Samples/Imported/<Cat>/<Name>/<File>" relative path that
+        // PresetManager strips back into the SampleLibrary instrument name.
+        auto sampleRel = juce::String("Samples/")
+            + destSample.getRelativePathFrom(samplesRoot).replaceCharacter('\\', '/');
 
         dida::preset::HybridPresetGenerator::Inputs in;
         in.category         = category;
@@ -347,7 +352,8 @@ private:
         auto preset = dida::preset::HybridPresetGenerator::generate(in);
         preset.name = name;
 
-        auto presetDir  = userPresets.getChildFile(category);
+        auto userPresets = presetManager->getUserPresetDirectory();
+        auto presetDir   = userPresets.getChildFile(category);
         presetDir.createDirectory();
         auto presetFile = presetDir.getNonexistentChildFile(name, ".didasynthpreset", true);
 
