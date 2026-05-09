@@ -63,6 +63,12 @@ endif()
 
 if(TARGET juce_audio_processors)
     set_property(TARGET juce_audio_processors PROPERTY INTERFACE_SOURCES "")
+
+    get_target_property(_dida_processors_links juce_audio_processors INTERFACE_LINK_LIBRARIES)
+    if(_dida_processors_links)
+        list(REMOVE_ITEM _dida_processors_links juce_audio_processors_headless juce::juce_audio_processors_headless)
+        set_property(TARGET juce_audio_processors PROPERTY INTERFACE_LINK_LIBRARIES "${_dida_processors_links}")
+    endif()
 endif()
 
 foreach(_dida_forbidden_headers IN ITEMS juce_lilv_headers juce_ara_headers)
@@ -166,5 +172,9 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND (CMAKE_CXX_SIMULATE_ID STREQUAL "M
         set_property(TARGET juce_recommended_config_flags PROPERTY INTERFACE_LINK_LIBRARIES "")
     endif()
 
-    target_compile_options(DIDITAGAIN_STUDIO PRIVATE /Od /Ob0)
+    foreach(_dida_noopt_target IN ITEMS DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3)
+        if(TARGET ${_dida_noopt_target})
+            target_compile_options(${_dida_noopt_target} PRIVATE /Od /Ob0)
+        endif()
+    endforeach()
 endif()
