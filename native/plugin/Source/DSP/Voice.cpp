@@ -206,34 +206,35 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         float sampL = 0.0f, sampR = 0.0f;
         const bool hasSampleSource = (loZone != nullptr) || (hiZone != nullptr);
 
+        auto advanceLoop = [this](const dida::SampleZone& z, double& pos, bool& finished)
+        {
+            const double n = (double) z.buffer.getNumSamples();
+            const double cropEnd  = juce::jlimit(2.0, n - 1.0, (double) cropEndFrac  * n);
+            const double loopStart = juce::jlimit(0.0, cropEnd - 2.0, (double) loopStartFrac * n);
+            const double loopEnd   = juce::jlimit(loopStart + 2.0, cropEnd, (double) loopEndFrac * n);
+            if (pos >= cropEnd)
+            {
+                if (sampleLooping && ! oneShotMode && loopEnd > loopStart + 2.0)
+                    pos = loopStart + (pos - loopEnd);
+                else
+                    finished = true;
+            }
+        };
+
         if (loZone && ! loFinished)
         {
-            float zl, zr; readZone(*loZone, loReadPos, zl, zr);
+            float zl, zr; readWithLoop(*loZone, loReadPos, loFinished, zl, zr);
             const float w = (hiZone ? (1.0f - zoneXfade) : 1.0f);
             sampL += zl * w; sampR += zr * w;
             loReadPos += loStep;
-            const double loEnd = (double) (loZone->buffer.getNumSamples() - 1);
-            if (loReadPos >= loEnd)
-            {
-                if (sampleLooping && loEnd > 1.0)
-                    loReadPos = std::fmod(loReadPos, loEnd);
-                else
-                    loFinished = true;
-            }
+            advanceLoop(*loZone, loReadPos, loFinished);
         }
         if (hiZone && ! hiFinished)
         {
-            float zl, zr; readZone(*hiZone, hiReadPos, zl, zr);
+            float zl, zr; readWithLoop(*hiZone, hiReadPos, hiFinished, zl, zr);
             sampL += zl * zoneXfade; sampR += zr * zoneXfade;
             hiReadPos += hiStep;
-            const double hiEnd = (double) (hiZone->buffer.getNumSamples() - 1);
-            if (hiReadPos >= hiEnd)
-            {
-                if (sampleLooping && hiEnd > 1.0)
-                    hiReadPos = std::fmod(hiReadPos, hiEnd);
-                else
-                    hiFinished = true;
-            }
+            advanceLoop(*hiZone, hiReadPos, hiFinished);
         }
 
         // Legacy synth fallback only for factory/pure-synth presets. Imported
