@@ -223,8 +223,9 @@ endforeach()
 if(MSVC OR (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND (CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC" OR CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")))
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF CACHE BOOL "" FORCE)
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE OFF CACHE BOOL "" FORCE)
+    set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "" CACHE STRING "" FORCE)
 
-    set(_DIDA_BAD_FLAGS "-O2" "-O3" "-Ox" "/O1" "/O2" "/O3" "/Ox" "/Ob1" "/Ob2" "/Ob3" "/GL" "/GL-" "/LTCG" "/Zi" "/Z7" "/Oi" "/Ot")
+    set(_DIDA_BAD_FLAGS "-O2" "-O3" "-Ox" "/O1" "/O2" "/O3" "/Ox" "/Ob1" "/Ob2" "/Ob3" "/GL" "/GL-" "/LTCG" "/Zi" "/Z7" "/MP" "/Oi" "/Ot")
     set(_DIDA_CFG_VARS
         CMAKE_C_FLAGS CMAKE_C_FLAGS_RELEASE CMAKE_C_FLAGS_RELWITHDEBINFO CMAKE_C_FLAGS_MINSIZEREL
         CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_RELWITHDEBINFO CMAKE_CXX_FLAGS_MINSIZEREL
@@ -244,7 +245,11 @@ if(MSVC OR (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND (CMAKE_CXX_SIMULATE_ID ST
 
     foreach(_dida_noopt_target IN ITEMS DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3)
         if(TARGET ${_dida_noopt_target})
-            target_compile_options(${_dida_noopt_target} PRIVATE /Od /Ob0)
+            set_property(TARGET ${_dida_noopt_target} PROPERTY MSVC_DEBUG_INFORMATION_FORMAT "")
+            set_property(TARGET ${_dida_noopt_target} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE)
+            set_property(TARGET ${_dida_noopt_target} PROPERTY VS_GLOBAL_UseMultiToolTask false)
+            set_property(TARGET ${_dida_noopt_target} PROPERTY VS_GLOBAL_CL_MPCount 1)
+            target_compile_options(${_dida_noopt_target} PRIVATE /Od /Ob0 /GL- /MP- /bigobj /FS)
         endif()
     endforeach()
 endif()
