@@ -116,6 +116,14 @@ target_sources(DIDITAGAIN_STUDIO PRIVATE
     Source/PluginEditor.h
 )
 
+# Some JUCE 8/CMake combinations do not propagate this module compile unit to
+# the VST3 target, which leaves AudioProcessor symbols undefined at link time.
+if(EXISTS "${JUCE_DIR}/modules/juce_audio_processors/juce_audio_processors.cpp")
+    target_sources(DIDITAGAIN_STUDIO PRIVATE
+        "${JUCE_DIR}/modules/juce_audio_processors/juce_audio_processors.cpp"
+    )
+endif()
+
 target_include_directories(DIDITAGAIN_STUDIO PRIVATE
     Source
     "${JUCE_DIR}/modules/juce_audio_processors/format_types/VST3_SDK"
@@ -184,12 +192,15 @@ foreach(_dida_defs_target IN ITEMS DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3 juce
 endforeach()
 
 # ---------------------------------------------------------------------------
-# ClangCL workaround: the optimizer has been crashing on Release builds.
-# Force optimizations OFF and strip LTO/PGO/debug-info flags that have
-# triggered the crashes. Applies to every target in this directory tree.
+# VS 2026 Insiders workaround: both ClangCL 20.x and MSVC 19.51 have been
+# crashing in code generation on this JUCE target. Build Release without the
+# optimizer/LTCG path that triggers the compiler access violation.
 # ---------------------------------------------------------------------------
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND (CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC" OR CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC"))
-    set(_DIDA_BAD_FLAGS "-O2" "-O3" "-Ox" "/O2" "/O3" "/Ox" "/Ob1" "/Ob2" "/Ob3" "/GL" "/GL-" "/LTCG" "/Zi" "/Z7" "/Oi" "/Ot")
+if(MSVC OR (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND (CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC" OR CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")))
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF CACHE BOOL "" FORCE)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE OFF CACHE BOOL "" FORCE)
+
+    set(_DIDA_BAD_FLAGS "-O2" "-O3" "-Ox" "/O1" "/O2" "/O3" "/Ox" "/Ob1" "/Ob2" "/Ob3" "/GL" "/GL-" "/LTCG" "/Zi" "/Z7" "/Oi" "/Ot")
     set(_DIDA_CFG_VARS
         CMAKE_C_FLAGS CMAKE_C_FLAGS_RELEASE CMAKE_C_FLAGS_RELWITHDEBINFO CMAKE_C_FLAGS_MINSIZEREL
         CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_RELWITHDEBINFO CMAKE_CXX_FLAGS_MINSIZEREL
