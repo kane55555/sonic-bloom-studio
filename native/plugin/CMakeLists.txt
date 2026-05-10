@@ -47,34 +47,31 @@ endif()
 
 add_subdirectory("${JUCE_DIR}" JUCE EXCLUDE_FROM_ALL)
 
-# JUCE 8 makes juce_audio_processors depend on an implementation-only split
-# module and also exposes optional ARA/LV2 support headers through that target.
-# This plugin is VST3-only, so keep the public JUCE module links below but stop
-# CMake from adding those optional helper compile units/include paths.
-if(TARGET juce_audio_processors_headless)
-    set_property(TARGET juce_audio_processors_headless PROPERTY INTERFACE_SOURCES "")
+# JUCE 8 splits part of juce_audio_processors into a headless implementation
+# target. Keep those implementation sources, but remove this project's custom
+# generated runtime files that trigger ClangCL codegen crashes.
+function(_dida_filter_forbidden_sources target_name)
+    if(TARGET ${target_name})
+        foreach(_dida_sources_property IN ITEMS SOURCES INTERFACE_SOURCES)
+            get_target_property(_dida_sources ${target_name} ${_dida_sources_property})
+            if(_dida_sources)
+                list(FILTER _dida_sources EXCLUDE REGEX "(DidaJuceAudioProcessorRuntime|FxChain|ReverbBlock)\\.cpp$")
+                set_property(TARGET ${target_name} PROPERTY ${_dida_sources_property} "${_dida_sources}")
+            endif()
+        endforeach()
 
-    get_target_property(_dida_headless_links juce_audio_processors_headless INTERFACE_LINK_LIBRARIES)
-    if(_dida_headless_links)
-        list(REMOVE_ITEM _dida_headless_links juce_lilv_headers juce::juce_lilv_headers juce_ara_headers juce::juce_ara_headers)
-        set_property(TARGET juce_audio_processors_headless PROPERTY INTERFACE_LINK_LIBRARIES "${_dida_headless_links}")
+        get_target_property(_dida_links ${target_name} INTERFACE_LINK_LIBRARIES)
+        if(_dida_links)
+            list(REMOVE_ITEM _dida_links
+                juce_lilv_headers juce::juce_lilv_headers
+                juce_ara_headers juce::juce_ara_headers)
+            set_property(TARGET ${target_name} PROPERTY INTERFACE_LINK_LIBRARIES "${_dida_links}")
+        endif()
     endif()
-endif()
+endfunction()
 
-# NOTE: Do NOT clear juce_audio_processors INTERFACE_SOURCES or INTERFACE_LINK_LIBRARIES.
-# That target carries the actual juce_audio_processors.cpp compile unit and its
-# transitive module dependencies. Clearing them produces undefined symbols at
-# link time (juce::AudioProcessor::*, AudioProcessorParameterGroup, etc.).
-# Strip ARA/LV2 helpers from its link list instead, leaving the rest intact.
-if(TARGET juce_audio_processors)
-    get_target_property(_dida_ap_links juce_audio_processors INTERFACE_LINK_LIBRARIES)
-    if(_dida_ap_links)
-        list(REMOVE_ITEM _dida_ap_links
-            juce_lilv_headers juce::juce_lilv_headers
-            juce_ara_headers juce::juce_ara_headers)
-        set_property(TARGET juce_audio_processors PROPERTY INTERFACE_LINK_LIBRARIES "${_dida_ap_links}")
-    endif()
-endif()
+_dida_filter_forbidden_sources(juce_audio_processors_headless)
+_dida_filter_forbidden_sources(juce_audio_processors)
 
 foreach(_dida_forbidden_headers IN ITEMS juce_lilv_headers juce_ara_headers)
     if(TARGET ${_dida_forbidden_headers})
@@ -118,15 +115,6 @@ target_sources(DIDITAGAIN_STUDIO PRIVATE
     Source/PluginEditor.cpp
     Source/PluginEditor.h
 )
-
-# The JUCE fork in this build routes the audio_processors implementation through
-# an optional headless target. We disable that target's interface sources above,
-# so add the normal module implementation compile unit directly to SharedCode.
-set(_dida_audio_processors_cpp "${JUCE_DIR}/modules/juce_audio_processors/juce_audio_processors.cpp")
-if(EXISTS "${_dida_audio_processors_cpp}")
-    target_sources(DIDITAGAIN_STUDIO PRIVATE "${_dida_audio_processors_cpp}")
-endif()
-
 
 target_include_directories(DIDITAGAIN_STUDIO PRIVATE
     Source
