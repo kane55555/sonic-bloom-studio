@@ -10,6 +10,11 @@ DiditagainStudioV2AudioProcessorEditor::DiditagainStudioV2AudioProcessorEditor (
 
 DiditagainStudioV2AudioProcessorEditor::~DiditagainStudioV2AudioProcessorEditor() = default;
 
+juce::AudioProcessorEditor* DiditagainStudioV2AudioProcessor::createEditor()
+{
+    return new DiditagainStudioV2AudioProcessorEditor (*this);
+}
+
 void DiditagainStudioV2AudioProcessorEditor::paint (juce::Graphics& g)
 {
     // Dark background
