@@ -251,8 +251,11 @@ if(MSVC OR (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND (CMAKE_CXX_SIMULATE_ID ST
         set_property(TARGET juce_recommended_config_flags PROPERTY INTERFACE_LINK_LIBRARIES "")
     endif()
 
-    foreach(_dida_noopt_target IN ITEMS DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3)
+    foreach(_dida_noopt_target IN ITEMS
+        DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3
+        juce_gui_basics juce_gui_extra juce_graphics juce_audio_plugin_client)
         if(TARGET ${_dida_noopt_target})
+            set_property(TARGET ${_dida_noopt_target} PROPERTY VS_NO_COMPILE_BATCHING ON)
             set_property(TARGET ${_dida_noopt_target} PROPERTY MSVC_DEBUG_INFORMATION_FORMAT "")
             set_property(TARGET ${_dida_noopt_target} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE)
             set_property(TARGET ${_dida_noopt_target} PROPERTY VS_GLOBAL_UseMultiToolTask false)
