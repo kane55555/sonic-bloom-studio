@@ -6,14 +6,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# VS 2026 Insiders' MSVC/ClangCL toolchains have been crashing while MSBuild
-# batches JUCE module sources into a single compiler task. This must be set
-# before any JUCE targets are created so all generated projects inherit it.
-if(CMAKE_GENERATOR MATCHES "Visual Studio")
-    set(CMAKE_VS_NO_COMPILE_BATCHING ON CACHE BOOL "" FORCE)
-    set(CMAKE_VS_GLOBALS "UseMultiToolTask=false" CACHE STRING "" FORCE)
-endif()
-
 # ---------------------------------------------------------------------------
 # Hard-disable every optional JUCE plugin-client variant we do not want.
 # These MUST be set BEFORE add_subdirectory(JUCE) so JUCE never generates
@@ -251,11 +243,8 @@ if(MSVC OR (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND (CMAKE_CXX_SIMULATE_ID ST
         set_property(TARGET juce_recommended_config_flags PROPERTY INTERFACE_LINK_LIBRARIES "")
     endif()
 
-    foreach(_dida_noopt_target IN ITEMS
-        DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3
-        juce_gui_basics juce_gui_extra juce_graphics juce_audio_plugin_client)
+    foreach(_dida_noopt_target IN ITEMS DIDITAGAIN_STUDIO DIDITAGAIN_STUDIO_VST3)
         if(TARGET ${_dida_noopt_target})
-            set_property(TARGET ${_dida_noopt_target} PROPERTY VS_NO_COMPILE_BATCHING ON)
             set_property(TARGET ${_dida_noopt_target} PROPERTY MSVC_DEBUG_INFORMATION_FORMAT "")
             set_property(TARGET ${_dida_noopt_target} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE)
             set_property(TARGET ${_dida_noopt_target} PROPERTY VS_GLOBAL_UseMultiToolTask false)
