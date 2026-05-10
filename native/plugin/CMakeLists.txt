@@ -118,11 +118,21 @@ target_sources(DIDITAGAIN_STUDIO PRIVATE
 
 # Some JUCE 8/CMake combinations do not propagate this module compile unit to
 # the VST3 target, which leaves AudioProcessor symbols undefined at link time.
-if(EXISTS "${JUCE_DIR}/modules/juce_audio_processors/juce_audio_processors.cpp")
-    target_sources(DIDITAGAIN_STUDIO PRIVATE
+# In JUCE 8 the implementation TU may live under juce_audio_processors_headless.
+set(_dida_ap_cpp "")
+foreach(_dida_ap_candidate IN ITEMS
         "${JUCE_DIR}/modules/juce_audio_processors/juce_audio_processors.cpp"
-    )
+        "${JUCE_DIR}/modules/juce_audio_processors_headless/juce_audio_processors_headless.cpp"
+        "${JUCE_DIR}/modules/juce_audio_processors_headless/juce_audio_processors.cpp")
+    if(EXISTS "${_dida_ap_candidate}" AND _dida_ap_cpp STREQUAL "")
+        set(_dida_ap_cpp "${_dida_ap_candidate}")
+    endif()
+endforeach()
+if(_dida_ap_cpp STREQUAL "")
+    message(FATAL_ERROR "Could not find juce_audio_processors implementation .cpp under ${JUCE_DIR}/modules. Check your JUCE checkout.")
 endif()
+message(STATUS "DIDITAGAIN: compiling juce_audio_processors TU from ${_dida_ap_cpp}")
+target_sources(DIDITAGAIN_STUDIO PRIVATE "${_dida_ap_cpp}")
 
 target_include_directories(DIDITAGAIN_STUDIO PRIVATE
     Source
