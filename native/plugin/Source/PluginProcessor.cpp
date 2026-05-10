@@ -1,5 +1,4 @@
 #include "PluginProcessor.h"
-#include "PluginEditor.h"
 
 DiditagainStudioV2AudioProcessor::DiditagainStudioV2AudioProcessor()
     : AudioProcessor (BusesProperties()
@@ -24,11 +23,6 @@ void DiditagainStudioV2AudioProcessor::processBlock (juce::AudioBuffer<float>& b
 {
     juce::ScopedNoDenormals noDenormals;
     buffer.clear();
-}
-
-juce::AudioProcessorEditor* DiditagainStudioV2AudioProcessor::createEditor()
-{
-    return new DiditagainStudioV2AudioProcessorEditor (*this);
 }
 
 void DiditagainStudioV2AudioProcessor::getStateInformation (juce::MemoryBlock&) {}
