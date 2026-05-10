@@ -116,15 +116,6 @@ target_sources(DIDITAGAIN_STUDIO PRIVATE
     Source/PluginEditor.h
 )
 
-# The JUCE fork in this build routes the audio_processors implementation through
-# an optional headless target. We disable that target's interface sources above,
-# so add the normal module implementation compile unit directly to SharedCode.
-set(_dida_audio_processors_cpp "${JUCE_DIR}/modules/juce_audio_processors/juce_audio_processors.cpp")
-if(EXISTS "${_dida_audio_processors_cpp}")
-    target_sources(DIDITAGAIN_STUDIO PRIVATE "${_dida_audio_processors_cpp}")
-endif()
-
-
 target_include_directories(DIDITAGAIN_STUDIO PRIVATE
     Source
     "${JUCE_DIR}/modules/juce_audio_processors/format_types/VST3_SDK"
