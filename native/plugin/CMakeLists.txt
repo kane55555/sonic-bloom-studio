@@ -45,6 +45,13 @@ if(NOT DEFINED JUCE_DIR OR NOT EXISTS "${JUCE_DIR}/CMakeLists.txt")
     message(FATAL_ERROR "JUCE_DIR is not set or invalid. Pass -DJUCE_DIR=<path-to-JUCE>.")
 endif()
 
+# MSVC reads sources as the active code page by default. JUCE's SheenBidi C
+# sources contain UTF-8 literals that fail to compile without /utf-8. This
+# MUST be set before add_subdirectory(JUCE) so juceaide also picks it up.
+if(MSVC)
+    add_compile_options(/utf-8)
+endif()
+
 add_subdirectory("${JUCE_DIR}" JUCE EXCLUDE_FROM_ALL)
 
 # JUCE 8 splits part of juce_audio_processors into a headless implementation
