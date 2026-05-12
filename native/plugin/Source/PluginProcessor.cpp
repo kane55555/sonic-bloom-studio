@@ -237,6 +237,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createP
         juce::ParameterID{"fxWetHighPass", 1}, "Wet FX HPF",
         juce::NormalisableRange<float>(20.0f, 800.0f, 1.0f, 0.4f), 80.0f));
 
+    // Direct Monitor — bypass reverb + delay for low-latency tracking.
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{"directMonitor", 1}, "Direct Monitor", false));
+
     return { params.begin(), params.end() };
 }
 
@@ -490,12 +494,15 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     fx.setChorusRate (presetMacrosActive ? 0.6f : (0.4f + m2 * 1.6f));
     fx.setChorusDepth(juce::jlimit(0.05f, 1.0f, presetMacrosActive ? 0.35f : 0.25f + m8 * 0.5f));
 
-    fx.setDelayMix(getF("fxDelayMix"));
+    const bool directMonitor = getF("directMonitor") > 0.5f;
+
+    fx.setDelayMix(directMonitor ? 0.0f : getF("fxDelayMix"));
     fx.setDelayTime(getF("fxDelayTime"));
     fx.setDelayFeedback(getF("fxDelayFeedback"));
 
-    fx.setReverbMix (presetMacrosActive ? clamp01(getF("fxReverbMix"))
-                                        : clamp01(getF("fxReverbMix")  + m7 * 0.6f));
+    fx.setReverbMix (directMonitor ? 0.0f
+                                   : (presetMacrosActive ? clamp01(getF("fxReverbMix"))
+                                                         : clamp01(getF("fxReverbMix")  + m7 * 0.6f)));
     fx.setReverbSize(presetMacrosActive ? clamp01(getF("fxReverbSize"))
                                         : clamp01(getF("fxReverbSize") + m5 * 0.5f));
 
