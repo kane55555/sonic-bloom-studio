@@ -41,6 +41,8 @@ private:
     juce::TextButton prevPreset{"<"};
     juce::TextButton nextPreset{">"};
     juce::TextButton savePreset{"SAVE"};
+    juce::TextButton directMonitorButton{"DIRECT"};
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> directMonitorAttach;
 
     // Panels (Browser/Layers/FX always visible via tabs; rest opened modally)
     std::unique_ptr<LayerEditor>      layerPanel;
