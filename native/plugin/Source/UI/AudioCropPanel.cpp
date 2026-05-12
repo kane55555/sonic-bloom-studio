@@ -611,11 +611,21 @@ void AudioCropPanel::resetSelectedToOriginal()
 {
     if (selectedIndex < 0) return;
     auto& m = samples[(size_t) selectedIndex];
+    auto src = juce::File(m.sourcePath);
+    auto backup = src.getSiblingFile(src.getFileNameWithoutExtension() + ".original" + src.getFileExtension());
+    if (backup.existsAsFile())
+    {
+        src.deleteFile();
+        backup.copyFileTo(src);
+        dida::SampleLibrary::invalidateCache();
+        if (onLibraryChanged) onLibraryChanged();
+    }
     m.cropStart = 0.0; m.cropEnd = 1.0;
     m.loopStart = 0.2; m.loopEnd = 0.95;
     m.loopCrossfadeMs = 15.0;
     pushUiFromMeta(m);
-    waveform->repaint();
+    if (waveform) waveform->loadFor(src);
+    if (waveform) waveform->repaint();
 }
 
 void AudioCropPanel::startPreview()
