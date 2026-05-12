@@ -80,11 +80,8 @@ DiditagainEditor::~DiditagainEditor() {}
 
 void DiditagainEditor::refreshPresetCombo()
 {
-    presetSelector.clear(juce::dontSendNotification);
-    auto& pm = processor.getPresetManager();
-    for (int i = 0; i < pm.getNumPresets(); ++i)
-        presetSelector.addItem(pm.getPresetName(i), i + 1);
-    presetSelector.setSelectedId(pm.getCurrentPresetIndex() + 1, juce::dontSendNotification);
+    // The header preset dropdown was removed in favour of the Browser tab.
+    // Kept as a no-op so existing call sites still compile.
 }
 
 void DiditagainEditor::refreshBrowserPresets()
