@@ -48,10 +48,14 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
 
     audioCropPanel = std::make_unique<AudioCropPanel>();
     addChildComponent(*audioCropPanel);
+    audioCropPanel->onLibraryChanged = [this]() {
+        dida::SampleLibrary::invalidateCache();
+        processor.getPresetManager().scanPresetDirectory();
+        refreshBrowserPresets();
+    };
 
     presetBrowserPanel->onPresetSelected = [this](int idx) {
         processor.getPresetManager().loadPreset(idx);
-        presetSelector.setSelectedId(idx + 1, juce::dontSendNotification);
     };
     refreshBrowserPresets();
 
