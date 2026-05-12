@@ -15,24 +15,39 @@ public:
     PresetBrowser()
     {
         addAndMakeVisible(categoryBox);
-        categoryBox.addItem("All",     1);
-        categoryBox.addItem("Bass",    2);
-        categoryBox.addItem("Keys",    3);
-        categoryBox.addItem("Lead",    4);
-        categoryBox.addItem("Pad",     5);
-        categoryBox.addItem("Pluck",   6);
-        categoryBox.addItem("FX",      7);
+        categoryBox.addItem("All", 1);
         categoryBox.setSelectedId(1, juce::dontSendNotification);
         categoryBox.onChange = [this]() { applyFilter(); };
 
         addAndMakeVisible(browser);
-        browser.onPresetSelected = [this](int row) { if (onPresetSelected) onPresetSelected(allIndices[row]); };
+        browser.onPresetSelected = [this](int row) {
+            if (onPresetSelected && row >= 0 && row < allIndices.size())
+                onPresetSelected(allIndices[row]);
+        };
     }
 
     void setPresets(const juce::StringArray& names, const juce::StringArray& categories)
     {
         allNames = names;
         allCategories = categories;
+
+        // Rebuild the category dropdown from whatever the data actually contains,
+        // preserving the user's current selection if possible.
+        const auto previous = categoryBox.getText();
+        categoryBox.clear(juce::dontSendNotification);
+        categoryBox.addItem("All", 1);
+        juce::StringArray uniques;
+        for (auto& c : categories)
+            if (c.isNotEmpty() && ! uniques.contains(c, true)) uniques.add(c);
+        uniques.sortNatural();
+        int id = 2;
+        for (auto& c : uniques) categoryBox.addItem(c, id++);
+        int restoreId = 1;
+        for (int i = 0; i < categoryBox.getNumItems(); ++i)
+            if (categoryBox.getItemText(i).equalsIgnoreCase(previous))
+                restoreId = categoryBox.getItemId(i);
+        categoryBox.setSelectedId(restoreId, juce::dontSendNotification);
+
         applyFilter();
     }
 

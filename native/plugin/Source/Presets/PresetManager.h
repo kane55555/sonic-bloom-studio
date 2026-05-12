@@ -32,6 +32,16 @@ public:
     int getNumPresets() const { return static_cast<int>(presets.size()); }
     int getCurrentPresetIndex() const { return currentIndex; }
     juce::String getPresetName(int index) const;
+    juce::String getPresetCategory(int index) const
+    {
+        if (index >= 0 && index < (int) presets.size()) return presets[index].category;
+        return {};
+    }
+    bool getPresetIsFactory(int index) const
+    {
+        if (index >= 0 && index < (int) presets.size()) return presets[index].isFactory;
+        return true;
+    }
 
     std::function<void()> onPresetLoaded;
 
