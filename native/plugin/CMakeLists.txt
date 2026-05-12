@@ -71,7 +71,15 @@ juce_add_plugin(DIDITAGAIN_STUDIO
     IS_MIDI_EFFECT          FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS TRUE
     COPY_PLUGIN_AFTER_BUILD  FALSE
+    VST3_AUTO_MANIFEST       FALSE
 )
+
+# Defensive: if VST3_AUTO_MANIFEST is honored, the juce_vst3_helper target
+# is never created. If an older JUCE still creates it, give it /O1 to avoid
+# an MSVC 14.44 internal compiler error in <memory> when built with /Od.
+if(TARGET juce_vst3_helper AND MSVC)
+    target_compile_options(juce_vst3_helper PRIVATE /O1)
+endif()
 
 set(DIDA_JUCE_AUDIO_PROCESSORS_CPP
     "${JUCE_DIR}/modules/juce_audio_processors/juce_audio_processors.cpp"
