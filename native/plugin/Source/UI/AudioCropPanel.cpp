@@ -518,9 +518,8 @@ static bool writeTrimmedWav(const juce::File& src, const juce::File& dest,
 
     const int64_t total = reader->lengthInSamples;
     if (total <= 0) return false;
-    const int64_t s0 = (int64_t) juce::jlimit(0.0, 1.0, cropStart) * 0 // suppress warning
-                       + (int64_t) (juce::jlimit(0.0, 1.0, cropStart) * (double) total);
-    const int64_t s1 = (int64_t) (juce::jlimit(0.0, 1.0, cropEnd)   * (double) total);
+    const int64_t s0  = (int64_t) (juce::jlimit(0.0, 1.0, cropStart) * (double) total);
+    const int64_t s1  = (int64_t) (juce::jlimit(0.0, 1.0, cropEnd)   * (double) total);
     const int64_t len = juce::jmax<int64_t>(0, s1 - s0);
     if (len <= 0) return false;
 
