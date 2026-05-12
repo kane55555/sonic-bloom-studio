@@ -237,6 +237,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createP
         juce::ParameterID{"fxWetHighPass", 1}, "Wet FX HPF",
         juce::NormalisableRange<float>(20.0f, 800.0f, 1.0f, 0.4f), 80.0f));
 
+    // Direct Monitor — bypass reverb + delay for low-latency tracking.
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{"directMonitor", 1}, "Direct Monitor", false));
+
     return { params.begin(), params.end() };
 }
 
