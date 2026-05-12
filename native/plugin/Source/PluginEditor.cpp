@@ -85,6 +85,28 @@ void DiditagainEditor::refreshPresetCombo()
     presetSelector.setSelectedId(pm.getCurrentPresetIndex() + 1, juce::dontSendNotification);
 }
 
+void DiditagainEditor::refreshBrowserPresets()
+{
+    if (! presetBrowserPanel) return;
+    auto& pm = processor.getPresetManager();
+    const int n = pm.getNumPresets();
+
+    // If any user (imported) presets exist, hide the factory placeholders so
+    // the browser shows the producer's own one-shots only. Otherwise fall back
+    // to showing the factory list so the browser is never empty.
+    bool hasUser = false;
+    for (int i = 0; i < n; ++i) if (! pm.getPresetIsFactory(i)) { hasUser = true; break; }
+
+    juce::StringArray names, cats;
+    for (int i = 0; i < n; ++i)
+    {
+        if (hasUser && pm.getPresetIsFactory(i)) continue;
+        names.add(pm.getPresetName(i));
+        auto cat = pm.getPresetCategory(i);
+        cats.add(cat.isNotEmpty() ? cat : juce::String("Other"));
+    }
+    presetBrowserPanel->setPresets(names, cats);
+
 void DiditagainEditor::setupTabs()
 {
     auto& C = Theme::getColors();
