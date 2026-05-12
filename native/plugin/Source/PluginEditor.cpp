@@ -24,12 +24,10 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     importPanel->presetManager = &processor.getPresetManager();
     importPanel->onRescan = [this]() {
         processor.getPresetManager().scanPresetDirectory();
-        refreshPresetCombo();
         refreshBrowserPresets();
     };
     importPanel->onPresetsCreated = [this]() {
         processor.getPresetManager().scanPresetDirectory();
-        refreshPresetCombo();
         refreshBrowserPresets();
     };
     importPanel->onOpenInbox = []() {
