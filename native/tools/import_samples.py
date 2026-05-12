@@ -224,6 +224,11 @@ def main() -> int:
             ap.print_help(); return 1
         candidates = [make_candidate(f, layout) for f in files]
 
+    # Always load the existing index up front so we can hand out unique,
+    # human-friendly preset names (e.g. "Guitar 1", "Guitar 2") per category.
+    existing_index = load_index(layout["index"])
+    assign_auto_names(candidates, existing_index)
+
     if args.review_json:
         args.review_json.parent.mkdir(parents=True, exist_ok=True)
         args.review_json.write_text(json.dumps(candidates, indent=2), encoding="utf-8")
