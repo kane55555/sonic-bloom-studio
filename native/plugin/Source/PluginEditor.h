@@ -60,7 +60,7 @@ private:
 
     void setupTabs();
     void switchTab(Tab tab);
-    void refreshPresetCombo();
+    void refreshPresetCombo() {}
     void refreshBrowserPresets();
     void showOverlay(juce::Component* panel, const juce::String& title);
     void hideOverlay();
