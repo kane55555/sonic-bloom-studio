@@ -103,6 +103,20 @@ list(FILTER DIDA_ALL_SOURCES EXCLUDE REGEX ".*/Tests/.*")
 
 target_sources(DIDITAGAIN_STUDIO PRIVATE ${DIDA_ALL_SOURCES})
 
+# Force-add the JUCE audio_processors module implementation directly to the
+# plugin target. JUCE's CMake interface does not always attach this .cpp to
+# the consuming target in this project, which causes 99 unresolved
+# juce::AudioProcessor* symbols at VST3 link time.
+set(DIDA_JUCE_AUDIO_PROCESSORS_CPP
+    "${JUCE_DIR}/modules/juce_audio_processors/juce_audio_processors.cpp"
+)
+if(NOT EXISTS "${DIDA_JUCE_AUDIO_PROCESSORS_CPP}")
+    message(FATAL_ERROR "Missing JUCE audio processors implementation: ${DIDA_JUCE_AUDIO_PROCESSORS_CPP}")
+endif()
+target_sources(DIDITAGAIN_STUDIO PRIVATE
+    "${DIDA_JUCE_AUDIO_PROCESSORS_CPP}"
+)
+
 target_include_directories(DIDITAGAIN_STUDIO PRIVATE
     Source
     "${JUCE_DIR}/modules/juce_audio_processors/format_types/VST3_SDK"
