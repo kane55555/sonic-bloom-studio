@@ -75,27 +75,37 @@ juce_add_plugin(DIDITAGAIN_STUDIO
 
 set_property(TARGET DIDITAGAIN_STUDIO PROPERTY UNITY_BUILD OFF)
 
-# Force-add the JUCE audio_processors module implementation directly to the
-# main plugin target so it is compiled into DIDITAGAIN_STUDIO_SharedCode.
-set(DIDA_JUCE_AUDIO_PROCESSORS_CPP
-    "${JUCE_DIR}/modules/juce_audio_processors/juce_audio_processors.cpp"
+# Link JUCE modules directly to the main plugin target created by
+# juce_add_plugin. This target produces DIDITAGAIN_STUDIO_SharedCode.lib, so
+# JUCE module INTERFACE_SOURCES such as juce_audio_processors.cpp are compiled
+# into the shared-code library before DIDITAGAIN_STUDIO_VST3 links.
+set(DIDA_JUCE_MODULES
+    juce::juce_audio_plugin_client
+    juce::juce_audio_processors
+    juce::juce_audio_utils
+    juce::juce_audio_formats
+    juce::juce_audio_devices
+    juce::juce_audio_basics
+    juce::juce_dsp
+    juce::juce_gui_extra
+    juce::juce_gui_basics
+    juce::juce_graphics
+    juce::juce_events
+    juce::juce_core
+    juce::juce_data_structures
 )
-if(NOT EXISTS "${DIDA_JUCE_AUDIO_PROCESSORS_CPP}")
-    message(FATAL_ERROR "Missing JUCE audio processors implementation: ${DIDA_JUCE_AUDIO_PROCESSORS_CPP}")
+
+target_link_libraries(DIDITAGAIN_STUDIO
+    PRIVATE
+        ${DIDA_JUCE_MODULES}
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags
+)
+
+if(TARGET DIDITAGAIN_STUDIO_SharedCode)
+    target_link_libraries(DIDITAGAIN_STUDIO_SharedCode PRIVATE ${DIDA_JUCE_MODULES})
 endif()
-set_source_files_properties("${DIDA_JUCE_AUDIO_PROCESSORS_CPP}" PROPERTIES
-    LANGUAGE CXX
-    HEADER_FILE_ONLY FALSE
-    SKIP_UNITY_BUILD_INCLUSION TRUE
-)
-target_sources(DIDITAGAIN_STUDIO PRIVATE
-    "${DIDA_JUCE_AUDIO_PROCESSORS_CPP}"
-)
-get_target_property(DIDA_SHARED_CODE_SOURCES DIDITAGAIN_STUDIO SOURCES)
-if(NOT DIDA_SHARED_CODE_SOURCES MATCHES "juce_audio_processors\\.cpp")
-    message(FATAL_ERROR "DIDITAGAIN_STUDIO is missing juce_audio_processors.cpp from its shared-code sources")
-endif()
-message(STATUS "DIDITAGAIN forced JUCE audio_processors source: ${DIDA_JUCE_AUDIO_PROCESSORS_CPP}")
 
 juce_generate_juce_header(DIDITAGAIN_STUDIO)
 
