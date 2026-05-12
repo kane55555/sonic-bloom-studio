@@ -72,16 +72,24 @@ juce_add_plugin(DIDITAGAIN_STUDIO
     COPY_PLUGIN_AFTER_BUILD  FALSE
 )
 
+# Force-add the JUCE audio_processors module implementation directly to the
+# main plugin target so it is compiled into DIDITAGAIN_STUDIO_SharedCode.
+set(DIDA_JUCE_AUDIO_PROCESSORS_CPP
+    "${JUCE_DIR}/modules/juce_audio_processors/juce_audio_processors.cpp"
+)
+if(NOT EXISTS "${DIDA_JUCE_AUDIO_PROCESSORS_CPP}")
+    message(FATAL_ERROR "Missing JUCE audio processors implementation: ${DIDA_JUCE_AUDIO_PROCESSORS_CPP}")
+endif()
+target_sources(DIDITAGAIN_STUDIO PRIVATE
+    "${DIDA_JUCE_AUDIO_PROCESSORS_CPP}"
+)
+
 juce_generate_juce_header(DIDITAGAIN_STUDIO)
 
 # ---------------------------------------------------------------------------
 # Source collection
 # ---------------------------------------------------------------------------
-set(DIDA_CORE_SOURCES
-    Source/PluginProcessor.cpp
-    Source/PluginEditor.cpp
-)
-
+file(GLOB DIDA_CORE_SOURCES             CONFIGURE_DEPENDS Source/*.cpp)
 file(GLOB_RECURSE DIDA_DSP_SOURCES        CONFIGURE_DEPENDS Source/DSP/*.cpp)
 file(GLOB_RECURSE DIDA_PRESET_SOURCES     CONFIGURE_DEPENDS Source/Presets/*.cpp)
 file(GLOB_RECURSE DIDA_UI_SOURCES         CONFIGURE_DEPENDS Source/UI/*.cpp)
@@ -102,20 +110,6 @@ list(FILTER DIDA_ALL_SOURCES EXCLUDE REGEX ".*/build/.*")
 list(FILTER DIDA_ALL_SOURCES EXCLUDE REGEX ".*/Tests/.*")
 
 target_sources(DIDITAGAIN_STUDIO PRIVATE ${DIDA_ALL_SOURCES})
-
-# Force-add the JUCE audio_processors module implementation directly to the
-# plugin target. JUCE's CMake interface does not always attach this .cpp to
-# the consuming target in this project, which causes 99 unresolved
-# juce::AudioProcessor* symbols at VST3 link time.
-set(DIDA_JUCE_AUDIO_PROCESSORS_CPP
-    "${JUCE_DIR}/modules/juce_audio_processors/juce_audio_processors.cpp"
-)
-if(NOT EXISTS "${DIDA_JUCE_AUDIO_PROCESSORS_CPP}")
-    message(FATAL_ERROR "Missing JUCE audio processors implementation: ${DIDA_JUCE_AUDIO_PROCESSORS_CPP}")
-endif()
-target_sources(DIDITAGAIN_STUDIO PRIVATE
-    "${DIDA_JUCE_AUDIO_PROCESSORS_CPP}"
-)
 
 target_include_directories(DIDITAGAIN_STUDIO PRIVATE
     Source
