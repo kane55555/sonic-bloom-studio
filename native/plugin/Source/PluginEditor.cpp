@@ -22,8 +22,16 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     accountPanel  = std::make_unique<AccountPanel>();
 
     importPanel->presetManager = &processor.getPresetManager();
-    importPanel->onRescan = [this]() { processor.getPresetManager().scanPresetDirectory(); refreshPresetCombo(); };
-    importPanel->onPresetsCreated = [this]() { processor.getPresetManager().scanPresetDirectory(); refreshPresetCombo(); };
+    importPanel->onRescan = [this]() {
+        processor.getPresetManager().scanPresetDirectory();
+        refreshPresetCombo();
+        refreshBrowserPresets();
+    };
+    importPanel->onPresetsCreated = [this]() {
+        processor.getPresetManager().scanPresetDirectory();
+        refreshPresetCombo();
+        refreshBrowserPresets();
+    };
     importPanel->onOpenInbox = []() {
         auto samples = dida::SampleLibrary::getSamplesRoot().getChildFile("Imported");
         samples.createDirectory();
@@ -42,16 +50,12 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
 
     audioCropPanel = std::make_unique<AudioCropPanel>();
     addChildComponent(*audioCropPanel);
-    {
-        auto& pm = processor.getPresetManager();
-        juce::StringArray names, cats;
-        for (int i = 0; i < pm.getNumPresets(); ++i) { names.add(pm.getPresetName(i)); cats.add("All"); }
-        presetBrowserPanel->setPresets(names, cats);
-        presetBrowserPanel->onPresetSelected = [this](int idx) {
-            processor.getPresetManager().loadPreset(idx);
-            presetSelector.setSelectedId(idx + 1, juce::dontSendNotification);
-        };
-    }
+
+    presetBrowserPanel->onPresetSelected = [this](int idx) {
+        processor.getPresetManager().loadPreset(idx);
+        presetSelector.setSelectedId(idx + 1, juce::dontSendNotification);
+    };
+    refreshBrowserPresets();
 
     overlayClose.setColour(juce::TextButton::buttonColourId, Theme::getColors().surfaceElevated);
     overlayClose.setColour(juce::TextButton::textColourOffId, Theme::getColors().textPrimary);
