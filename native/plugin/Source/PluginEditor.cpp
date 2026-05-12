@@ -114,7 +114,7 @@ void DiditagainEditor::setupTabs()
     directMonitorButton.setColour(juce::TextButton::textColourOnId, C.surface);
     addAndMakeVisible(directMonitorButton);
     directMonitorAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
-        processor.getApvts(), "directMonitor", directMonitorButton);
+        processor.getAPVTS(), "directMonitor", directMonitorButton);
 
     refreshPresetCombo();
 
