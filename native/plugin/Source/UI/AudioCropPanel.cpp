@@ -507,36 +507,125 @@ void AudioCropPanel::pullMetaFromUi(CropMeta& m)
     m.loopEnabled     = m.autoLoop && ! m.oneShotMode;
 }
 
+// Write a trimmed WAV containing only the [cropStart..cropEnd] portion of
+// `src` to `dest`. Returns true on success.
+static bool writeTrimmedWav(const juce::File& src, const juce::File& dest,
+                            double cropStart, double cropEnd)
+{
+    juce::AudioFormatManager fm; fm.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> reader(fm.createReaderFor(src));
+    if (! reader) return false;
+
+    const int64_t total = reader->lengthInSamples;
+    if (total <= 0) return false;
+    const int64_t s0  = (int64_t) (juce::jlimit(0.0, 1.0, cropStart) * (double) total);
+    const int64_t s1  = (int64_t) (juce::jlimit(0.0, 1.0, cropEnd)   * (double) total);
+    const int64_t len = juce::jmax<int64_t>(0, s1 - s0);
+    if (len <= 0) return false;
+
+    const int numCh = (int) reader->numChannels;
+    juce::AudioBuffer<float> buf(numCh, (int) len);
+    reader->read(&buf, 0, (int) len, s0, true, numCh > 1);
+
+    dest.deleteFile();
+    auto out = std::unique_ptr<juce::FileOutputStream>(dest.createOutputStream());
+    if (! out) return false;
+    juce::WavAudioFormat wav;
+    std::unique_ptr<juce::AudioFormatWriter> writer(
+        wav.createWriterFor(out.get(), reader->sampleRate, (unsigned) numCh,
+                            juce::jmax(16, (int) reader->bitsPerSample), {}, 0));
+    if (! writer) return false;
+    out.release(); // writer owns the stream now
+    writer->writeFromAudioSampleBuffer(buf, 0, (int) len);
+    return true;
+}
+
 void AudioCropPanel::persistSelected(bool asNewVersion)
 {
     if (selectedIndex < 0) return;
     auto m = samples[(size_t) selectedIndex];
+    pullMetaFromUi(m);
     m.needsReview = false;
+
+    auto src = juce::File(m.sourcePath);
+    if (! src.existsAsFile())
+    {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+            "Save crop failed", "Source file no longer exists:\n" + src.getFullPathName());
+        return;
+    }
+
+    juce::File dest;
     if (asNewVersion)
     {
-        auto src = juce::File(m.sourcePath);
-        auto copy = src.getSiblingFile(src.getFileNameWithoutExtension() + "_v2." + src.getFileExtension().trimCharactersAtStart("."));
-        src.copyFileTo(copy);
-        m.sourcePath       = copy.getFullPathName();
-        m.originalFileName = copy.getFileName();
-        m.sampleId         = copy.getFileNameWithoutExtension();
+        const auto ext = src.getFileExtension();
+        dest = src.getSiblingFile(src.getFileNameWithoutExtension() + "_v2" + ext);
+        for (int i = 2; dest.exists(); ++i)
+            dest = src.getSiblingFile(src.getFileNameWithoutExtension() + "_v" + juce::String(i) + ext);
+    }
+    else
+    {
+        // Back up the untouched original ONCE so "Reset To Original" still works.
+        auto backup = src.getSiblingFile(src.getFileNameWithoutExtension() + ".original" + src.getFileExtension());
+        if (! backup.existsAsFile()) src.copyFileTo(backup);
+        dest = src;
+    }
+
+    if (! writeTrimmedWav(src, dest, m.cropStart, m.cropEnd))
+    {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+            "Save crop failed", "Could not write trimmed audio to:\n" + dest.getFullPathName());
+        return;
+    }
+
+    // After writing the trimmed file, the crop is now the whole file.
+    m.sourcePath        = dest.getFullPathName();
+    m.originalFileName  = dest.getFileName();
+    m.sampleId          = dest.getFileNameWithoutExtension();
+    m.cropStart         = 0.0;
+    m.cropEnd           = 1.0;
+
+    // If we saved a new version, append it; otherwise update in place.
+    if (asNewVersion)
+    {
         samples.push_back(m);
         applyFilter();
     }
+    else
+    {
+        samples[(size_t) selectedIndex] = m;
+        if (waveform) waveform->loadFor(dest);
+        pushUiFromMeta(m);
+    }
     writeMeta(m);
-    samples[(size_t) selectedIndex] = m;
     sampleList.repaint();
+    if (waveform) waveform->repaint();
+
+    // Force the audio engine to drop cached buffers so playback picks up the
+    // new file, and tell the editor to refresh the preset browser.
+    dida::SampleLibrary::invalidateCache();
+    if (onLibraryChanged) onLibraryChanged();
 }
 
 void AudioCropPanel::resetSelectedToOriginal()
 {
     if (selectedIndex < 0) return;
     auto& m = samples[(size_t) selectedIndex];
+    auto src = juce::File(m.sourcePath);
+    auto backup = src.getSiblingFile(src.getFileNameWithoutExtension() + ".original" + src.getFileExtension());
+    if (backup.existsAsFile())
+    {
+        src.deleteFile();
+        backup.copyFileTo(src);
+        dida::SampleLibrary::invalidateCache();
+        if (onLibraryChanged) onLibraryChanged();
+    }
     m.cropStart = 0.0; m.cropEnd = 1.0;
     m.loopStart = 0.2; m.loopEnd = 0.95;
     m.loopCrossfadeMs = 15.0;
     pushUiFromMeta(m);
-    waveform->repaint();
+    if (waveform) waveform->loadFor(src);
+    if (waveform) waveform->repaint();
 }
 
 void AudioCropPanel::startPreview()

@@ -24,12 +24,10 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     importPanel->presetManager = &processor.getPresetManager();
     importPanel->onRescan = [this]() {
         processor.getPresetManager().scanPresetDirectory();
-        refreshPresetCombo();
         refreshBrowserPresets();
     };
     importPanel->onPresetsCreated = [this]() {
         processor.getPresetManager().scanPresetDirectory();
-        refreshPresetCombo();
         refreshBrowserPresets();
     };
     importPanel->onOpenInbox = []() {
@@ -50,10 +48,14 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
 
     audioCropPanel = std::make_unique<AudioCropPanel>();
     addChildComponent(*audioCropPanel);
+    audioCropPanel->onLibraryChanged = [this]() {
+        dida::SampleLibrary::invalidateCache();
+        processor.getPresetManager().scanPresetDirectory();
+        refreshBrowserPresets();
+    };
 
     presetBrowserPanel->onPresetSelected = [this](int idx) {
         processor.getPresetManager().loadPreset(idx);
-        presetSelector.setSelectedId(idx + 1, juce::dontSendNotification);
     };
     refreshBrowserPresets();
 
@@ -78,11 +80,8 @@ DiditagainEditor::~DiditagainEditor() {}
 
 void DiditagainEditor::refreshPresetCombo()
 {
-    presetSelector.clear(juce::dontSendNotification);
-    auto& pm = processor.getPresetManager();
-    for (int i = 0; i < pm.getNumPresets(); ++i)
-        presetSelector.addItem(pm.getPresetName(i), i + 1);
-    presetSelector.setSelectedId(pm.getCurrentPresetIndex() + 1, juce::dontSendNotification);
+    // The header preset dropdown was removed in favour of the Browser tab.
+    // Kept as a no-op so existing call sites still compile.
 }
 
 void DiditagainEditor::refreshBrowserPresets()
@@ -128,9 +127,6 @@ void DiditagainEditor::setupTabs()
     menuButton.onClick = [this]() { openMenu(); };
     addAndMakeVisible(menuButton);
 
-    addAndMakeVisible(presetSelector);
-    addAndMakeVisible(prevPreset);
-    addAndMakeVisible(nextPreset);
     addAndMakeVisible(savePreset);
 
     directMonitorButton.setClickingTogglesState(true);
@@ -142,23 +138,6 @@ void DiditagainEditor::setupTabs()
     addAndMakeVisible(directMonitorButton);
     directMonitorAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
         processor.getAPVTS(), "directMonitor", directMonitorButton);
-
-    refreshPresetCombo();
-
-    presetSelector.onChange = [this]() {
-        const int idx = presetSelector.getSelectedId() - 1;
-        if (idx >= 0) processor.getPresetManager().loadPreset(idx);
-    };
-    prevPreset.onClick = [this]() {
-        auto& pm2 = processor.getPresetManager();
-        int idx = pm2.getCurrentPresetIndex();
-        if (idx > 0) { pm2.loadPreset(idx - 1); presetSelector.setSelectedId(idx, juce::dontSendNotification); }
-    };
-    nextPreset.onClick = [this]() {
-        auto& pm2 = processor.getPresetManager();
-        int idx = pm2.getCurrentPresetIndex();
-        if (idx < pm2.getNumPresets() - 1) { pm2.loadPreset(idx + 1); presetSelector.setSelectedId(idx + 2, juce::dontSendNotification); }
-    };
 }
 
 void DiditagainEditor::openMenu()
@@ -276,13 +255,10 @@ void DiditagainEditor::resized()
 {
     int pw = getWidth();
 
-    // Header right-cluster
+    // Header right-cluster (preset dropdown removed; use Browser tab instead)
     menuButton         .setBounds(pw - 50,  14, 36, 28);
     savePreset         .setBounds(pw - 110, 14, 56, 28);
-    nextPreset         .setBounds(pw - 145, 14, 30, 28);
-    presetSelector     .setBounds(pw - 350, 14, 200, 28);
-    prevPreset         .setBounds(pw - 385, 14, 30, 28);
-    directMonitorButton.setBounds(pw - 460, 14, 68, 28);
+    directMonitorButton.setBounds(pw - 184, 14, 68, 28);
 
     // Tabs (centered-ish, left of preset cluster)
     int tabsLeft = 320;

@@ -37,9 +37,6 @@ private:
 
     // Header
     juce::TextButton menuButton{ juce::String::charToString(juce::juce_wchar(0x2630)) }; // ☰
-    juce::ComboBox   presetSelector;
-    juce::TextButton prevPreset{"<"};
-    juce::TextButton nextPreset{">"};
     juce::TextButton savePreset{"SAVE"};
     juce::TextButton directMonitorButton{"DIRECT"};
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> directMonitorAttach;

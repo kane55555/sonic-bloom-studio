@@ -21,6 +21,10 @@ public:
     // Re-scan all imported sample folders and rebuild the list.
     void rescan();
 
+    // Fired whenever the on-disk sample library changes (rescan / save crop).
+    // Editor uses this to rescan presets and refresh the browser tab.
+    std::function<void()> onLibraryChanged;
+
 private:
     struct CropMeta
     {
