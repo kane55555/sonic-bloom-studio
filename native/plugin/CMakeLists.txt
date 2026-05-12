@@ -148,24 +148,6 @@ target_compile_definitions(DIDITAGAIN_STUDIO PUBLIC
     JUCE_PLUGINHOST_LV2=0
 )
 
-target_link_libraries(DIDITAGAIN_STUDIO PRIVATE
-    juce::juce_audio_plugin_client
-    juce::juce_audio_processors
-    juce::juce_audio_utils
-    juce::juce_audio_basics
-    juce::juce_audio_devices
-    juce::juce_audio_formats
-    juce::juce_dsp
-    juce::juce_gui_extra
-    juce::juce_gui_basics
-    juce::juce_graphics
-    juce::juce_events
-    juce::juce_core
-    juce::juce_data_structures
-    juce::juce_recommended_config_flags
-    juce::juce_recommended_warning_flags
-)
-
 # ---------------------------------------------------------------------------
 # Compiler options (no LTO, no /O2, no /Zi/Z7, debug-friendly)
 # ---------------------------------------------------------------------------
