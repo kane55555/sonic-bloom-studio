@@ -51,6 +51,49 @@ NEW_CATEGORIES = [
     "DarkPads","Plucks","Bass808","FXRisers","Textures","Uncategorized",
 ]
 
+# Producer-friendly singular display name per category (used for auto numbering
+# like "Guitar 1", "Pad 2", "Choir 3", etc.).
+CATEGORY_DISPLAY_NAME = {
+    "DrillBells":  "Bell",
+    "AlienLeads":  "Lead",
+    "PainPianos":  "Piano",
+    "ChoirsVox":   "Choir",
+    "Guitars":     "Guitar",
+    "DarkPads":    "Pad",
+    "Plucks":      "Pluck",
+    "Bass808":     "808",
+    "FXRisers":    "FX",
+    "Textures":    "Texture",
+    "Uncategorized": "Sound",
+}
+
+def display_name_for(category: str) -> str:
+    return CATEGORY_DISPLAY_NAME.get(category, "Sound")
+
+_NUM_SUFFIX_RE = re.compile(r"\s+(\d+)\s*$")
+
+def next_preset_number(existing_index: list[dict], category: str,
+                       reserved: set[int] | None = None) -> int:
+    """Return the next free integer N such that "<DisplayName> N" is unique
+    within the given category. Considers both presets already in index.json
+    and any numbers reserved during the current batch."""
+    base = display_name_for(category).lower()
+    used: set[int] = set(reserved or set())
+    for e in existing_index:
+        if (e.get("category") or "") != category:
+            continue
+        nm = (e.get("name") or "").strip()
+        if not nm.lower().startswith(base.lower()):
+            continue
+        m = _NUM_SUFFIX_RE.search(nm)
+        if m:
+            try: used.add(int(m.group(1)))
+            except ValueError: pass
+    n = 1
+    while n in used:
+        n += 1
+    return n
+
 # Keyword -> category. Order matters: more specific first.
 CATEGORY_KEYWORDS: list[tuple[str, str]] = [
     # DrillBells

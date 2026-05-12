@@ -27,6 +27,7 @@ from pathlib import Path
 from dida_common import (
     studio_root, ensure_layout, classify_category, detect_note, detect_velocity,
     default_root_for, build_preset, load_index, save_index, upsert_index, now_iso,
+    display_name_for, next_preset_number,
 )
 
 AUDIO_EXTS = {".wav", ".flac", ".ogg", ".mp3", ".aif", ".aiff"}
@@ -75,13 +76,9 @@ def make_candidate(src: Path, layout: dict) -> dict:
     velocity = detect_velocity(stem)
 
     one_shot = category in ("FXRisers",)
-    safe_stem = f"{category}_{note_token}"
-    if velocity is not None: safe_stem += f"_v{velocity}"
-
-    sample_rel = f"Samples/Imported/{category}/{safe_stem}{src.suffix.lower()}"
-    preset_rel = f"Presets/User/{category}/{safe_stem}.didasynthpreset"
-    metadata_rel = f"Metadata/Imports/{safe_stem}.import.json"
-
+    # NOTE: presetName + target paths are assigned later via assign_auto_names()
+    # so numbering ("Guitar 1", "Pad 2", ...) stays unique across the existing
+    # index AND the current batch.
     return {
         "originalPath": str(src),
         "originalFileName": src.name,
@@ -91,17 +88,38 @@ def make_candidate(src: Path, layout: dict) -> dict:
         "rootMidi": midi,
         "rootNoteSource": root_source,
         "detectedVelocity": velocity,
-        "targetSamplePath": sample_rel,
-        "targetPresetPath": preset_rel,
-        "targetMetadataPath": metadata_rel,
+        "targetSamplePath": "",
+        "targetPresetPath": "",
+        "targetMetadataPath": "",
         "template": category,
-        "presetName": _humanize(safe_stem),
+        "presetName": "",
         "tags": [category.lower(), "imported", "hybrid"],
         "oneShotMode": one_shot,
         "pitchTracking": pitch_track,
         "needsReview": needs_review,
         "warnings": [] if not needs_review else ["root note guessed"],
     }
+
+def assign_auto_names(candidates: list[dict], existing_index: list[dict]) -> None:
+    """Mutate candidates in place, giving each a producer-friendly name like
+    "Guitar 1", "Pad 2", "Choir 3" — unique within its category."""
+    reserved: dict[str, set[int]] = {}
+    for c in candidates:
+        cat = c["detectedCategory"]
+        # Skip if caller (e.g. --from-review) already set a name + paths.
+        if c.get("presetName") and c.get("targetPresetPath"):
+            continue
+        used = reserved.setdefault(cat, set())
+        n = next_preset_number(existing_index, cat, reserved=used)
+        used.add(n)
+        display = display_name_for(cat)
+        name = f"{display} {n}"
+        safe_stem = name.replace(" ", "_")
+        ext = Path(c["originalPath"]).suffix.lower()
+        c["presetName"] = name
+        c["targetSamplePath"]   = f"Samples/Imported/{cat}/{safe_stem}{ext}"
+        c["targetPresetPath"]   = f"Presets/User/{cat}/{safe_stem}.didasynthpreset"
+        c["targetMetadataPath"] = f"Metadata/Imports/{safe_stem}.import.json"
 
 def _humanize(stem: str) -> str:
     return stem.replace("_", " ")
@@ -205,6 +223,11 @@ def main() -> int:
         if not files:
             ap.print_help(); return 1
         candidates = [make_candidate(f, layout) for f in files]
+
+    # Always load the existing index up front so we can hand out unique,
+    # human-friendly preset names (e.g. "Guitar 1", "Guitar 2") per category.
+    existing_index = load_index(layout["index"])
+    assign_auto_names(candidates, existing_index)
 
     if args.review_json:
         args.review_json.parent.mkdir(parents=True, exist_ok=True)
