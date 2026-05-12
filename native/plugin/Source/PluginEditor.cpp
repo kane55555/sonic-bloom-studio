@@ -106,6 +106,16 @@ void DiditagainEditor::setupTabs()
     addAndMakeVisible(nextPreset);
     addAndMakeVisible(savePreset);
 
+    directMonitorButton.setClickingTogglesState(true);
+    directMonitorButton.setTooltip("Bypass reverb + delay for low-latency tracking. Turn off for mixdown.");
+    directMonitorButton.setColour(juce::TextButton::buttonColourId, C.surface);
+    directMonitorButton.setColour(juce::TextButton::buttonOnColourId, C.accentTeal);
+    directMonitorButton.setColour(juce::TextButton::textColourOffId, C.accentTeal);
+    directMonitorButton.setColour(juce::TextButton::textColourOnId, C.surface);
+    addAndMakeVisible(directMonitorButton);
+    directMonitorAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+        processor.getApvts(), "directMonitor", directMonitorButton);
+
     refreshPresetCombo();
 
     presetSelector.onChange = [this]() {
