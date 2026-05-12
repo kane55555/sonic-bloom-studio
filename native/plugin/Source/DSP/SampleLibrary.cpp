@@ -191,86 +191,54 @@ namespace {
         return file;
     }
 
-    static uint32_t readU32(const char* p) noexcept
+    juce::AudioFormatManager& sharedFormatManager()
     {
-        return static_cast<uint32_t>(static_cast<unsigned char>(p[0]))
-             | (static_cast<uint32_t>(static_cast<unsigned char>(p[1])) << 8)
-             | (static_cast<uint32_t>(static_cast<unsigned char>(p[2])) << 16)
-             | (static_cast<uint32_t>(static_cast<unsigned char>(p[3])) << 24);
-    }
-
-    static uint16_t readU16(const char* p) noexcept
-    {
-        return static_cast<uint16_t>(static_cast<unsigned char>(p[0])
-             | (static_cast<uint16_t>(static_cast<unsigned char>(p[1])) << 8));
-    }
-
-    bool readWavSampleZoneFromFile(const juce::File& file, int rootMidi, int hiVel, SampleZone& zone)
-    {
-        juce::MemoryBlock bytes;
-        if (! file.loadFileAsData(bytes) || bytes.getSize() < 44) return false;
-
-        const auto* data = static_cast<const char*>(bytes.getData());
-        const auto size = bytes.getSize();
-        if (std::memcmp(data, "RIFF", 4) != 0 || std::memcmp(data + 8, "WAVE", 4) != 0) return false;
-
-        uint16_t channels = 0, bitsPerSample = 0, audioFormat = 0;
-        uint32_t sampleRate = 44100, dataOffset = 0, dataBytes = 0;
-
-        size_t pos = 12;
-        while (pos + 8 <= size)
-        {
-            const char* chunk = data + pos;
-            const uint32_t chunkSize = readU32(chunk + 4);
-            const size_t chunkData = pos + 8;
-            if (chunkData + chunkSize > size) break;
-
-            if (std::memcmp(chunk, "fmt ", 4) == 0 && chunkSize >= 16)
-            {
-                audioFormat = readU16(data + chunkData);
-                channels = readU16(data + chunkData + 2);
-                sampleRate = readU32(data + chunkData + 4);
-                bitsPerSample = readU16(data + chunkData + 14);
-            }
-            else if (std::memcmp(chunk, "data", 4) == 0)
-            {
-                dataOffset = static_cast<uint32_t>(chunkData);
-                dataBytes = chunkSize;
-            }
-
-            pos = chunkData + chunkSize + (chunkSize & 1u);
-        }
-
-        if (audioFormat != 1 || channels < 1 || channels > 2 || bitsPerSample != 16 || dataOffset == 0 || dataBytes == 0)
-            return false;
-
-        const int numSamples = static_cast<int>(dataBytes / (channels * sizeof(int16_t)));
-        if (numSamples <= 0) return false;
-
-        zone.sourceSampleRate = sampleRate > 0 ? static_cast<double>(sampleRate) : 44100.0;
-        zone.rootMidi = juce::jlimit(0, 127, rootMidi);
-        zone.loVel = 0;
-        zone.hiVel = juce::jlimit(1, 127, hiVel);
-        zone.fileName = file.getFileName();
-        zone.buffer.setSize(2, numSamples);
-        zone.buffer.clear();
-
-        const auto* pcm = reinterpret_cast<const int16_t*>(data + dataOffset);
-        constexpr float scale = 1.0f / 32768.0f;
-        for (int i = 0; i < numSamples; ++i)
-        {
-            const float left = static_cast<float>(pcm[i * channels]) * scale;
-            const float right = channels > 1 ? static_cast<float>(pcm[i * channels + 1]) * scale : left;
-            zone.buffer.setSample(0, i, left);
-            zone.buffer.setSample(1, i, right);
-        }
-
-        return true;
+        static juce::AudioFormatManager fm;
+        static std::once_flag once;
+        std::call_once(once, [] { fm.registerBasicFormats(); });
+        return fm;
     }
 
     bool readSampleZoneFromFile(const juce::File& file, int rootMidi, int hiVel, SampleZone& zone)
     {
-        return file.hasFileExtension("wav") && readWavSampleZoneFromFile(file, rootMidi, hiVel, zone);
+        if (! file.existsAsFile()) return false;
+
+        auto& fm = sharedFormatManager();
+        std::unique_ptr<juce::AudioFormatReader> reader(fm.createReaderFor(file));
+        if (reader == nullptr) return false;
+
+        const int numSamples = static_cast<int>(reader->lengthInSamples);
+        if (numSamples <= 0) return false;
+
+        const int srcChannels = juce::jmax(1, (int) reader->numChannels);
+
+        zone.sourceSampleRate = reader->sampleRate > 0.0 ? reader->sampleRate : 44100.0;
+        zone.rootMidi = juce::jlimit(0, 127, rootMidi);
+        zone.loVel    = 0;
+        zone.hiVel    = juce::jlimit(1, 127, hiVel);
+        zone.fileName = file.getFileName();
+
+        zone.buffer.setSize(2, numSamples);
+        zone.buffer.clear();
+
+        // Read into a temp buffer that matches the source channel count, then
+        // splat to stereo. AudioFormatReader::read fills extra dest channels
+        // by duplicating, which is what we want for mono -> stereo.
+        if (srcChannels == 1)
+        {
+            juce::AudioBuffer<float> tmp(1, numSamples);
+            if (! reader->read(&tmp, 0, numSamples, 0, true, false))
+                return false;
+            zone.buffer.copyFrom(0, 0, tmp, 0, 0, numSamples);
+            zone.buffer.copyFrom(1, 0, tmp, 0, 0, numSamples);
+        }
+        else
+        {
+            if (! reader->read(&zone.buffer, 0, numSamples, 0, true, true))
+                return false;
+        }
+
+        return true;
     }
 }
 
