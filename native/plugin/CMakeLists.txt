@@ -73,6 +73,18 @@ juce_add_plugin(DIDITAGAIN_STUDIO
     COPY_PLUGIN_AFTER_BUILD  FALSE
 )
 
+set(DIDA_JUCE_AUDIO_PROCESSORS_CPP
+    "${JUCE_DIR}/modules/juce_audio_processors/juce_audio_processors.cpp"
+)
+
+if(NOT EXISTS "${DIDA_JUCE_AUDIO_PROCESSORS_CPP}")
+    message(FATAL_ERROR "Missing JUCE audio processors implementation: ${DIDA_JUCE_AUDIO_PROCESSORS_CPP}")
+endif()
+
+target_sources(DIDITAGAIN_STUDIO PRIVATE
+    "${DIDA_JUCE_AUDIO_PROCESSORS_CPP}"
+)
+
 set_property(TARGET DIDITAGAIN_STUDIO PROPERTY UNITY_BUILD OFF)
 
 # Link JUCE modules directly to the main plugin target created by
