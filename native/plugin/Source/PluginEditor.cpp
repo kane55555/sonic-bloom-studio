@@ -106,6 +106,7 @@ void DiditagainEditor::refreshBrowserPresets()
         cats.add(cat.isNotEmpty() ? cat : juce::String("Other"));
     }
     presetBrowserPanel->setPresets(names, cats);
+}
 
 void DiditagainEditor::setupTabs()
 {
