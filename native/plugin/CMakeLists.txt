@@ -51,6 +51,7 @@ endif()
 # Hard-disable LTO/IPO globally.
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE OFF)
+set(CMAKE_UNITY_BUILD OFF)
 
 add_subdirectory("${JUCE_DIR}" JUCE EXCLUDE_FROM_ALL)
 
@@ -72,6 +73,8 @@ juce_add_plugin(DIDITAGAIN_STUDIO
     COPY_PLUGIN_AFTER_BUILD  FALSE
 )
 
+set_property(TARGET DIDITAGAIN_STUDIO PROPERTY UNITY_BUILD OFF)
+
 # Force-add the JUCE audio_processors module implementation directly to the
 # main plugin target so it is compiled into DIDITAGAIN_STUDIO_SharedCode.
 set(DIDA_JUCE_AUDIO_PROCESSORS_CPP
@@ -80,9 +83,19 @@ set(DIDA_JUCE_AUDIO_PROCESSORS_CPP
 if(NOT EXISTS "${DIDA_JUCE_AUDIO_PROCESSORS_CPP}")
     message(FATAL_ERROR "Missing JUCE audio processors implementation: ${DIDA_JUCE_AUDIO_PROCESSORS_CPP}")
 endif()
+set_source_files_properties("${DIDA_JUCE_AUDIO_PROCESSORS_CPP}" PROPERTIES
+    LANGUAGE CXX
+    HEADER_FILE_ONLY FALSE
+    SKIP_UNITY_BUILD_INCLUSION TRUE
+)
 target_sources(DIDITAGAIN_STUDIO PRIVATE
     "${DIDA_JUCE_AUDIO_PROCESSORS_CPP}"
 )
+get_target_property(DIDA_SHARED_CODE_SOURCES DIDITAGAIN_STUDIO SOURCES)
+if(NOT DIDA_SHARED_CODE_SOURCES MATCHES "juce_audio_processors\\.cpp")
+    message(FATAL_ERROR "DIDITAGAIN_STUDIO is missing juce_audio_processors.cpp from its shared-code sources")
+endif()
+message(STATUS "DIDITAGAIN forced JUCE audio_processors source: ${DIDA_JUCE_AUDIO_PROCESSORS_CPP}")
 
 juce_generate_juce_header(DIDITAGAIN_STUDIO)
 
