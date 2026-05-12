@@ -127,9 +127,6 @@ void DiditagainEditor::setupTabs()
     menuButton.onClick = [this]() { openMenu(); };
     addAndMakeVisible(menuButton);
 
-    addAndMakeVisible(presetSelector);
-    addAndMakeVisible(prevPreset);
-    addAndMakeVisible(nextPreset);
     addAndMakeVisible(savePreset);
 
     directMonitorButton.setClickingTogglesState(true);
@@ -141,23 +138,6 @@ void DiditagainEditor::setupTabs()
     addAndMakeVisible(directMonitorButton);
     directMonitorAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
         processor.getAPVTS(), "directMonitor", directMonitorButton);
-
-    refreshPresetCombo();
-
-    presetSelector.onChange = [this]() {
-        const int idx = presetSelector.getSelectedId() - 1;
-        if (idx >= 0) processor.getPresetManager().loadPreset(idx);
-    };
-    prevPreset.onClick = [this]() {
-        auto& pm2 = processor.getPresetManager();
-        int idx = pm2.getCurrentPresetIndex();
-        if (idx > 0) { pm2.loadPreset(idx - 1); presetSelector.setSelectedId(idx, juce::dontSendNotification); }
-    };
-    nextPreset.onClick = [this]() {
-        auto& pm2 = processor.getPresetManager();
-        int idx = pm2.getCurrentPresetIndex();
-        if (idx < pm2.getNumPresets() - 1) { pm2.loadPreset(idx + 1); presetSelector.setSelectedId(idx + 2, juce::dontSendNotification); }
-    };
 }
 
 void DiditagainEditor::openMenu()
