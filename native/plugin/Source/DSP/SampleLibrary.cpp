@@ -261,7 +261,8 @@ std::shared_ptr<const Multisample> SampleLibrary::loadInstrument(const juce::Str
     auto folder = getSamplesRoot().getChildFile(name);
     if (! folder.isDirectory()) return nullptr;
 
-    auto files = folder.findChildFiles(juce::File::findFiles, false, "*.wav");
+    const auto wildcards = sharedFormatManager().getWildcardForAllFormats();
+    auto files = folder.findChildFiles(juce::File::findFiles, false, wildcards);
     if (files.isEmpty()) return nullptr;
 
     auto ms = std::make_shared<Multisample>();
