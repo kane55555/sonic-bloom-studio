@@ -27,6 +27,7 @@ from pathlib import Path
 from dida_common import (
     studio_root, ensure_layout, classify_category, detect_note, detect_velocity,
     default_root_for, build_preset, load_index, save_index, upsert_index, now_iso,
+    display_name_for, next_preset_number,
 )
 
 AUDIO_EXTS = {".wav", ".flac", ".ogg", ".mp3", ".aif", ".aiff"}
