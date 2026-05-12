@@ -250,11 +250,12 @@ void DiditagainEditor::resized()
     int pw = getWidth();
 
     // Header right-cluster
-    menuButton    .setBounds(pw - 50,  14, 36, 28);
-    savePreset    .setBounds(pw - 110, 14, 56, 28);
-    nextPreset    .setBounds(pw - 145, 14, 30, 28);
-    presetSelector.setBounds(pw - 350, 14, 200, 28);
-    prevPreset    .setBounds(pw - 385, 14, 30, 28);
+    menuButton         .setBounds(pw - 50,  14, 36, 28);
+    savePreset         .setBounds(pw - 110, 14, 56, 28);
+    nextPreset         .setBounds(pw - 145, 14, 30, 28);
+    presetSelector     .setBounds(pw - 350, 14, 200, 28);
+    prevPreset         .setBounds(pw - 385, 14, 30, 28);
+    directMonitorButton.setBounds(pw - 460, 14, 68, 28);
 
     // Tabs (centered-ish, left of preset cluster)
     int tabsLeft = 320;
