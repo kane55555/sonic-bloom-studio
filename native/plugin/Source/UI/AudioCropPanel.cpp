@@ -90,9 +90,9 @@ AudioCropPanel::CropMeta AudioCropPanel::readMeta(const juce::File& audio)
     {
         // Defaults based on category.
         const auto cat = m.category;
-        if (cat == "FX / Risers" || cat == "Textures")
+        if (cat == "FX" || cat == "Drums")
         { m.autoLoop = false; m.oneShotMode = true;  m.pitchTracking = false; }
-        else if (cat == "Bass / 808")
+        else if (cat == "Bass")
         { m.autoLoop = false; m.oneShotMode = false; m.pitchTracking = true;  }
         else
         { m.autoLoop = true;  m.oneShotMode = false; m.pitchTracking = true;  }
