@@ -17,7 +17,7 @@ struct PresetInfo
     bool isFactory = false;
 
     // "Drop folder" presets: a raw audio one-shot living inside one of the
-    // category subfolders under Presets/User/<Category>/. When loaded, the
+    // category subfolders under Samples/Presets/User/<Category>/. When loaded, the
     // engine swaps to this sample directly — no .didasynthpreset required.
     bool isSampleDrop = false;
     juce::String sampleSourcePath; // absolute path to the audio file
@@ -27,7 +27,7 @@ struct PresetInfo
 
 namespace dida { namespace preset {
     // Broad instrument categories. Each becomes a folder under
-    //   <Documents>/DIDITAGAIN STUDIO/Presets/User/<Category>/
+    //   <Documents>/DIDITAGAIN STUDIO/Samples/Presets/User/<Category>/
     // Drop a .wav/.aif/.flac/.mp3/.ogg one-shot in there and it shows up
     // automatically in the Browser tab as "<Category> N".
     inline const juce::StringArray& dropCategories()
