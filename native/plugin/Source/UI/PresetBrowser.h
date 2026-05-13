@@ -14,6 +14,8 @@
 //    onPresetSelected(globalIndex)
 //==============================================================================
 #include <JuceHeader.h>
+#include <set>
+#include <algorithm>
 #include "Theme.h"
 
 class PresetBrowser : public juce::Component, private juce::ListBoxModel
