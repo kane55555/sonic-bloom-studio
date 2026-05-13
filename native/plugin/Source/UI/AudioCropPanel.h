@@ -113,7 +113,7 @@ private:
     void selectIndex(int newIndex);
     void pushUiFromMeta(const CropMeta&);
     void pullMetaFromUi(CropMeta&);
-    void persistSelected(bool asNewVersion);
+    void persistSelected();
     void resetSelectedToOriginal();
     void startPreview();
     void stopPreview();
