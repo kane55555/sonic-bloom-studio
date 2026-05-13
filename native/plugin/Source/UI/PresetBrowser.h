@@ -126,7 +126,7 @@ private:
 
     /** Map a preset to one of the broad categories. The folder hint wins
         whenever it matches a known bucket — that way dropping a file into
-        Presets/User/Pads always lands in "Pads" regardless of its filename. */
+        Samples/Presets/User/Pads always lands in "Pads" regardless of its filename. */
     static juce::String classify(const juce::String& nameIn, const juce::String& hintCat)
     {
         // 1) Folder hint takes priority.
