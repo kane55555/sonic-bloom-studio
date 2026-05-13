@@ -2,7 +2,7 @@
 #include <JuceHeader.h>
 
 // Permanent "Audio Crop" tab. Lists every imported user sample under
-// <Documents>/DIDITAGAIN STUDIO/Samples/Imported (and User), shows a
+// <Documents>/DIDITAGAIN STUDIO/Samples/Imported, User, and Presets/User, shows a
 // waveform with crop/loop markers and producer-friendly controls, and
 // stores per-sample crop metadata as JSON next to the audio file.
 //
