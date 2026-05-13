@@ -30,8 +30,8 @@ PresetManager::PresetManager(juce::AudioProcessor& proc) : processor(proc)
     auto samplesRoot = dida::SampleLibrary::getSamplesRoot();
     if (! samplesRoot.exists()) samplesRoot.createDirectory();
 
-    // Pre-create one folder per broad category under Presets/User so the user
-    // can just drop one-shots into the right bucket from the OS file browser.
+    // Pre-create one folder per broad category under Samples/Presets/User so the
+    // user can drop one-shots into the right bucket from the OS file browser.
     auto userPresetDir = getUserPresetDirectory();
     userPresetDir.createDirectory();
     for (auto& cat : dida::preset::dropCategories())
@@ -60,8 +60,7 @@ void PresetManager::loadDroppedSamples()
         auto dir = root.getChildFile(cat);
         if (! dir.isDirectory()) continue;
 
-        // Non-recursive so users don't accidentally pick up backup folders.
-        auto files = dir.findChildFiles(juce::File::findFiles, false, wildcards);
+        auto files = dir.findChildFiles(juce::File::findFiles, true, wildcards);
         // Stable, natural sort so renamed/added files keep predictable numbering.
         std::sort(files.begin(), files.end(), [](const juce::File& a, const juce::File& b) {
             return a.getFileName().compareNatural(b.getFileName()) < 0;
@@ -75,12 +74,16 @@ void PresetManager::loadDroppedSamples()
             if (stem.endsWithIgnoreCase(".original")) continue;
 
             PresetInfo info;
-            // Auto-numbered display name: "Guitar 1", "Pad 2", ...
-            // Strip a trailing 's' so "Pianos" -> "Piano N", "Strings" -> "String N".
+            // Auto-numbered display name: "Guitar 1", "Pad 2", ... for files
+            // dropped directly in a category. If the user made a per-preset
+            // folder, use that folder name as the preset name.
             juce::String singular = cat;
             if (singular.endsWithIgnoreCase("s") && singular.length() > 2)
                 singular = singular.dropLastCharacters(1);
-            info.name = singular + " " + juce::String(n++);
+            const auto parentName = f.getParentDirectory().getFileName();
+            info.name = parentName.equalsIgnoreCase(cat)
+                ? singular + " " + juce::String(n++)
+                : parentName;
             info.author = "User";
             info.category = cat;
             info.description = f.getFileName();
@@ -255,18 +258,18 @@ void PresetManager::loadPreset(int index)
         // whatever oscillator/sub/noise levels the previous preset left armed.
         // Voice multiplies sample output by oscALevel, so push it to unity and
         // silence Osc B / Sub / Noise. Filter wide open, sensible amp env.
-        setParam(processor, "oscALevel",  1.0);
-        setParam(processor, "oscBLevel",  0.0);
-        setParam(processor, "subLevel",   0.0);
-        setParam(processor, "subEnabled", 0.0);
-        setParam(processor, "noiseLevel", 0.0);
-        setParam(processor, "filterCutoff", 20000.0);
-        setParam(processor, "filterResonance", 0.0);
-        setParam(processor, "filterDrive", 0.0);
-        setParam(processor, "ampAttack",  0.005);
-        setParam(processor, "ampDecay",   0.1);
-        setParam(processor, "ampSustain", 1.0);
-        setParam(processor, "ampRelease", 0.2);
+        setParam(processor, "oscALevel",       1.0);
+        setParam(processor, "oscBLevel",       0.0);
+        setParam(processor, "subOscLevel",     0.0);
+        setParam(processor, "subOscEnabled",   false);
+        setParam(processor, "noiseLevel",      0.0);
+        setParam(processor, "filter1Cutoff",   20000.0);
+        setParam(processor, "filter1Resonance",0.0);
+        setParam(processor, "filter1Drive",    0.0);
+        setParam(processor, "env1Attack",      0.005);
+        setParam(processor, "env1Decay",       0.1);
+        setParam(processor, "env1Sustain",     1.0);
+        setParam(processor, "env1Release",     0.2);
 
         if (onPresetLoaded) onPresetLoaded();
         return;
@@ -516,10 +519,9 @@ juce::File PresetManager::getFactoryPresetDirectory() const
 
 juce::File PresetManager::getUserPresetDirectory() const
 {
-    // Must match where native/tools/import_samples.py writes presets:
-    //   <UserDocuments>/DIDITAGAIN STUDIO/Presets/User/<Category>/*.didasynthpreset
-    // Previously this pointed at AppData, so imported presets were invisible
-    // to the in-plugin browser even after Rescan.
+    // User-facing drop folders:
+    //   <UserDocuments>/DIDITAGAIN STUDIO/Samples/Presets/User/<Category>/
+    // Raw one-shots dropped here are treated as sample-backed user presets.
     return dida::SampleLibrary::getSamplesRoot()
         .getChildFile("Presets").getChildFile("User");
 }

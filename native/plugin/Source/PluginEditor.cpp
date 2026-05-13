@@ -99,14 +99,16 @@ void DiditagainEditor::refreshBrowserPresets()
     for (int i = 0; i < n; ++i) if (! pm.getPresetIsFactory(i)) { hasUser = true; break; }
 
     juce::StringArray names, cats;
+    juce::Array<int> presetIndices;
     for (int i = 0; i < n; ++i)
     {
         if (hasUser && pm.getPresetIsFactory(i)) continue;
         names.add(pm.getPresetName(i));
         auto cat = pm.getPresetCategory(i);
         cats.add(cat.isNotEmpty() ? cat : juce::String("Other"));
+        presetIndices.add(i);
     }
-    presetBrowserPanel->setPresets(names, cats);
+    presetBrowserPanel->setPresets(names, cats, presetIndices);
 }
 
 void DiditagainEditor::setupTabs()

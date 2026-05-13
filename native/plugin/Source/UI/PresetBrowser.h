@@ -39,11 +39,22 @@ public:
     /** Editor calls this with one entry per preset (parallel arrays). */
     void setPresets(const juce::StringArray& names, const juce::StringArray& categories)
     {
+        juce::Array<int> presetIndices;
+        for (int i = 0; i < names.size(); ++i)
+            presetIndices.add(i);
+        setPresets(names, categories, presetIndices);
+    }
+
+    /** Same as above, but keeps the real PresetManager index when the editor
+        hides factory presets from the displayed list. */
+    void setPresets(const juce::StringArray& names, const juce::StringArray& categories,
+                    const juce::Array<int>& presetIndices)
+    {
         items.clear();
         for (int i = 0; i < names.size(); ++i)
         {
             Item it;
-            it.globalIndex = i;
+            it.globalIndex = i < presetIndices.size() ? presetIndices[i] : i;
             it.name        = names[i];
             it.hintCat     = i < categories.size() ? categories[i] : juce::String();
             it.category    = classify(it.name, it.hintCat);
@@ -115,7 +126,7 @@ private:
 
     /** Map a preset to one of the broad categories. The folder hint wins
         whenever it matches a known bucket — that way dropping a file into
-        Presets/User/Pads always lands in "Pads" regardless of its filename. */
+        Samples/Presets/User/Pads always lands in "Pads" regardless of its filename. */
     static juce::String classify(const juce::String& nameIn, const juce::String& hintCat)
     {
         // 1) Folder hint takes priority.
