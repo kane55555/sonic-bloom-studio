@@ -250,6 +250,24 @@ void PresetManager::loadPreset(int index)
         requestedSampleLooping     = info.sampleLooping;
         requestedCategory          = info.category;
         macroMapper.clear();
+
+        // Reset the synth voice so the dropped sample is what you hear — not
+        // whatever oscillator/sub/noise levels the previous preset left armed.
+        // Voice multiplies sample output by oscALevel, so push it to unity and
+        // silence Osc B / Sub / Noise. Filter wide open, sensible amp env.
+        setParam(processor, "oscALevel",  1.0);
+        setParam(processor, "oscBLevel",  0.0);
+        setParam(processor, "subLevel",   0.0);
+        setParam(processor, "subEnabled", 0.0);
+        setParam(processor, "noiseLevel", 0.0);
+        setParam(processor, "filterCutoff", 20000.0);
+        setParam(processor, "filterResonance", 0.0);
+        setParam(processor, "filterDrive", 0.0);
+        setParam(processor, "ampAttack",  0.005);
+        setParam(processor, "ampDecay",   0.1);
+        setParam(processor, "ampSustain", 1.0);
+        setParam(processor, "ampRelease", 0.2);
+
         if (onPresetLoaded) onPresetLoaded();
         return;
     }

@@ -24,6 +24,15 @@ namespace {
     {
         return dida::SampleLibrary::getSamplesRoot().getChildFile("User");
     }
+    // Drop-folder presets live under <Documents>/DIDITAGAIN STUDIO/Presets/User/<Cat>/
+    // (sibling of the Samples tree). Surface them in the crop browser too.
+    static juce::File presetDropsRoot()
+    {
+        return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+            .getChildFile("DIDITAGAIN STUDIO")
+            .getChildFile("Presets")
+            .getChildFile("User");
+    }
 
     static juce::String midiToNoteName(int midi)
     {
@@ -447,6 +456,7 @@ void AudioCropPanel::rescan()
     };
     scanFolder(importedRoot());
     scanFolder(userRoot());
+    scanFolder(presetDropsRoot());
     applyFilter();
     if (! samples.empty()) selectIndex(0);
 }
