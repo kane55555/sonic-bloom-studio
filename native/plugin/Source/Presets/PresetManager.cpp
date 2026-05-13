@@ -424,8 +424,11 @@ juce::File PresetManager::getFactoryPresetDirectory() const
 
 juce::File PresetManager::getUserPresetDirectory() const
 {
-    return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-        .getChildFile("DIDITAGAIN").getChildFile("DIDITAGAIN STUDIO")
+    // Must match where native/tools/import_samples.py writes presets:
+    //   <UserDocuments>/DIDITAGAIN STUDIO/Presets/User/<Category>/*.didasynthpreset
+    // Previously this pointed at AppData, so imported presets were invisible
+    // to the in-plugin browser even after Rescan.
+    return dida::SampleLibrary::getSamplesRoot()
         .getChildFile("Presets").getChildFile("User");
 }
 
