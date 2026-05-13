@@ -456,6 +456,7 @@ void AudioCropPanel::rescan()
     };
     scanFolder(importedRoot());
     scanFolder(userRoot());
+    scanFolder(presetDropsRoot());
     applyFilter();
     if (! samples.empty()) selectIndex(0);
 }
