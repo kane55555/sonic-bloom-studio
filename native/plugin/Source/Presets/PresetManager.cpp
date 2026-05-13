@@ -255,18 +255,18 @@ void PresetManager::loadPreset(int index)
         // whatever oscillator/sub/noise levels the previous preset left armed.
         // Voice multiplies sample output by oscALevel, so push it to unity and
         // silence Osc B / Sub / Noise. Filter wide open, sensible amp env.
-        setParam(processor, "oscALevel",  1.0);
-        setParam(processor, "oscBLevel",  0.0);
-        setParam(processor, "subLevel",   0.0);
-        setParam(processor, "subEnabled", 0.0);
-        setParam(processor, "noiseLevel", 0.0);
-        setParam(processor, "filterCutoff", 20000.0);
-        setParam(processor, "filterResonance", 0.0);
-        setParam(processor, "filterDrive", 0.0);
-        setParam(processor, "ampAttack",  0.005);
-        setParam(processor, "ampDecay",   0.1);
-        setParam(processor, "ampSustain", 1.0);
-        setParam(processor, "ampRelease", 0.2);
+        setParam(processor, "oscALevel",       1.0);
+        setParam(processor, "oscBLevel",       0.0);
+        setParam(processor, "subOscLevel",     0.0);
+        setParam(processor, "subOscEnabled",   false);
+        setParam(processor, "noiseLevel",      0.0);
+        setParam(processor, "filter1Cutoff",   20000.0);
+        setParam(processor, "filter1Resonance",0.0);
+        setParam(processor, "filter1Drive",    0.0);
+        setParam(processor, "env1Attack",      0.005);
+        setParam(processor, "env1Decay",       0.1);
+        setParam(processor, "env1Sustain",     1.0);
+        setParam(processor, "env1Release",     0.2);
 
         if (onPresetLoaded) onPresetLoaded();
         return;
