@@ -107,46 +107,46 @@ private:
         static const juce::StringArray k {
             "All Sounds",
             "Pianos", "Keys", "Guitars", "Strings", "Pads", "Bells", "Plucks",
-            "Leads", "Bass", "Synths", "Choirs / Vocals", "Brass", "Winds",
-            "Drums / Percussion", "FX / Textures", "Imported / User Sounds"
+            "Leads", "Bass", "Synths", "Choirs", "Brass", "Winds",
+            "Drums", "FX", "Imported"
         };
         return k;
     }
 
-    /** Map a preset to one of the broad categories using name keywords. */
+    /** Map a preset to one of the broad categories. The folder hint wins
+        whenever it matches a known bucket — that way dropping a file into
+        Presets/User/Pads always lands in "Pads" regardless of its filename. */
     static juce::String classify(const juce::String& nameIn, const juce::String& hintCat)
     {
-        const auto n = nameIn.toLowerCase();
-        const auto h = hintCat.toLowerCase();
+        // 1) Folder hint takes priority.
+        for (auto& c : categoryOrder())
+            if (c.equalsIgnoreCase(hintCat)) return c;
 
+        // 2) Otherwise infer from the preset name.
+        const auto n = nameIn.toLowerCase();
         auto any = [&](std::initializer_list<const char*> kws) {
-            for (auto* k : kws) if (n.contains(k) || h.contains(k)) return true;
+            for (auto* k : kws) if (n.contains(k)) return true;
             return false;
         };
-
         if (any({"piano", "grand", "upright", "rhodes", "wurli"}))      return "Pianos";
-        if (any({"guitar", "nylon", "strat", "tele", "acoustic"}))       return "Guitars";
-        if (any({"choir", "vocal", "vox", "ahh", "ooh", "voice"}))       return "Choirs / Vocals";
-        if (any({"violin", "viola", "cello", "orchestra", "string"}))    return "Strings";
+        if (any({"guitar", "nylon", "strat", "tele", "acoustic"}))      return "Guitars";
+        if (any({"choir", "vocal", "vox", "ahh", "ooh", "voice"}))      return "Choirs";
+        if (any({"violin", "viola", "cello", "orchestra", "string"}))   return "Strings";
         if (any({"brass", "trumpet", "trombone", "horn", "tuba", "sax"})) return "Brass";
-        if (any({"flute", "clarinet", "oboe", "bassoon", "wind"}))       return "Winds";
-        if (any({"bell", "mallet", "music box", "chime", "glock"}))      return "Bells";
+        if (any({"flute", "clarinet", "oboe", "bassoon", "wind"}))      return "Winds";
+        if (any({"bell", "mallet", "music box", "chime", "glock"}))     return "Bells";
         if (any({"pluck"}))                                              return "Plucks";
         if (any({"pad", "ambient", "atmosphere", "drone"}))              return "Pads";
         if (any({"lead", "solo"}))                                       return "Leads";
         if (any({"bass", "808", "sub"}))                                 return "Bass";
         if (any({"drum", "kick", "snare", "clap", "hat", "perc", "tom", "cymbal"}))
-                                                                          return "Drums / Percussion";
+                                                                          return "Drums";
         if (any({"fx", "texture", "noise", "sweep", "riser", "impact", "hit"}))
-                                                                          return "FX / Textures";
+                                                                          return "FX";
         if (any({"key", "ep", "organ", "clav"}))                         return "Keys";
         if (any({"synth"}))                                              return "Synths";
 
-        // Fall back to PresetManager's own hint if it matches one of our broad buckets.
-        for (auto& c : categoryOrder())
-            if (c.equalsIgnoreCase(hintCat)) return c;
-
-        return "Imported / User Sounds";
+        return "Imported";
     }
 
     //--------------------------------------------------------------------------

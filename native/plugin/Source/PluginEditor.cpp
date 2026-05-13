@@ -30,10 +30,12 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
         processor.getPresetManager().scanPresetDirectory();
         refreshBrowserPresets();
     };
-    importPanel->onOpenInbox = []() {
-        auto samples = dida::SampleLibrary::getSamplesRoot().getChildFile("Imported");
-        samples.createDirectory();
-        samples.revealToUser();
+    importPanel->onOpenInbox = [this]() {
+        // Reveal the per-category drop folders so the user can drag one-shots
+        // straight into Pianos/, Guitars/, Pads/, etc.
+        auto userPresets = processor.getPresetManager().getUserPresetDirectory();
+        userPresets.createDirectory();
+        userPresets.revealToUser();
     };
 
     addChildComponent(*synthPanel);

@@ -30,6 +30,13 @@ PresetManager::PresetManager(juce::AudioProcessor& proc) : processor(proc)
     auto samplesRoot = dida::SampleLibrary::getSamplesRoot();
     if (! samplesRoot.exists()) samplesRoot.createDirectory();
 
+    // Pre-create one folder per broad category under Presets/User so the user
+    // can just drop one-shots into the right bucket from the OS file browser.
+    auto userPresetDir = getUserPresetDirectory();
+    userPresetDir.createDirectory();
+    for (auto& cat : dida::preset::dropCategories())
+        userPresetDir.getChildFile(cat).createDirectory();
+
     scanPresetDirectory();
 }
 
@@ -38,6 +45,57 @@ void PresetManager::scanPresetDirectory()
     presets.clear();
     loadFactoryPresets();
     loadUserPresets();
+    loadDroppedSamples();
+}
+
+void PresetManager::loadDroppedSamples()
+{
+    auto root = getUserPresetDirectory();
+    if (! root.isDirectory()) return;
+
+    const juce::String wildcards = "*.wav;*.aif;*.aiff;*.flac;*.mp3;*.ogg";
+
+    for (auto& cat : dida::preset::dropCategories())
+    {
+        auto dir = root.getChildFile(cat);
+        if (! dir.isDirectory()) continue;
+
+        // Non-recursive so users don't accidentally pick up backup folders.
+        auto files = dir.findChildFiles(juce::File::findFiles, false, wildcards);
+        // Stable, natural sort so renamed/added files keep predictable numbering.
+        std::sort(files.begin(), files.end(), [](const juce::File& a, const juce::File& b) {
+            return a.getFileName().compareNatural(b.getFileName()) < 0;
+        });
+
+        int n = 1;
+        for (auto& f : files)
+        {
+            // Skip backup/version artefacts created by the crop panel.
+            const auto stem = f.getFileNameWithoutExtension();
+            if (stem.endsWithIgnoreCase(".original")) continue;
+
+            PresetInfo info;
+            // Auto-numbered display name: "Guitar 1", "Pad 2", ...
+            // Strip a trailing 's' so "Pianos" -> "Piano N", "Strings" -> "String N".
+            juce::String singular = cat;
+            if (singular.endsWithIgnoreCase("s") && singular.length() > 2)
+                singular = singular.dropLastCharacters(1);
+            info.name = singular + " " + juce::String(n++);
+            info.author = "User";
+            info.category = cat;
+            info.description = f.getFileName();
+            info.filePath = f.getFullPathName();        // doubles as identity
+            info.isFactory = false;
+            info.isSampleDrop = true;
+            info.sampleSourcePath = f.getFullPathName();
+            info.sampleRootMidi = 60;
+            // Looping makes sense for sustained categories; not for transients.
+            info.sampleLooping = (cat == "Pads" || cat == "Strings"
+                                  || cat == "Choirs" || cat == "Brass"
+                                  || cat == "Winds"  || cat == "Synths");
+            presets.push_back(info);
+        }
+    }
 }
 
 static void readPresetInfoFromJson(const juce::var& json,
@@ -177,10 +235,26 @@ void PresetManager::loadPreset(int index)
     }
 
     currentIndex = index;
+    const auto& info = presets[index];
     juce::String logMessage;
-    logMessage << "load index=" << index << " name=" << presets[index].name << " file=" << presets[index].filePath;
+    logMessage << "load index=" << index << " name=" << info.name << " file=" << info.filePath;
     didaPresetManagerLog(logMessage);
-    juce::File file(presets[index].filePath);
+
+    if (info.isSampleDrop)
+    {
+        // No JSON to parse — just route the dropped one-shot into the engine.
+        requestedInstrument        = {};
+        requestedSampleSource      = info.sampleSourcePath;
+        requestedSampleDisplayName = info.name;
+        requestedSampleRootMidi    = info.sampleRootMidi;
+        requestedSampleLooping     = info.sampleLooping;
+        requestedCategory          = info.category;
+        macroMapper.clear();
+        if (onPresetLoaded) onPresetLoaded();
+        return;
+    }
+
+    juce::File file(info.filePath);
     loadPresetFromFile(file);
 }
 
