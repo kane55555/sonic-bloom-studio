@@ -5,15 +5,15 @@
 namespace {
     static const char* kCategories[] = {
         "All Imported Samples", "Current Preset Sample",
-        "Drill Bells", "Alien Leads", "Pain Pianos", "Choirs / Vox",
-        "Guitars", "Dark Pads", "Plucks", "Bass / 808",
-        "FX / Risers", "Textures", "Uncategorized"
+        "Pianos", "Keys", "Guitars", "Strings", "Pads", "Bells", "Plucks",
+        "Leads", "Bass", "Synths", "Choirs", "Brass", "Winds",
+        "Drums", "FX", "Imported", "Uncategorized"
     };
 
     static const char* kEditableCats[] = {
-        "Drill Bells", "Alien Leads", "Pain Pianos", "Choirs / Vox",
-        "Guitars", "Dark Pads", "Plucks", "Bass / 808",
-        "FX / Risers", "Textures", "Uncategorized"
+        "Pianos", "Keys", "Guitars", "Strings", "Pads", "Bells", "Plucks",
+        "Leads", "Bass", "Synths", "Choirs", "Brass", "Winds",
+        "Drums", "FX", "Imported", "Uncategorized"
     };
 
     static juce::File importedRoot()
@@ -130,16 +130,21 @@ void AudioCropPanel::writeMeta(const CropMeta& m)
 juce::String AudioCropPanel::inferCategory(const juce::File& f)
 {
     auto parent = f.getParentDirectory().getFileName().toLowerCase();
-    if (parent.contains("bell"))   return "Drill Bells";
-    if (parent.contains("alien"))  return "Alien Leads";
-    if (parent.contains("piano"))  return "Pain Pianos";
-    if (parent.contains("choir") || parent.contains("vox")) return "Choirs / Vox";
+    if (parent.contains("piano"))  return "Pianos";
+    if (parent.contains("key") || parent.contains("organ") || parent.contains("ep")) return "Keys";
     if (parent.contains("guitar")) return "Guitars";
-    if (parent.contains("pad"))    return "Dark Pads";
+    if (parent.contains("string") || parent.contains("violin") || parent.contains("cello")) return "Strings";
+    if (parent.contains("pad"))    return "Pads";
+    if (parent.contains("bell"))   return "Bells";
     if (parent.contains("pluck"))  return "Plucks";
-    if (parent.contains("bass") || parent.contains("808")) return "Bass / 808";
-    if (parent.contains("fx") || parent.contains("riser")) return "FX / Risers";
-    if (parent.contains("texture"))return "Textures";
+    if (parent.contains("lead") || parent.contains("alien")) return "Leads";
+    if (parent.contains("bass") || parent.contains("808")) return "Bass";
+    if (parent.contains("synth"))  return "Synths";
+    if (parent.contains("choir") || parent.contains("vox") || parent.contains("vocal")) return "Choirs";
+    if (parent.contains("brass"))  return "Brass";
+    if (parent.contains("wind") || parent.contains("flute")) return "Winds";
+    if (parent.contains("drum") || parent.contains("perc")) return "Drums";
+    if (parent.contains("fx") || parent.contains("riser") || parent.contains("texture")) return "FX";
     return "Uncategorized";
 }
 
