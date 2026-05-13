@@ -727,6 +727,5 @@ void AudioCropPanel::resized()
     row(6);
     previewBtn    .setBounds(row(28));
     saveBtn       .setBounds(row(28));
-    saveAsBtn     .setBounds(row(28));
     resetBtn      .setBounds(row(28));
 }
