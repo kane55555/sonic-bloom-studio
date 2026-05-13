@@ -105,4 +105,5 @@ private:
 
     void loadFactoryPresets();
     void loadUserPresets();
+    void loadDroppedSamples();
 };
