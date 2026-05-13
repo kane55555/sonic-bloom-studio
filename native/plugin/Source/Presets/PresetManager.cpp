@@ -235,10 +235,26 @@ void PresetManager::loadPreset(int index)
     }
 
     currentIndex = index;
+    const auto& info = presets[index];
     juce::String logMessage;
-    logMessage << "load index=" << index << " name=" << presets[index].name << " file=" << presets[index].filePath;
+    logMessage << "load index=" << index << " name=" << info.name << " file=" << info.filePath;
     didaPresetManagerLog(logMessage);
-    juce::File file(presets[index].filePath);
+
+    if (info.isSampleDrop)
+    {
+        // No JSON to parse — just route the dropped one-shot into the engine.
+        requestedInstrument        = {};
+        requestedSampleSource      = info.sampleSourcePath;
+        requestedSampleDisplayName = info.name;
+        requestedSampleRootMidi    = info.sampleRootMidi;
+        requestedSampleLooping     = info.sampleLooping;
+        requestedCategory          = info.category;
+        macroMapper.clear();
+        if (onPresetLoaded) onPresetLoaded();
+        return;
+    }
+
+    juce::File file(info.filePath);
     loadPresetFromFile(file);
 }
 
