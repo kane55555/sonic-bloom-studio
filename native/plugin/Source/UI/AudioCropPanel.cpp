@@ -433,12 +433,10 @@ AudioCropPanel::AudioCropPanel()
     addAndMakeVisible(categoryBox);
 
     previewBtn.onClick = [this]() { startPreview(); };
-    saveBtn.onClick    = [this]() { persistSelected(false); };
-    saveAsBtn.onClick  = [this]() { persistSelected(true);  };
+    saveBtn.onClick    = [this]() { persistSelected(); };
     resetBtn.onClick   = [this]() { resetSelectedToOriginal(); };
     addAndMakeVisible(previewBtn);
     addAndMakeVisible(saveBtn);
-    addAndMakeVisible(saveAsBtn);
     addAndMakeVisible(resetBtn);
 
     rescan();
