@@ -92,7 +92,6 @@ private:
     juce::ComboBox     categoryBox;
     juce::TextButton   previewBtn   { "Preview" };
     juce::TextButton   saveBtn      { "Save" };
-    juce::TextButton   saveAsBtn    { "Save As New Version" };
     juce::TextButton   resetBtn     { "Reset To Original" };
 
     // ---- audio preview ----
@@ -114,7 +113,7 @@ private:
     void selectIndex(int newIndex);
     void pushUiFromMeta(const CropMeta&);
     void pullMetaFromUi(CropMeta&);
-    void persistSelected(bool asNewVersion);
+    void persistSelected();
     void resetSelectedToOriginal();
     void startPreview();
     void stopPreview();

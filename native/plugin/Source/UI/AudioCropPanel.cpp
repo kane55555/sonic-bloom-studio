@@ -433,12 +433,10 @@ AudioCropPanel::AudioCropPanel()
     addAndMakeVisible(categoryBox);
 
     previewBtn.onClick = [this]() { startPreview(); };
-    saveBtn.onClick    = [this]() { persistSelected(false); };
-    saveAsBtn.onClick  = [this]() { persistSelected(true);  };
+    saveBtn.onClick    = [this]() { persistSelected(); };
     resetBtn.onClick   = [this]() { resetSelectedToOriginal(); };
     addAndMakeVisible(previewBtn);
     addAndMakeVisible(saveBtn);
-    addAndMakeVisible(saveAsBtn);
     addAndMakeVisible(resetBtn);
 
     rescan();
@@ -554,7 +552,7 @@ static bool writeTrimmedWav(const juce::File& src, const juce::File& dest,
     return true;
 }
 
-void AudioCropPanel::persistSelected(bool asNewVersion)
+void AudioCropPanel::persistSelected()
 {
     if (selectedIndex < 0) return;
     auto m = samples[(size_t) selectedIndex];
@@ -569,48 +567,21 @@ void AudioCropPanel::persistSelected(bool asNewVersion)
         return;
     }
 
-    juce::File dest;
-    if (asNewVersion)
-    {
-        const auto ext = src.getFileExtension();
-        dest = src.getSiblingFile(src.getFileNameWithoutExtension() + "_v2" + ext);
-        for (int i = 2; dest.exists(); ++i)
-            dest = src.getSiblingFile(src.getFileNameWithoutExtension() + "_v" + juce::String(i) + ext);
-    }
-    else
-    {
-        // Back up the untouched original ONCE so "Reset To Original" still works.
-        auto backup = src.getSiblingFile(src.getFileNameWithoutExtension() + ".original" + src.getFileExtension());
-        if (! backup.existsAsFile()) src.copyFileTo(backup);
-        dest = src;
-    }
-
-    if (! writeTrimmedWav(src, dest, m.cropStart, m.cropEnd))
+    // Overwrite the original with the cropped audio. No backup, no new versions.
+    if (! writeTrimmedWav(src, src, m.cropStart, m.cropEnd))
     {
         juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-            "Save crop failed", "Could not write trimmed audio to:\n" + dest.getFullPathName());
+            "Save crop failed", "Could not write trimmed audio to:\n" + src.getFullPathName());
         return;
     }
 
-    // After writing the trimmed file, the crop is now the whole file.
-    m.sourcePath        = dest.getFullPathName();
-    m.originalFileName  = dest.getFileName();
-    m.sampleId          = dest.getFileNameWithoutExtension();
+    // After writing the trimmed file, the crop now covers the whole file.
     m.cropStart         = 0.0;
     m.cropEnd           = 1.0;
 
-    // If we saved a new version, append it; otherwise update in place.
-    if (asNewVersion)
-    {
-        samples.push_back(m);
-        applyFilter();
-    }
-    else
-    {
-        samples[(size_t) selectedIndex] = m;
-        if (waveform) waveform->loadFor(dest);
-        pushUiFromMeta(m);
-    }
+    samples[(size_t) selectedIndex] = m;
+    if (waveform) waveform->loadFor(src);
+    pushUiFromMeta(m);
     writeMeta(m);
     sampleList.repaint();
     if (waveform) waveform->repaint();
@@ -633,13 +604,19 @@ void AudioCropPanel::resetSelectedToOriginal()
         backup.copyFileTo(src);
         dida::SampleLibrary::invalidateCache();
         if (onLibraryChanged) onLibraryChanged();
+        m.cropStart = 0.0; m.cropEnd = 1.0;
+        m.loopStart = 0.2; m.loopEnd = 0.95;
+        m.loopCrossfadeMs = 15.0;
+        pushUiFromMeta(m);
+        if (waveform) waveform->loadFor(src);
+        if (waveform) waveform->repaint();
     }
-    m.cropStart = 0.0; m.cropEnd = 1.0;
-    m.loopStart = 0.2; m.loopEnd = 0.95;
-    m.loopCrossfadeMs = 15.0;
-    pushUiFromMeta(m);
-    if (waveform) waveform->loadFor(src);
-    if (waveform) waveform->repaint();
+    else
+    {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon,
+            "Reset To Original", "No original backup exists for this file.\n"
+            "The crop tab now overwrites the original file when saving.");
+    }
 }
 
 void AudioCropPanel::startPreview()
@@ -756,6 +733,5 @@ void AudioCropPanel::resized()
     row(6);
     previewBtn    .setBounds(row(28));
     saveBtn       .setBounds(row(28));
-    saveAsBtn     .setBounds(row(28));
     resetBtn      .setBounds(row(28));
 }
