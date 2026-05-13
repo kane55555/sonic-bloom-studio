@@ -604,13 +604,19 @@ void AudioCropPanel::resetSelectedToOriginal()
         backup.copyFileTo(src);
         dida::SampleLibrary::invalidateCache();
         if (onLibraryChanged) onLibraryChanged();
+        m.cropStart = 0.0; m.cropEnd = 1.0;
+        m.loopStart = 0.2; m.loopEnd = 0.95;
+        m.loopCrossfadeMs = 15.0;
+        pushUiFromMeta(m);
+        if (waveform) waveform->loadFor(src);
+        if (waveform) waveform->repaint();
     }
-    m.cropStart = 0.0; m.cropEnd = 1.0;
-    m.loopStart = 0.2; m.loopEnd = 0.95;
-    m.loopCrossfadeMs = 15.0;
-    pushUiFromMeta(m);
-    if (waveform) waveform->loadFor(src);
-    if (waveform) waveform->repaint();
+    else
+    {
+        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon,
+            "Reset To Original", "No original backup exists for this file.\n"
+            "The crop tab now overwrites the original file when saving.");
+    }
 }
 
 void AudioCropPanel::startPreview()
