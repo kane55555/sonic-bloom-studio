@@ -30,6 +30,13 @@ PresetManager::PresetManager(juce::AudioProcessor& proc) : processor(proc)
     auto samplesRoot = dida::SampleLibrary::getSamplesRoot();
     if (! samplesRoot.exists()) samplesRoot.createDirectory();
 
+    // Pre-create one folder per broad category under Presets/User so the user
+    // can just drop one-shots into the right bucket from the OS file browser.
+    auto userPresetDir = getUserPresetDirectory();
+    userPresetDir.createDirectory();
+    for (auto& cat : dida::preset::dropCategories())
+        userPresetDir.getChildFile(cat).createDirectory();
+
     scanPresetDirectory();
 }
 
