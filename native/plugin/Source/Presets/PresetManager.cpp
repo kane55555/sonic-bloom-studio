@@ -66,7 +66,6 @@ void PresetManager::loadDroppedSamples()
             return a.getFileName().compareNatural(b.getFileName()) < 0;
         });
 
-        int n = 1;
         for (auto& f : files)
         {
             // Skip backup/version artefacts created by the crop panel.
@@ -74,15 +73,12 @@ void PresetManager::loadDroppedSamples()
             if (stem.endsWithIgnoreCase(".original")) continue;
 
             PresetInfo info;
-            // Auto-numbered display name: "Guitar 1", "Pad 2", ... for files
-            // dropped directly in a category. If the user made a per-preset
-            // folder, use that folder name as the preset name.
-            juce::String singular = cat;
-            if (singular.endsWithIgnoreCase("s") && singular.length() > 2)
-                singular = singular.dropLastCharacters(1);
+            // Use the actual filename as the preset name when the file is dropped
+            // directly into a category folder. For files inside a per-preset
+            // sub-folder, use the sub-folder name instead.
             const auto parentName = f.getParentDirectory().getFileName();
             info.name = parentName.equalsIgnoreCase(cat)
-                ? singular + " " + juce::String(n++)
+                ? f.getFileNameWithoutExtension()
                 : parentName;
             info.author = "User";
             info.category = cat;
