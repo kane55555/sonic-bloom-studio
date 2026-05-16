@@ -266,6 +266,33 @@ bool SynthEngine::setMultisampleSources(const juce::Array<juce::File>& files,
     return ms != nullptr || files.isEmpty();
 }
 
+bool SynthEngine::loadMultisamplePreset(const juce::String& category,
+                                        const juce::String& presetName,
+                                        const juce::String& folderPath)
+{
+    const auto sourceName = juce::String("folder:") + category + ":" + presetName + ":" + folderPath;
+    if (sourceName == currentInstrumentName && activeMultisample != nullptr)
+        return true;
+
+    auto ms = folderPath.isEmpty()
+        ? std::shared_ptr<const dida::Multisample>{}
+        : dida::SampleLibrary::loadMultisamplePreset(category, presetName, folderPath);
+
+    if (folderPath.isNotEmpty() && ms == nullptr)
+        juce::Logger::writeToLog("[DIDITAGAIN sample] failed to load multisample preset folder: "
+            + category + " > " + presetName + " path=" + folderPath);
+
+    activeMultisample = ms;
+    currentInstrumentName = sourceName;
+
+    forEachSynthVoice([&](SynthVoice& v)
+    {
+        v.setMultisample(activeMultisample);
+    });
+
+    return ms != nullptr || folderPath.isEmpty();
+}
+
 void SynthEngine::setFallbackSynthesisEnabled(bool enabled)
 {
     fallbackSynthesisEnabled = enabled;
