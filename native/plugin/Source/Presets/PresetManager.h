@@ -76,6 +76,7 @@ public:
     // Most recent instrument folder requested by a preset (empty if none).
     const juce::String& getRequestedInstrument() const noexcept { return requestedInstrument; }
     const juce::String& getRequestedSampleSource() const noexcept { return requestedSampleSource; }
+    const juce::StringArray& getRequestedSampleSources() const noexcept { return requestedSampleSources; }
     int getRequestedSampleRootMidi() const noexcept { return requestedSampleRootMidi; }
     const juce::String& getRequestedSampleDisplayName() const noexcept { return requestedSampleDisplayName; }
     bool isCurrentPresetSampleSourceDriven() const noexcept { return requestedSampleSource.isNotEmpty(); }
