@@ -102,6 +102,7 @@ private:
     int currentIndex = 0;
     juce::String requestedInstrument;
     juce::String requestedSampleSource;
+    juce::StringArray requestedSampleSources;
     juce::String requestedSampleDisplayName;
     int requestedSampleRootMidi = 60;
     bool requestedSampleLooping = false;
