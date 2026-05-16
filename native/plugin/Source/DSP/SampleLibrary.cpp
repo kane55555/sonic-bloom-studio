@@ -1,6 +1,7 @@
 #include "SampleLibrary.h"
 #include <algorithm>
 #include <cstring>
+#include <limits>
 #include <mutex>
 
 namespace dida {
@@ -40,6 +41,13 @@ static int noteNameToMidi(const juce::String& noteToken)
     const int midi = (octave + 1) * 12 + semis;
     if (midi < 0 || midi > 127) return -1;
     return midi;
+}
+
+static juce::String midiToNoteName(int midi)
+{
+    static const char* names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+    midi = juce::jlimit(0, 127, midi);
+    return juce::String(names[midi % 12]) + juce::String((midi / 12) - 1);
 }
 
 // Parse "Brass_C3" or "Brass_F#3_v90" out of a filename stem.
@@ -83,52 +91,52 @@ void Multisample::pickZonesForNote(int midi, int velocity,
     xfade = 0.0f;
     if (zones.empty()) return;
 
-    // First filter by velocity layer: pick the smallest hiVel >= velocity, else max.
     auto velMatches = [velocity](const SampleZone& z)
     {
         return velocity >= z.loVel && velocity <= z.hiVel;
     };
 
-    auto pickBest = [&](int rootTarget, bool wantBelowOrEqual) -> const SampleZone*
+    for (auto& z : zones)
     {
-        const SampleZone* best = nullptr;
-        int bestDist = std::numeric_limits<int>::max();
-        for (auto& z : zones)
+        if (velMatches(z) && midi >= z.lowKey && midi <= z.highKey)
         {
-            if (! velMatches(z)) continue;
-            const int d = wantBelowOrEqual ? (rootTarget - z.rootMidi)
-                                           : (z.rootMidi - rootTarget);
-            if (d < 0) continue; // wrong side
-            if (d < bestDist) { bestDist = d; best = &z; }
+            *lower = &z;
+            return;
         }
-        return best;
-    };
+    }
 
-    const SampleZone* lo = pickBest(midi, true);
-    const SampleZone* hi = pickBest(midi + 1, false);
-
-    // Velocity fallback: if no exact velocity match, ignore velocity and use any zone.
-    if (lo == nullptr && hi == nullptr)
+    // Velocity fallback: keep the hard key zone, but ignore velocity layers.
+    for (auto& z : zones)
     {
-        const SampleZone* nearest = nullptr;
-        int bestDist = std::numeric_limits<int>::max();
+        if (midi >= z.lowKey && midi <= z.highKey)
+        {
+            *lower = &z;
+            return;
+        }
+    }
+
+    const SampleZone* nearest = nullptr;
+    int bestDist = std::numeric_limits<int>::max();
+    for (auto& z : zones)
+    {
+        if (! velMatches(z)) continue;
+        const int d = std::abs(midi - z.rootMidi);
+        if (d < bestDist)
+        {
+            bestDist = d;
+            nearest = &z;
+        }
+    }
+
+    if (nearest == nullptr)
+    {
         for (auto& z : zones)
         {
             const int d = std::abs(midi - z.rootMidi);
             if (d < bestDist) { bestDist = d; nearest = &z; }
         }
-        *lower = nearest;
-        return;
     }
-
-    if (lo == nullptr) { *lower = hi; return; }
-    if (hi == nullptr) { *lower = lo; return; }
-
-    *lower = lo;
-    *upper = hi;
-    const int span = hi->rootMidi - lo->rootMidi;
-    xfade = span > 0 ? juce::jlimit(0.0f, 1.0f,
-        static_cast<float>(midi - lo->rootMidi) / static_cast<float>(span)) : 0.0f;
+    *lower = nearest;
 }
 
 //==============================================================================
@@ -240,6 +248,81 @@ namespace {
 
         return true;
     }
+
+    void assignStandardKeyZone(SampleZone& zone) noexcept
+    {
+        const int root = juce::jlimit(0, 127, zone.rootMidi);
+        switch (root % 12)
+        {
+            case 0:  zone.lowKey = root;     zone.highKey = root + 1; break; // C -> C/C#
+            case 3:  zone.lowKey = root - 1; zone.highKey = root + 1; break; // D# -> D/D#/E
+            case 6:  zone.lowKey = root - 1; zone.highKey = root + 1; break; // F# -> F/F#/G
+            case 9:  zone.lowKey = root - 1; zone.highKey = root + 2; break; // A -> G#/A/A#/B
+            default: zone.lowKey = root;     zone.highKey = root;     break;
+        }
+        zone.lowKey = juce::jlimit(0, 127, zone.lowKey);
+        zone.highKey = juce::jlimit(zone.lowKey, 127, zone.highKey);
+    }
+
+    std::shared_ptr<const Multisample> buildMultisampleFromFiles(const juce::Array<juce::File>& files,
+                                                                 const juce::String& displayName)
+    {
+        auto ms = std::make_shared<Multisample>();
+        ms->instrumentName = displayName.isNotEmpty() ? displayName : "Multisample";
+
+        for (auto& file : files)
+        {
+            int rootMidi = 60;
+            int hiVel = 127;
+            if (! parseSampleName(file.getFileNameWithoutExtension(), rootMidi, hiVel))
+            {
+                juce::Logger::writeToLog("[DIDITAGAIN multisample] skipped unparseable file: " + file.getFileName());
+                continue;
+            }
+
+            SampleZone zone;
+            if (readSampleZoneFromFile(file, rootMidi, hiVel, zone))
+            {
+                assignStandardKeyZone(zone);
+                ms->zones.push_back(std::move(zone));
+            }
+        }
+
+        if (ms->zones.empty()) return nullptr;
+
+        std::sort(ms->zones.begin(), ms->zones.end(),
+            [](const SampleZone& a, const SampleZone& b)
+            {
+                if (a.rootMidi != b.rootMidi) return a.rootMidi < b.rootMidi;
+                return a.hiVel < b.hiVel;
+            });
+
+        int i = 0;
+        while (i < (int) ms->zones.size())
+        {
+            int j = i;
+            while (j < (int) ms->zones.size() && ms->zones[j].rootMidi == ms->zones[i].rootMidi)
+                ++j;
+            int prevHi = -1;
+            for (int k = i; k < j; ++k)
+            {
+                ms->zones[k].loVel = prevHi + 1;
+                prevHi = ms->zones[k].hiVel;
+            }
+            ms->zones[j - 1].hiVel = 127;
+            i = j;
+        }
+
+        juce::StringArray zoneDebug;
+        for (const auto& z : ms->zones)
+            zoneDebug.add(z.fileName + " root=" + midiToNoteName(z.rootMidi)
+                + " zone=" + midiToNoteName(z.lowKey) + "-" + midiToNoteName(z.highKey));
+        juce::Logger::writeToLog("[DIDITAGAIN multisample] loaded " + ms->instrumentName
+            + " zones=" + juce::String((int) ms->zones.size())
+            + " :: " + zoneDebug.joinIntoString(", "));
+
+        return ms;
+    }
 }
 
 void SampleLibrary::invalidateCache()
@@ -265,51 +348,8 @@ std::shared_ptr<const Multisample> SampleLibrary::loadInstrument(const juce::Str
     auto files = folder.findChildFiles(juce::File::findFiles, false, wildcards);
     if (files.isEmpty()) return nullptr;
 
-    auto ms = std::make_shared<Multisample>();
-    ms->instrumentName = name;
-
-    for (auto& file : files)
-    {
-        int rootMidi = 60;
-        int hiVel = 127;
-        if (! parseSampleName(file.getFileNameWithoutExtension(), rootMidi, hiVel))
-        {
-            // Skip files that don't follow the naming convention.
-            continue;
-        }
-
-        SampleZone zone;
-        if (readSampleZoneFromFile(file, rootMidi, hiVel, zone))
-            ms->zones.push_back(std::move(zone));
-    }
-
-    if (ms->zones.empty()) return nullptr;
-
-    // Sort zones by root, then by hiVel — makes lookups predictable.
-    std::sort(ms->zones.begin(), ms->zones.end(),
-        [](const SampleZone& a, const SampleZone& b)
-        {
-            if (a.rootMidi != b.rootMidi) return a.rootMidi < b.rootMidi;
-            return a.hiVel < b.hiVel;
-        });
-
-    // Build velocity lo bounds within each root group.
-    int i = 0;
-    while (i < (int) ms->zones.size())
-    {
-        int j = i;
-        while (j < (int) ms->zones.size() && ms->zones[j].rootMidi == ms->zones[i].rootMidi)
-            ++j;
-        int prevHi = -1;
-        for (int k = i; k < j; ++k)
-        {
-            ms->zones[k].loVel = prevHi + 1;
-            prevHi = ms->zones[k].hiVel;
-        }
-        // Stretch the top layer to 127 in case file said v100.
-        ms->zones[j - 1].hiVel = 127;
-        i = j;
-    }
+    auto ms = buildMultisampleFromFiles(files, name);
+    if (ms == nullptr) return nullptr;
 
     {
         std::lock_guard<std::mutex> lock(cacheMutex());
@@ -367,46 +407,38 @@ std::shared_ptr<const Multisample> SampleLibrary::loadMultisampleFromFiles(const
         if (it != cache().end()) return it->second;
     }
 
-    auto ms = std::make_shared<Multisample>();
-    ms->instrumentName = displayName.isNotEmpty() ? displayName : "Multisample";
+    auto ms = buildMultisampleFromFiles(files, displayName);
+    if (ms == nullptr) return nullptr;
 
-    for (auto& file : files)
     {
-        int rootMidi = 60;
-        int hiVel = 127;
-        if (! parseSampleName(file.getFileNameWithoutExtension(), rootMidi, hiVel))
-            continue; // need a note token to know where this file lives
+        std::lock_guard<std::mutex> lock(cacheMutex());
+        cache()[cacheKey] = ms;
+    }
+    return ms;
+}
 
-        SampleZone zone;
-        if (readSampleZoneFromFile(file, rootMidi, hiVel, zone))
-            ms->zones.push_back(std::move(zone));
+std::shared_ptr<const Multisample> SampleLibrary::loadMultisamplePreset(const juce::String& category,
+                                                                        const juce::String& presetName,
+                                                                        const juce::String& folderPath)
+{
+    juce::File folder(folderPath);
+    if (! folder.isDirectory()) return nullptr;
+
+    const auto cacheKey = (juce::String("folder:") + category + ":" + presetName + ":" + folder.getFullPathName()).toStdString();
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex());
+        auto it = cache().find(cacheKey);
+        if (it != cache().end()) return it->second;
     }
 
-    if (ms->zones.empty()) return nullptr;
+    auto files = folder.findChildFiles(juce::File::findFiles, true, "*.wav");
+    if (files.isEmpty()) return nullptr;
+    std::sort(files.begin(), files.end(), [](const juce::File& a, const juce::File& b) {
+        return a.getFileName().compareNatural(b.getFileName()) < 0;
+    });
 
-    std::sort(ms->zones.begin(), ms->zones.end(),
-        [](const SampleZone& a, const SampleZone& b)
-        {
-            if (a.rootMidi != b.rootMidi) return a.rootMidi < b.rootMidi;
-            return a.hiVel < b.hiVel;
-        });
-
-    // Build velocity lo bounds within each root group.
-    int i = 0;
-    while (i < (int) ms->zones.size())
-    {
-        int j = i;
-        while (j < (int) ms->zones.size() && ms->zones[j].rootMidi == ms->zones[i].rootMidi)
-            ++j;
-        int prevHi = -1;
-        for (int k = i; k < j; ++k)
-        {
-            ms->zones[k].loVel = prevHi + 1;
-            prevHi = ms->zones[k].hiVel;
-        }
-        ms->zones[j - 1].hiVel = 127;
-        i = j;
-    }
+    auto ms = buildMultisampleFromFiles(files, presetName.isNotEmpty() ? presetName : folder.getFileName());
+    if (ms == nullptr) return nullptr;
 
     {
         std::lock_guard<std::mutex> lock(cacheMutex());

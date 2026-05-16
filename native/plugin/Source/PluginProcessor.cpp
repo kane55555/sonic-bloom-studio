@@ -397,10 +397,24 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                 // Swap the active multisample instrument requested by the preset.
                 const auto& requestedSample = presetManager.getRequestedSampleSource();
                 const auto& requestedSampleList = presetManager.getRequestedSampleSources();
+                const auto& requestedFolder = presetManager.getRequestedSampleFolderPath();
                 const auto& requested = presetManager.getRequestedInstrument();
-                synthEngine.setFallbackSynthesisEnabled(requestedSample.isEmpty() && requestedSampleList.isEmpty());
+                synthEngine.setFallbackSynthesisEnabled(requestedSample.isEmpty()
+                    && requestedSampleList.isEmpty()
+                    && requestedFolder.isEmpty());
                 bool sampleLoaded = false;
-                if (requestedSampleList.size() > 1)
+                if (requestedFolder.isNotEmpty())
+                {
+                    sampleLoaded = synthEngine.loadMultisamplePreset(presetManager.getRequestedCategory(),
+                                                                     presetManager.getRequestedSampleDisplayName(),
+                                                                     requestedFolder);
+                    synthEngine.setSampleLooping(presetManager.getRequestedSampleLooping());
+                    if (! sampleLoaded)
+                        didaAudioLog("multisample folder load FAILED path=" + requestedFolder
+                            + " name=" + presetManager.getRequestedSampleDisplayName()
+                            + " -> falling back to explicit file list");
+                }
+                if (! sampleLoaded && requestedSampleList.size() > 1)
                 {
                     juce::Array<juce::File> files;
                     for (auto& p : requestedSampleList) files.add(juce::File(p));
@@ -431,6 +445,7 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                     }
                     else if (requested.isEmpty()
                              && requestedSampleList.isEmpty()
+                              && requestedFolder.isEmpty()
                              && synthEngine.getInstrumentName().isNotEmpty())
                     {
                         synthEngine.setInstrument({});

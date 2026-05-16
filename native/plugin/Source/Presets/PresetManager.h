@@ -27,6 +27,7 @@ struct PresetInfo
     // ..."_A5.wav"), this holds every file in the group so the engine can
     // build a true multisampled instrument stretched across the keyboard.
     juce::StringArray sampleSourcePaths;
+    juce::String sampleFolderPath;
 };
 
 namespace dida { namespace preset {
@@ -77,6 +78,7 @@ public:
     const juce::String& getRequestedInstrument() const noexcept { return requestedInstrument; }
     const juce::String& getRequestedSampleSource() const noexcept { return requestedSampleSource; }
     const juce::StringArray& getRequestedSampleSources() const noexcept { return requestedSampleSources; }
+    const juce::String& getRequestedSampleFolderPath() const noexcept { return requestedSampleFolderPath; }
     int getRequestedSampleRootMidi() const noexcept { return requestedSampleRootMidi; }
     const juce::String& getRequestedSampleDisplayName() const noexcept { return requestedSampleDisplayName; }
     bool isCurrentPresetSampleSourceDriven() const noexcept { return requestedSampleSource.isNotEmpty(); }
@@ -103,6 +105,7 @@ private:
     juce::String requestedInstrument;
     juce::String requestedSampleSource;
     juce::StringArray requestedSampleSources;
+    juce::String requestedSampleFolderPath;
     juce::String requestedSampleDisplayName;
     int requestedSampleRootMidi = 60;
     bool requestedSampleLooping = false;

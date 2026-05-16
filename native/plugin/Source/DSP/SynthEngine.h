@@ -50,6 +50,9 @@ public:
     // Multi-zone (true multisample) load from an explicit file list. The roots
     // are parsed from each filename's note suffix.
     bool setMultisampleSources(const juce::Array<juce::File>& files, const juce::String& displayName);
+    bool loadMultisamplePreset(const juce::String& category,
+                               const juce::String& presetName,
+                               const juce::String& folderPath);
     void setFallbackSynthesisEnabled(bool enabled);
     void setSampleLooping(bool shouldLoop);
     void setSampleCropLoop(float cropStart, float cropEnd,

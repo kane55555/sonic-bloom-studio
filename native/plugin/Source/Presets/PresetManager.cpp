@@ -99,7 +99,7 @@ static void scanCategoryFolder(const juce::File& categoryDir,
     if (! categoryDir.isDirectory()) return;
     const juce::String wildcards = "*.wav;*.aif;*.aiff;*.flac;*.mp3;*.ogg";
 
-    struct Group { juce::String name; juce::Array<juce::File> files; bool isFolder; };
+    struct Group { juce::String name; juce::Array<juce::File> files; bool isFolder; juce::String folderPath; };
     juce::Array<Group> groups;
     auto findGroup = [&](const juce::String& key) -> Group* {
         for (auto& g : groups) if (g.name.equalsIgnoreCase(key)) return &g;
@@ -123,7 +123,7 @@ static void scanCategoryFolder(const juce::File& categoryDir,
             if (! f.getFileNameWithoutExtension().endsWithIgnoreCase(".original"))
                 filtered.add(f);
         if (filtered.isEmpty()) continue;
-        groups.add({ sub.getFileName(), filtered, true });
+        groups.add({ sub.getFileName(), filtered, true, sub.getFullPathName() });
     }
 
     // 2) Loose files directly under category → single back-compat preset.
@@ -140,7 +140,7 @@ static void scanCategoryFolder(const juce::File& categoryDir,
         // Avoid colliding with a subfolder of the same name.
         juce::String autoName = categoryName;
         if (findGroup(autoName) != nullptr) autoName += " (loose)";
-        groups.add({ autoName, looseFiltered, true });
+        groups.add({ autoName, looseFiltered, false, {} });
     }
 
     const juce::String cat = categoryName;
@@ -200,6 +200,7 @@ static void scanCategoryFolder(const juce::File& categoryDir,
         info.sampleSourcePath = chosen.getFullPathName();
         info.sampleRootMidi = chosenRoot;
         info.sampleLooping = sustained;
+        info.sampleFolderPath = g.isFolder ? g.folderPath : juce::String();
         if (g.files.size() > 1)
         {
             for (auto& f : g.files)
@@ -405,6 +406,7 @@ void PresetManager::loadPreset(int index)
         requestedInstrument        = {};
         requestedSampleSource      = info.sampleSourcePath;
         requestedSampleSources     = info.sampleSourcePaths;
+        requestedSampleFolderPath  = info.sampleFolderPath;
         requestedSampleDisplayName = info.name;
         requestedSampleRootMidi    = info.sampleRootMidi;
         requestedSampleLooping     = info.sampleLooping;
@@ -464,6 +466,7 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
             requestedInstrument = {};
             requestedSampleSource = {};
             requestedSampleSources.clear();
+            requestedSampleFolderPath = {};
             requestedSampleDisplayName = {};
             requestedSampleRootMidi = 60;
             requestedSampleLooping = false;
@@ -498,6 +501,7 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
     requestedInstrument = {};
     requestedSampleSource = {};
     requestedSampleSources.clear();
+    requestedSampleFolderPath = {};
     requestedSampleDisplayName = {};
     requestedSampleRootMidi = 60;
     auto sampler = json.getProperty(key::sampler, juce::var());

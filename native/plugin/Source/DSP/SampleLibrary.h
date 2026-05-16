@@ -20,8 +20,8 @@
 //  fallback layer. When multiple velocity layers exist for the same note, the
 //  layer whose hiVel is the smallest value >= playedVel is selected.
 //
-//  Playback uses linear-interpolated pitch-shift and crossfades the two
-//  nearest root notes for smooth coverage across the keyboard.
+//  Playback uses hard key zones: C covers C-C#, D# covers D-E,
+//  F# covers F-G, and A covers G#-B for each octave.
 //==============================================================================
 #include <JuceHeader.h>
 #include <memory>
@@ -35,6 +35,8 @@ struct SampleZone
     juce::AudioBuffer<float> buffer;     // always stereo internally
     double sourceSampleRate = 44100.0;
     int rootMidi = 60;
+    int lowKey = 60;
+    int highKey = 60;
     int loVel = 0;
     int hiVel = 127;
     juce::String fileName;
@@ -46,10 +48,9 @@ public:
     std::vector<SampleZone> zones;
     juce::String instrumentName;
 
-    // Find the two nearest zones for crossfade. Returns:
-    //   *lower : zone with rootMidi <= midi (or nearest)
-    //   *upper : zone with rootMidi >  midi (or null if none above)
-    //   xfade  : 0..1, weight of the upper zone (0 = use only lower)
+    // Find the hard key-zone for this MIDI note. Returns the matching zone in
+    // *lower and leaves *upper null. If no lowKey/highKey range matches, the
+    // nearest root is returned as an explicit fallback.
     void pickZonesForNote(int midi, int velocity,
                           const SampleZone** lower,
                           const SampleZone** upper,
@@ -82,9 +83,15 @@ public:
     // parsed from each filename's trailing note token (e.g. "_C3", "_F#4").
     // Files without a parseable note token are skipped. Used by the preset
     // browser to play a user-dropped sub-folder ("Guitars/Guitar 1/") as a
-    // single multisampled instrument stretched across the keyboard.
+    // single multisampled instrument with one WAV per hard key zone.
     static std::shared_ptr<const Multisample> loadMultisampleFromFiles(const juce::Array<juce::File>& files,
                                                                        const juce::String& displayName);
+
+    // True folder-preset loader: one preset folder equals one instrument, and
+    // every parseable WAV inside the folder becomes one hard key zone.
+    static std::shared_ptr<const Multisample> loadMultisamplePreset(const juce::String& category,
+                                                                    const juce::String& presetName,
+                                                                    const juce::String& folderPath);
 
     // Force a rescan (clears the in-memory cache).
     static void invalidateCache();
