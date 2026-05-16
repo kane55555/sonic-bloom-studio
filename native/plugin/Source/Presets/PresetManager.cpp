@@ -88,45 +88,60 @@ static int parseRootMidiFromStem(const juce::String& stem)
     return (midi >= 0 && midi <= 127) ? midi : -1;
 }
 
-void PresetManager::loadDroppedSamples()
+// Scan one "category root" directory. Each immediate subfolder is treated as
+// a preset (multisample group of every WAV inside). Loose WAVs sitting
+// directly in the category folder are collapsed into a single backward-compat
+// preset named after the category itself.
+static void scanCategoryFolder(const juce::File& categoryDir,
+                               const juce::String& categoryName,
+                               std::vector<PresetInfo>& outPresets)
 {
-    auto root = getUserPresetDirectory();
-    if (! root.isDirectory()) return;
-
+    if (! categoryDir.isDirectory()) return;
     const juce::String wildcards = "*.wav;*.aif;*.aiff;*.flac;*.mp3;*.ogg";
 
-    for (auto& cat : dida::preset::dropCategories())
-    {
-        auto dir = root.getChildFile(cat);
-        if (! dir.isDirectory()) continue;
+    struct Group { juce::String name; juce::Array<juce::File> files; bool isFolder; };
+    juce::Array<Group> groups;
+    auto findGroup = [&](const juce::String& key) -> Group* {
+        for (auto& g : groups) if (g.name.equalsIgnoreCase(key)) return &g;
+        return nullptr;
+    };
 
-        auto files = dir.findChildFiles(juce::File::findFiles, true, wildcards);
-        std::sort(files.begin(), files.end(), [](const juce::File& a, const juce::File& b) {
+    // 1) Subfolders → one preset per subfolder (multisample).
+    auto subdirs = categoryDir.findChildFiles(juce::File::findDirectories, false);
+    std::sort(subdirs.begin(), subdirs.end(), [](const juce::File& a, const juce::File& b) {
+        return a.getFileName().compareNatural(b.getFileName()) < 0;
+    });
+    for (auto& sub : subdirs)
+    {
+        auto subFiles = sub.findChildFiles(juce::File::findFiles, true, wildcards);
+        if (subFiles.isEmpty()) continue;
+        std::sort(subFiles.begin(), subFiles.end(), [](const juce::File& a, const juce::File& b) {
             return a.getFileName().compareNatural(b.getFileName()) < 0;
         });
+        juce::Array<juce::File> filtered;
+        for (auto& f : subFiles)
+            if (! f.getFileNameWithoutExtension().endsWithIgnoreCase(".original"))
+                filtered.add(f);
+        if (filtered.isEmpty()) continue;
+        groups.add({ sub.getFileName(), filtered, true });
+    }
 
-        // Group by "preset identity": files placed directly in the category
-        // folder are one preset per file. Files inside a sub-folder are
-        // collapsed into a single multisample preset named after the sub-folder.
-        struct Group { juce::String name; juce::Array<juce::File> files; bool isFolder; };
-        juce::Array<Group> groups;
-        auto findGroup = [&](const juce::String& key) -> Group* {
-            for (auto& g : groups) if (g.name == key) return &g;
-            return nullptr;
-        };
-
-        for (auto& f : files)
-        {
-            const auto stem = f.getFileNameWithoutExtension();
-            if (stem.endsWithIgnoreCase(".original")) continue;
-
-            const auto parentName = f.getParentDirectory().getFileName();
-            const bool inSubfolder = ! parentName.equalsIgnoreCase(cat);
-            const juce::String key = inSubfolder ? parentName : stem;
-
-            if (auto* g = findGroup(key)) { g->files.add(f); }
-            else { groups.add({ key, { f }, inSubfolder }); }
-        }
+    // 2) Loose files directly under category → single back-compat preset.
+    auto looseFiles = categoryDir.findChildFiles(juce::File::findFiles, false, wildcards);
+    std::sort(looseFiles.begin(), looseFiles.end(), [](const juce::File& a, const juce::File& b) {
+        return a.getFileName().compareNatural(b.getFileName()) < 0;
+    });
+    juce::Array<juce::File> looseFiltered;
+    for (auto& f : looseFiles)
+        if (! f.getFileNameWithoutExtension().endsWithIgnoreCase(".original"))
+            looseFiltered.add(f);
+    if (! looseFiltered.isEmpty())
+    {
+        // Avoid colliding with a subfolder of the same name.
+        juce::String autoName = categoryName;
+        if (findGroup(autoName) != nullptr) autoName += " (loose)";
+        groups.add({ autoName, looseFiltered, true });
+    }
 
         const bool sustained = (cat == "Pads" || cat == "Strings"
                                 || cat == "Choirs" || cat == "Brass"
