@@ -248,6 +248,81 @@ namespace {
 
         return true;
     }
+
+    void assignStandardKeyZone(SampleZone& zone) noexcept
+    {
+        const int root = juce::jlimit(0, 127, zone.rootMidi);
+        switch (root % 12)
+        {
+            case 0:  zone.lowKey = root;     zone.highKey = root + 1; break; // C -> C/C#
+            case 3:  zone.lowKey = root - 1; zone.highKey = root + 1; break; // D# -> D/D#/E
+            case 6:  zone.lowKey = root - 1; zone.highKey = root + 1; break; // F# -> F/F#/G
+            case 9:  zone.lowKey = root - 1; zone.highKey = root + 2; break; // A -> G#/A/A#/B
+            default: zone.lowKey = root;     zone.highKey = root;     break;
+        }
+        zone.lowKey = juce::jlimit(0, 127, zone.lowKey);
+        zone.highKey = juce::jlimit(zone.lowKey, 127, zone.highKey);
+    }
+
+    std::shared_ptr<const Multisample> buildMultisampleFromFiles(const juce::Array<juce::File>& files,
+                                                                 const juce::String& displayName)
+    {
+        auto ms = std::make_shared<Multisample>();
+        ms->instrumentName = displayName.isNotEmpty() ? displayName : "Multisample";
+
+        for (auto& file : files)
+        {
+            int rootMidi = 60;
+            int hiVel = 127;
+            if (! parseSampleName(file.getFileNameWithoutExtension(), rootMidi, hiVel))
+            {
+                juce::Logger::writeToLog("[DIDITAGAIN multisample] skipped unparseable file: " + file.getFileName());
+                continue;
+            }
+
+            SampleZone zone;
+            if (readSampleZoneFromFile(file, rootMidi, hiVel, zone))
+            {
+                assignStandardKeyZone(zone);
+                ms->zones.push_back(std::move(zone));
+            }
+        }
+
+        if (ms->zones.empty()) return nullptr;
+
+        std::sort(ms->zones.begin(), ms->zones.end(),
+            [](const SampleZone& a, const SampleZone& b)
+            {
+                if (a.rootMidi != b.rootMidi) return a.rootMidi < b.rootMidi;
+                return a.hiVel < b.hiVel;
+            });
+
+        int i = 0;
+        while (i < (int) ms->zones.size())
+        {
+            int j = i;
+            while (j < (int) ms->zones.size() && ms->zones[j].rootMidi == ms->zones[i].rootMidi)
+                ++j;
+            int prevHi = -1;
+            for (int k = i; k < j; ++k)
+            {
+                ms->zones[k].loVel = prevHi + 1;
+                prevHi = ms->zones[k].hiVel;
+            }
+            ms->zones[j - 1].hiVel = 127;
+            i = j;
+        }
+
+        juce::StringArray zoneDebug;
+        for (const auto& z : ms->zones)
+            zoneDebug.add(z.fileName + " root=" + midiToNoteName(z.rootMidi)
+                + " zone=" + midiToNoteName(z.lowKey) + "-" + midiToNoteName(z.highKey));
+        juce::Logger::writeToLog("[DIDITAGAIN multisample] loaded " + ms->instrumentName
+            + " zones=" + juce::String((int) ms->zones.size())
+            + " :: " + zoneDebug.joinIntoString(", "));
+
+        return ms;
+    }
 }
 
 void SampleLibrary::invalidateCache()
