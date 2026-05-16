@@ -26,6 +26,11 @@ DiditagainProcessor::DiditagainProcessor()
 
 DiditagainProcessor::~DiditagainProcessor() {}
 
+static inline void didaAudioLog(const juce::String& message)
+{
+    DBG(juce::String("[DIDITAGAIN AUDIO] ") + message);
+}
+
 juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
