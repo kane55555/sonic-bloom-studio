@@ -88,94 +88,171 @@ static int parseRootMidiFromStem(const juce::String& stem)
     return (midi >= 0 && midi <= 127) ? midi : -1;
 }
 
-void PresetManager::loadDroppedSamples()
+// Scan one "category root" directory. Each immediate subfolder is treated as
+// a preset (multisample group of every WAV inside). Loose WAVs sitting
+// directly in the category folder are collapsed into a single backward-compat
+// preset named after the category itself.
+static void scanCategoryFolder(const juce::File& categoryDir,
+                               const juce::String& categoryName,
+                               std::vector<PresetInfo>& outPresets)
 {
-    auto root = getUserPresetDirectory();
-    if (! root.isDirectory()) return;
-
+    if (! categoryDir.isDirectory()) return;
     const juce::String wildcards = "*.wav;*.aif;*.aiff;*.flac;*.mp3;*.ogg";
 
-    for (auto& cat : dida::preset::dropCategories())
-    {
-        auto dir = root.getChildFile(cat);
-        if (! dir.isDirectory()) continue;
+    struct Group { juce::String name; juce::Array<juce::File> files; bool isFolder; };
+    juce::Array<Group> groups;
+    auto findGroup = [&](const juce::String& key) -> Group* {
+        for (auto& g : groups) if (g.name.equalsIgnoreCase(key)) return &g;
+        return nullptr;
+    };
 
-        auto files = dir.findChildFiles(juce::File::findFiles, true, wildcards);
-        std::sort(files.begin(), files.end(), [](const juce::File& a, const juce::File& b) {
+    // 1) Subfolders → one preset per subfolder (multisample).
+    auto subdirs = categoryDir.findChildFiles(juce::File::findDirectories, false);
+    std::sort(subdirs.begin(), subdirs.end(), [](const juce::File& a, const juce::File& b) {
+        return a.getFileName().compareNatural(b.getFileName()) < 0;
+    });
+    for (auto& sub : subdirs)
+    {
+        auto subFiles = sub.findChildFiles(juce::File::findFiles, true, wildcards);
+        if (subFiles.isEmpty()) continue;
+        std::sort(subFiles.begin(), subFiles.end(), [](const juce::File& a, const juce::File& b) {
             return a.getFileName().compareNatural(b.getFileName()) < 0;
         });
+        juce::Array<juce::File> filtered;
+        for (auto& f : subFiles)
+            if (! f.getFileNameWithoutExtension().endsWithIgnoreCase(".original"))
+                filtered.add(f);
+        if (filtered.isEmpty()) continue;
+        groups.add({ sub.getFileName(), filtered, true });
+    }
 
-        // Group by "preset identity": files placed directly in the category
-        // folder are one preset per file. Files inside a sub-folder are
-        // collapsed into a single multisample preset named after the sub-folder.
-        struct Group { juce::String name; juce::Array<juce::File> files; bool isFolder; };
-        juce::Array<Group> groups;
-        auto findGroup = [&](const juce::String& key) -> Group* {
-            for (auto& g : groups) if (g.name == key) return &g;
-            return nullptr;
-        };
+    // 2) Loose files directly under category → single back-compat preset.
+    auto looseFiles = categoryDir.findChildFiles(juce::File::findFiles, false, wildcards);
+    std::sort(looseFiles.begin(), looseFiles.end(), [](const juce::File& a, const juce::File& b) {
+        return a.getFileName().compareNatural(b.getFileName()) < 0;
+    });
+    juce::Array<juce::File> looseFiltered;
+    for (auto& f : looseFiles)
+        if (! f.getFileNameWithoutExtension().endsWithIgnoreCase(".original"))
+            looseFiltered.add(f);
+    if (! looseFiltered.isEmpty())
+    {
+        // Avoid colliding with a subfolder of the same name.
+        juce::String autoName = categoryName;
+        if (findGroup(autoName) != nullptr) autoName += " (loose)";
+        groups.add({ autoName, looseFiltered, true });
+    }
 
-        for (auto& f : files)
+    const juce::String cat = categoryName;
+    const bool sustained = (cat == "Pads" || cat == "Strings"
+                            || cat == "Choirs" || cat == "Brass"
+                            || cat == "Winds"  || cat == "Synths");
+
+    for (auto& g : groups)
+    {
+        // Pick a representative sample: prefer the one closest to middle C
+        // when notes are parseable; otherwise fall back to the first file.
+        juce::File chosen = g.files.getFirst();
+        int chosenRoot = 60;
+        int bestDist = 9999;
+        int parseable = 0;
+        for (auto& f : g.files)
         {
-            const auto stem = f.getFileNameWithoutExtension();
-            if (stem.endsWithIgnoreCase(".original")) continue;
-
-            const auto parentName = f.getParentDirectory().getFileName();
-            const bool inSubfolder = ! parentName.equalsIgnoreCase(cat);
-            const juce::String key = inSubfolder ? parentName : stem;
-
-            if (auto* g = findGroup(key)) { g->files.add(f); }
-            else { groups.add({ key, { f }, inSubfolder }); }
+            const int m = parseRootMidiFromStem(f.getFileNameWithoutExtension());
+            if (m >= 0)
+            {
+                ++parseable;
+                const int d = std::abs(m - 60);
+                if (d < bestDist) { bestDist = d; chosen = f; chosenRoot = m; }
+            }
         }
 
-        const bool sustained = (cat == "Pads" || cat == "Strings"
-                                || cat == "Choirs" || cat == "Brass"
-                                || cat == "Winds"  || cat == "Synths");
-
-        for (auto& g : groups)
+        if (g.files.isEmpty())
         {
-            // Pick a representative sample: prefer the one closest to middle C
-            // when notes are parseable; otherwise fall back to the first file.
-            juce::File chosen = g.files.getFirst();
-            int chosenRoot = 60;
-            int bestDist = 9999;
+            DBG("Preset folder has no WAV files: " << g.name);
+            continue;
+        }
+        if (parseable == 0 && g.files.size() > 1)
+            DBG("Preset folder has no parseable root notes: " << g.name);
+
+        // Duplicate root-note warning.
+        {
+            juce::SortedSet<int> seen;
             for (auto& f : g.files)
             {
                 const int m = parseRootMidiFromStem(f.getFileNameWithoutExtension());
-                if (m >= 0)
-                {
-                    const int d = std::abs(m - 60);
-                    if (d < bestDist) { bestDist = d; chosen = f; chosenRoot = m; }
-                }
+                if (m < 0) continue;
+                if (seen.contains(m))
+                    DBG("Duplicate root note " << m << " in preset " << g.name);
+                else
+                    seen.add(m);
             }
+        }
 
-            PresetInfo info;
-            info.name = g.name;
-            info.author = "User";
-            info.category = cat;
-            info.description = g.isFolder
-                ? (juce::String(g.files.size()) + " samples")
-                : chosen.getFileName();
-            info.filePath = chosen.getFullPathName();
-            info.isFactory = false;
-            info.isSampleDrop = true;
-            info.sampleSourcePath = chosen.getFullPathName();
-            info.sampleRootMidi = chosenRoot;
-            info.sampleLooping = sustained;
-            if (g.isFolder && g.files.size() > 1)
-            {
-                for (auto& f : g.files)
-                {
-                    // Only include files that have a parseable root note so
-                    // the multisample loader can map them to a key.
-                    if (parseRootMidiFromStem(f.getFileNameWithoutExtension()) >= 0)
-                        info.sampleSourcePaths.add(f.getFullPathName());
-                }
-                // If nothing parsed, leave empty so we fall back to single-sample mode.
-                if (info.sampleSourcePaths.size() < 2)
-                    info.sampleSourcePaths.clear();
-            }
-            presets.push_back(info);
+        PresetInfo info;
+        info.name = g.name;
+        info.author = "User";
+        info.category = cat;
+        info.description = juce::String(g.files.size()) + " samples";
+        info.filePath = chosen.getFullPathName();
+        info.isFactory = false;
+        info.isSampleDrop = true;
+        info.sampleSourcePath = chosen.getFullPathName();
+        info.sampleRootMidi = chosenRoot;
+        info.sampleLooping = sustained;
+        if (g.files.size() > 1)
+        {
+            for (auto& f : g.files)
+                if (parseRootMidiFromStem(f.getFileNameWithoutExtension()) >= 0)
+                    info.sampleSourcePaths.add(f.getFullPathName());
+            if (info.sampleSourcePaths.size() < 2)
+                info.sampleSourcePaths.clear();
+        }
+
+        // De-dupe: skip if another preset with the same category+name+path exists.
+        bool dup = false;
+        for (auto& existing : outPresets)
+        {
+            if (existing.category == info.category
+                && existing.name.equalsIgnoreCase(info.name)
+                && existing.filePath == info.filePath)
+            { dup = true; break; }
+        }
+        if (! dup) outPresets.push_back(info);
+    }
+}
+
+void PresetManager::loadDroppedSamples()
+{
+    // New layout: <Samples>/<Category>/<PresetName>/*.wav
+    // Any immediate subfolder of the Samples root (other than "Presets") is
+    // treated as a category. This matches what the user sees in the OS file
+    // browser and avoids exposing individual WAV files as presets.
+    auto samplesRoot = dida::SampleLibrary::getSamplesRoot();
+    if (samplesRoot.isDirectory())
+    {
+        auto catDirs = samplesRoot.findChildFiles(juce::File::findDirectories, false);
+        std::sort(catDirs.begin(), catDirs.end(), [](const juce::File& a, const juce::File& b) {
+            return a.getFileName().compareNatural(b.getFileName()) < 0;
+        });
+        for (auto& d : catDirs)
+        {
+            const auto name = d.getFileName();
+            if (name.equalsIgnoreCase("Presets")) continue; // reserved for .didasynthpreset trees
+            scanCategoryFolder(d, name, presets);
+        }
+    }
+
+    // Backwards compat: also scan the legacy drop tree at
+    // <Samples>/Presets/User/<Category>/.
+    auto legacyRoot = getUserPresetDirectory();
+    if (legacyRoot.isDirectory())
+    {
+        for (auto& cat : dida::preset::dropCategories())
+        {
+            auto dir = legacyRoot.getChildFile(cat);
+            if (dir.isDirectory())
+                scanCategoryFolder(dir, cat, presets);
         }
     }
 }
