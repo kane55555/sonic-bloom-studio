@@ -399,15 +399,22 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                 const auto& requestedSampleList = presetManager.getRequestedSampleSources();
                 const auto& requested = presetManager.getRequestedInstrument();
                 synthEngine.setFallbackSynthesisEnabled(requestedSample.isEmpty() && requestedSampleList.isEmpty());
+                bool sampleLoaded = false;
                 if (requestedSampleList.size() > 1)
                 {
                     juce::Array<juce::File> files;
                     for (auto& p : requestedSampleList) files.add(juce::File(p));
-                    synthEngine.setMultisampleSources(files,
+                    sampleLoaded = synthEngine.setMultisampleSources(files,
                                                      presetManager.getRequestedSampleDisplayName());
                     synthEngine.setSampleLooping(presetManager.getRequestedSampleLooping());
+                    if (! sampleLoaded)
+                        didaAudioLog(juce::String("multisample load FAILED files=") + juce::String(files.size())
+                            + " name=" + presetManager.getRequestedSampleDisplayName()
+                            + " -> falling back to single-sample path");
                 }
-                else if (requestedSample.isNotEmpty())
+                // Single-sample fallback: also fires if the multisample path
+                // returned no zones (e.g. files had no parseable note suffix).
+                if (! sampleLoaded && requestedSample.isNotEmpty())
                 {
                     synthEngine.setSampleSource(requestedSample,
                                                 presetManager.getRequestedSampleRootMidi(),
