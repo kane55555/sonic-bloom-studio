@@ -399,33 +399,43 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                 const auto& requestedSampleList = presetManager.getRequestedSampleSources();
                 const auto& requested = presetManager.getRequestedInstrument();
                 synthEngine.setFallbackSynthesisEnabled(requestedSample.isEmpty() && requestedSampleList.isEmpty());
+                bool sampleLoaded = false;
                 if (requestedSampleList.size() > 1)
                 {
                     juce::Array<juce::File> files;
                     for (auto& p : requestedSampleList) files.add(juce::File(p));
-                    synthEngine.setMultisampleSources(files,
+                    sampleLoaded = synthEngine.setMultisampleSources(files,
                                                      presetManager.getRequestedSampleDisplayName());
                     synthEngine.setSampleLooping(presetManager.getRequestedSampleLooping());
+                    if (! sampleLoaded)
+                        didaAudioLog(juce::String("multisample load FAILED files=") + juce::String(files.size())
+                            + " name=" + presetManager.getRequestedSampleDisplayName()
+                            + " -> falling back to single-sample path");
                 }
-                else if (requestedSample.isNotEmpty())
+                if (! sampleLoaded)
                 {
-                    synthEngine.setSampleSource(requestedSample,
-                                                presetManager.getRequestedSampleRootMidi(),
-                                                presetManager.getRequestedSampleDisplayName());
-                    // Looping decision now comes from the V2 preset (category +
-                    // oneShotMode + per-layer loop flag). Bells/808s/plucks no
-                    // longer get force-looped into a sustained drone.
-                    synthEngine.setSampleLooping(presetManager.getRequestedSampleLooping());
-                }
-                else if (requested.isNotEmpty() && requested != synthEngine.getInstrumentName())
-                {
-                    synthEngine.setInstrument(requested);
-                    synthEngine.setSampleLooping(false);
-                }
-                else if (requested.isEmpty() && synthEngine.getInstrumentName().isNotEmpty())
-                {
-                    synthEngine.setInstrument({});
-                    synthEngine.setSampleLooping(false);
+                    // Single-sample fallback (also covers the case where the
+                    // multisample path returned no zones, e.g. files had no
+                    // parseable note suffix).
+                    if (requestedSample.isNotEmpty())
+                    {
+                        synthEngine.setSampleSource(requestedSample,
+                                                    presetManager.getRequestedSampleRootMidi(),
+                                                    presetManager.getRequestedSampleDisplayName());
+                        synthEngine.setSampleLooping(presetManager.getRequestedSampleLooping());
+                    }
+                    else if (requested.isNotEmpty() && requested != synthEngine.getInstrumentName())
+                    {
+                        synthEngine.setInstrument(requested);
+                        synthEngine.setSampleLooping(false);
+                    }
+                    else if (requested.isEmpty()
+                             && requestedSampleList.isEmpty()
+                             && synthEngine.getInstrumentName().isNotEmpty())
+                    {
+                        synthEngine.setInstrument({});
+                        synthEngine.setSampleLooping(false);
+                    }
                 }
 
                 didaPresetLog(juce::String("applied serial=") + juce::String(deferredPresetChange.presetSerial)
