@@ -1,0 +1,18 @@
+# Supabase function configuration.
+# JWT verification is enabled by default (functions validate via getClaims()).
+# The Stripe webhook needs verify_jwt = false once it's deployed.
+
+[functions.license-activate]
+verify_jwt = true
+
+[functions.license-verify]
+verify_jwt = true
+
+[functions.license-deactivate]
+verify_jwt = true
+
+[functions.entitlements]
+verify_jwt = true
+
+[functions.stripe-webhook]
+verify_jwt = false
