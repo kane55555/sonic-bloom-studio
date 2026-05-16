@@ -20,10 +20,13 @@ struct PresetInfo
     // category subfolders under Samples/Presets/User/<Category>/. When loaded, the
     // engine swaps to this sample directly — no .didasynthpreset required.
     bool isSampleDrop = false;
-    juce::String sampleSourcePath; // absolute path to the audio file
+    juce::String sampleSourcePath; // absolute path to the audio file (representative)
     int  sampleRootMidi = 60;
     bool sampleLooping = false;
-};
+    // When the drop is a folder of per-note samples ("Guitars/Guitar 1/_C3.wav"
+    // ..."_A5.wav"), this holds every file in the group so the engine can
+    // build a true multisampled instrument stretched across the keyboard.
+    juce::StringArray sampleSourcePaths;
 
 namespace dida { namespace preset {
     // Broad instrument categories. Each becomes a folder under
