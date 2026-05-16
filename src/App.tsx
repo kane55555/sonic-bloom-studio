@@ -18,6 +18,7 @@ import FactorySamplesPage from "./pages/FactorySamplesPage";
 import PackBrowserPage from "./pages/PackBrowserPage";
 import PackVersionsPage from "./pages/PackVersionsPage";
 import EntitlementsPage from "./pages/EntitlementsPage";
+import MultisampleUploadPage from "./pages/MultisampleUploadPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="/pack-versions" element={<PackVersionsPage />} />
             <Route path="/entitlements" element={<EntitlementsPage />} />
             <Route path="/samples" element={<SampleLibraryPage />} />
+            <Route path="/multisample-upload" element={<MultisampleUploadPage />} />
             <Route path="/factory-samples" element={<FactorySamplesPage />} />
             <Route path="/activations" element={<ActivationsPage />} />
             <Route path="/security" element={<SecurityPage />} />
