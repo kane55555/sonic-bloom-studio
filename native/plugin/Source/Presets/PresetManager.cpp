@@ -420,6 +420,7 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
     // Sampler instrument (legacy)
     requestedInstrument = {};
     requestedSampleSource = {};
+    requestedSampleSources.clear();
     requestedSampleDisplayName = {};
     requestedSampleRootMidi = 60;
     auto sampler = json.getProperty(key::sampler, juce::var());
