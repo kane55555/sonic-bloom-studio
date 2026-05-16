@@ -1,6 +1,7 @@
 #include "SampleLibrary.h"
 #include <algorithm>
 #include <cstring>
+#include <limits>
 #include <mutex>
 
 namespace dida {
@@ -40,6 +41,13 @@ static int noteNameToMidi(const juce::String& noteToken)
     const int midi = (octave + 1) * 12 + semis;
     if (midi < 0 || midi > 127) return -1;
     return midi;
+}
+
+static juce::String midiToNoteName(int midi)
+{
+    static const char* names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+    midi = juce::jlimit(0, 127, midi);
+    return juce::String(names[midi % 12]) + juce::String((midi / 12) - 1);
 }
 
 // Parse "Brass_C3" or "Brass_F#3_v90" out of a filename stem.
