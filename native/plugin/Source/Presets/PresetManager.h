@@ -27,6 +27,7 @@ struct PresetInfo
     // ..."_A5.wav"), this holds every file in the group so the engine can
     // build a true multisampled instrument stretched across the keyboard.
     juce::StringArray sampleSourcePaths;
+};
 
 namespace dida { namespace preset {
     // Broad instrument categories. Each becomes a folder under
