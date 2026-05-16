@@ -235,7 +235,36 @@ bool SynthEngine::setSampleSource(const juce::String& sourcePath, int rootMidi, 
     return ms != nullptr || sourcePath.isEmpty();
 }
 
-void SynthEngine::setFallbackSynthesisEnabled(bool enabled)
+bool SynthEngine::setMultisampleSources(const juce::Array<juce::File>& files,
+                                        const juce::String& displayName)
+{
+    // Build a unique cache name so repeated calls with the same file set are
+    // no-ops at the engine level (SampleLibrary also caches by content).
+    juce::StringArray paths;
+    for (auto& f : files) paths.add(f.getFullPathName());
+    paths.sort(true);
+    const auto sourceName = juce::String("multi:") + displayName + "|" + paths.joinIntoString("|");
+    if (sourceName == currentInstrumentName && activeMultisample != nullptr)
+        return true;
+
+    auto ms = files.isEmpty()
+        ? std::shared_ptr<const dida::Multisample>{}
+        : dida::SampleLibrary::loadMultisampleFromFiles(files, displayName);
+
+    if (! files.isEmpty() && ms == nullptr)
+        juce::Logger::writeToLog("[DIDITAGAIN sample] failed to load multisample group: " + displayName
+            + " files=" + juce::String(files.size()));
+
+    activeMultisample = ms;
+    currentInstrumentName = sourceName;
+
+    forEachSynthVoice([&](SynthVoice& v)
+    {
+        v.setMultisample(activeMultisample);
+    });
+
+    return ms != nullptr || files.isEmpty();
+}
 {
     fallbackSynthesisEnabled = enabled;
     forEachSynthVoice([enabled](SynthVoice& v)
