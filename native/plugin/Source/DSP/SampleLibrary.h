@@ -20,8 +20,8 @@
 //  fallback layer. When multiple velocity layers exist for the same note, the
 //  layer whose hiVel is the smallest value >= playedVel is selected.
 //
-//  Playback uses linear-interpolated pitch-shift and crossfades the two
-//  nearest root notes for smooth coverage across the keyboard.
+//  Playback uses hard key zones: C covers C-C#, D# covers D-E,
+//  F# covers F-G, and A covers G#-B for each octave.
 //==============================================================================
 #include <JuceHeader.h>
 #include <memory>
@@ -83,7 +83,7 @@ public:
     // parsed from each filename's trailing note token (e.g. "_C3", "_F#4").
     // Files without a parseable note token are skipped. Used by the preset
     // browser to play a user-dropped sub-folder ("Guitars/Guitar 1/") as a
-    // single multisampled instrument stretched across the keyboard.
+    // single multisampled instrument with one WAV per hard key zone.
     static std::shared_ptr<const Multisample> loadMultisampleFromFiles(const juce::Array<juce::File>& files,
                                                                        const juce::String& displayName);
 
