@@ -46,6 +46,18 @@ void SynthVoice::reset() noexcept
 
 static double midiToHzD(double m) { return 440.0 * std::pow(2.0, (m - 69.0) / 12.0); }
 
+static juce::String midiToNoteName(int midi)
+{
+    static const char* names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+    midi = juce::jlimit(0, 127, midi);
+    return juce::String(names[midi % 12]) + juce::String((midi / 12) - 1);
+}
+
+static juce::String signedSemitoneOffset(int semis)
+{
+    return semis > 0 ? (juce::String("+") + juce::String(semis)) : juce::String(semis);
+}
+
 void SynthVoice::startNote(int midiNoteNumber, float vel,
                            juce::SynthesiserSound*, int)
 {
@@ -65,6 +77,25 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
         const int playedMidi = juce::jlimit(0, 127, midiNoteNumber + pitchOffsetSemis);
         const int playedVel  = juce::jlimit(1, 127, static_cast<int>(vel * 127.0f + 0.5f));
         multisample->pickZonesForNote(playedMidi, playedVel, &loZone, &hiZone, zoneXfade);
+
+        if (loZone != nullptr)
+        {
+            const bool fallbackNearest = playedMidi < loZone->lowKey || playedMidi > loZone->highKey;
+            juce::String message;
+            message << "NoteOn " << midiToNoteName(midiNoteNumber)
+                    << " -> selected " << loZone->fileName
+                    << " root=" << midiToNoteName(loZone->rootMidi)
+                    << " zone=" << midiToNoteName(loZone->lowKey) << "-" << midiToNoteName(loZone->highKey)
+                    << " offset=" << signedSemitoneOffset(playedMidi - loZone->rootMidi);
+            if (fallbackNearest)
+                message << " WARNING no matching hard zone; nearest root fallback";
+            juce::Logger::writeToLog("[DIDITAGAIN multisample] " + message);
+        }
+        else
+        {
+            juce::Logger::writeToLog("[DIDITAGAIN multisample] NoteOn " + midiToNoteName(midiNoteNumber)
+                + " WARNING no zone selected");
+        }
     }
 
     // Start at cropStart (in samples) so the user-trimmed region plays first.
