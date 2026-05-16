@@ -35,6 +35,8 @@ struct SampleZone
     juce::AudioBuffer<float> buffer;     // always stereo internally
     double sourceSampleRate = 44100.0;
     int rootMidi = 60;
+    int lowKey = 60;
+    int highKey = 60;
     int loVel = 0;
     int hiVel = 127;
     juce::String fileName;
@@ -46,10 +48,9 @@ public:
     std::vector<SampleZone> zones;
     juce::String instrumentName;
 
-    // Find the two nearest zones for crossfade. Returns:
-    //   *lower : zone with rootMidi <= midi (or nearest)
-    //   *upper : zone with rootMidi >  midi (or null if none above)
-    //   xfade  : 0..1, weight of the upper zone (0 = use only lower)
+    // Find the hard key-zone for this MIDI note. Returns the matching zone in
+    // *lower and leaves *upper null. If no lowKey/highKey range matches, the
+    // nearest root is returned as an explicit fallback.
     void pickZonesForNote(int midi, int velocity,
                           const SampleZone** lower,
                           const SampleZone** upper,
@@ -85,6 +86,12 @@ public:
     // single multisampled instrument stretched across the keyboard.
     static std::shared_ptr<const Multisample> loadMultisampleFromFiles(const juce::Array<juce::File>& files,
                                                                        const juce::String& displayName);
+
+    // True folder-preset loader: one preset folder equals one instrument, and
+    // every parseable WAV inside the folder becomes one hard key zone.
+    static std::shared_ptr<const Multisample> loadMultisamplePreset(const juce::String& category,
+                                                                    const juce::String& presetName,
+                                                                    const juce::String& folderPath);
 
     // Force a rescan (clears the in-memory cache).
     static void invalidateCache();
