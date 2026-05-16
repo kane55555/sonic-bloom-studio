@@ -58,6 +58,13 @@ static juce::String signedSemitoneOffset(int semis)
     return semis > 0 ? (juce::String("+") + juce::String(semis)) : juce::String(semis);
 }
 
+static void multisampleDebugLog(const juce::String& message)
+{
+    const auto line = "[DIDITAGAIN multisample] " + message;
+    DBG(line);
+    juce::Logger::writeToLog(line);
+}
+
 void SynthVoice::startNote(int midiNoteNumber, float vel,
                            juce::SynthesiserSound*, int)
 {
@@ -89,12 +96,11 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
                     << " offset=" << signedSemitoneOffset(playedMidi - loZone->rootMidi);
             if (fallbackNearest)
                 message << " WARNING no matching hard zone; nearest root fallback";
-            juce::Logger::writeToLog("[DIDITAGAIN multisample] " + message);
+            multisampleDebugLog(message);
         }
         else
         {
-            juce::Logger::writeToLog("[DIDITAGAIN multisample] NoteOn " + midiToNoteName(midiNoteNumber)
-                + " WARNING no zone selected");
+            multisampleDebugLog("NoteOn " + midiToNoteName(midiNoteNumber) + " WARNING no zone selected");
         }
     }
 
