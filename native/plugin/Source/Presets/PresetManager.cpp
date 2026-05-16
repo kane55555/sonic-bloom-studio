@@ -48,6 +48,46 @@ void PresetManager::scanPresetDirectory()
     loadDroppedSamples();
 }
 
+// Parse a trailing note token like "C3", "F#4", "Gb2", "Fs4" from a filename
+// stem. Returns -1 if no recognisable note suffix is found.
+static int parseRootMidiFromStem(const juce::String& stem)
+{
+    // Find last underscore/space/dash separator; the token after it is the note.
+    int sep = -1;
+    for (int i = stem.length() - 1; i >= 0; --i)
+    {
+        const auto c = stem[i];
+        if (c == '_' || c == ' ' || c == '-') { sep = i; break; }
+    }
+    const juce::String tok = (sep >= 0 ? stem.substring(sep + 1) : stem).toUpperCase();
+    if (tok.isEmpty()) return -1;
+
+    const juce::juce_wchar letter = tok[0];
+    if (letter < 'A' || letter > 'G') return -1;
+    static const int semitone[7] = { 9, 11, 0, 2, 4, 5, 7 }; // A..G
+    int pc = semitone[letter - 'A'];
+
+    int idx = 1;
+    if (idx < tok.length())
+    {
+        const auto c = tok[idx];
+        if (c == '#' || c == 'S') { pc += 1; ++idx; }
+        else if (c == 'B' || c == 'F') {
+            // "B"/"FLAT" accidental — but be careful not to swallow octave digits.
+            if (c == 'B' && idx + 1 < tok.length() && juce::CharacterFunctions::isDigit(tok[idx + 1])) {
+                pc -= 1; ++idx;
+            } else if (tok.substring(idx).startsWithIgnoreCase("FLAT")) {
+                pc -= 1; idx += 4;
+            }
+        }
+    }
+    const auto octStr = tok.substring(idx);
+    if (octStr.isEmpty() || ! juce::CharacterFunctions::isDigit(octStr[0])) return -1;
+    const int octave = octStr.getIntValue();
+    const int midi = (octave + 1) * 12 + ((pc + 12) % 12);
+    return (midi >= 0 && midi <= 127) ? midi : -1;
+}
+
 void PresetManager::loadDroppedSamples()
 {
     auto root = getUserPresetDirectory();
@@ -61,37 +101,67 @@ void PresetManager::loadDroppedSamples()
         if (! dir.isDirectory()) continue;
 
         auto files = dir.findChildFiles(juce::File::findFiles, true, wildcards);
-        // Stable, natural sort so renamed/added files keep predictable numbering.
         std::sort(files.begin(), files.end(), [](const juce::File& a, const juce::File& b) {
             return a.getFileName().compareNatural(b.getFileName()) < 0;
         });
 
+        // Group by "preset identity": files placed directly in the category
+        // folder are one preset per file. Files inside a sub-folder are
+        // collapsed into a single multisample preset named after the sub-folder.
+        struct Group { juce::String name; juce::Array<juce::File> files; bool isFolder; };
+        juce::Array<Group> groups;
+        auto findGroup = [&](const juce::String& key) -> Group* {
+            for (auto& g : groups) if (g.name == key) return &g;
+            return nullptr;
+        };
+
         for (auto& f : files)
         {
-            // Skip backup/version artefacts created by the crop panel.
             const auto stem = f.getFileNameWithoutExtension();
             if (stem.endsWithIgnoreCase(".original")) continue;
 
-            PresetInfo info;
-            // Use the actual filename as the preset name when the file is dropped
-            // directly into a category folder. For files inside a per-preset
-            // sub-folder, use the sub-folder name instead.
             const auto parentName = f.getParentDirectory().getFileName();
-            info.name = parentName.equalsIgnoreCase(cat)
-                ? f.getFileNameWithoutExtension()
-                : parentName;
+            const bool inSubfolder = ! parentName.equalsIgnoreCase(cat);
+            const juce::String key = inSubfolder ? parentName : stem;
+
+            if (auto* g = findGroup(key)) { g->files.add(f); }
+            else { groups.add({ key, { f }, inSubfolder }); }
+        }
+
+        const bool sustained = (cat == "Pads" || cat == "Strings"
+                                || cat == "Choirs" || cat == "Brass"
+                                || cat == "Winds"  || cat == "Synths");
+
+        for (auto& g : groups)
+        {
+            // Pick a representative sample: prefer the one closest to middle C
+            // when notes are parseable; otherwise fall back to the first file.
+            juce::File chosen = g.files.getFirst();
+            int chosenRoot = 60;
+            int bestDist = 9999;
+            for (auto& f : g.files)
+            {
+                const int m = parseRootMidiFromStem(f.getFileNameWithoutExtension());
+                if (m >= 0)
+                {
+                    const int d = std::abs(m - 60);
+                    if (d < bestDist) { bestDist = d; chosen = f; chosenRoot = m; }
+                }
+            }
+
+            PresetInfo info;
+            info.name = g.name;
             info.author = "User";
             info.category = cat;
-            info.description = f.getFileName();
-            info.filePath = f.getFullPathName();        // doubles as identity
+            info.description = g.isFolder
+                ? (juce::String(g.files.size()) + " samples")
+                : chosen.getFileName();
+            info.filePath = chosen.getFullPathName();
             info.isFactory = false;
             info.isSampleDrop = true;
-            info.sampleSourcePath = f.getFullPathName();
-            info.sampleRootMidi = 60;
-            // Looping makes sense for sustained categories; not for transients.
-            info.sampleLooping = (cat == "Pads" || cat == "Strings"
-                                  || cat == "Choirs" || cat == "Brass"
-                                  || cat == "Winds"  || cat == "Synths");
+            info.sampleSourcePath = chosen.getFullPathName();
+            info.sampleRootMidi = chosenRoot;
+            info.sampleLooping = sustained;
             presets.push_back(info);
         }
     }
