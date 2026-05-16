@@ -83,52 +83,52 @@ void Multisample::pickZonesForNote(int midi, int velocity,
     xfade = 0.0f;
     if (zones.empty()) return;
 
-    // First filter by velocity layer: pick the smallest hiVel >= velocity, else max.
     auto velMatches = [velocity](const SampleZone& z)
     {
         return velocity >= z.loVel && velocity <= z.hiVel;
     };
 
-    auto pickBest = [&](int rootTarget, bool wantBelowOrEqual) -> const SampleZone*
+    for (auto& z : zones)
     {
-        const SampleZone* best = nullptr;
-        int bestDist = std::numeric_limits<int>::max();
-        for (auto& z : zones)
+        if (velMatches(z) && midi >= z.lowKey && midi <= z.highKey)
         {
-            if (! velMatches(z)) continue;
-            const int d = wantBelowOrEqual ? (rootTarget - z.rootMidi)
-                                           : (z.rootMidi - rootTarget);
-            if (d < 0) continue; // wrong side
-            if (d < bestDist) { bestDist = d; best = &z; }
+            *lower = &z;
+            return;
         }
-        return best;
-    };
+    }
 
-    const SampleZone* lo = pickBest(midi, true);
-    const SampleZone* hi = pickBest(midi + 1, false);
-
-    // Velocity fallback: if no exact velocity match, ignore velocity and use any zone.
-    if (lo == nullptr && hi == nullptr)
+    // Velocity fallback: keep the hard key zone, but ignore velocity layers.
+    for (auto& z : zones)
     {
-        const SampleZone* nearest = nullptr;
-        int bestDist = std::numeric_limits<int>::max();
+        if (midi >= z.lowKey && midi <= z.highKey)
+        {
+            *lower = &z;
+            return;
+        }
+    }
+
+    const SampleZone* nearest = nullptr;
+    int bestDist = std::numeric_limits<int>::max();
+    for (auto& z : zones)
+    {
+        if (! velMatches(z)) continue;
+        const int d = std::abs(midi - z.rootMidi);
+        if (d < bestDist)
+        {
+            bestDist = d;
+            nearest = &z;
+        }
+    }
+
+    if (nearest == nullptr)
+    {
         for (auto& z : zones)
         {
             const int d = std::abs(midi - z.rootMidi);
             if (d < bestDist) { bestDist = d; nearest = &z; }
         }
-        *lower = nearest;
-        return;
     }
-
-    if (lo == nullptr) { *lower = hi; return; }
-    if (hi == nullptr) { *lower = lo; return; }
-
-    *lower = lo;
-    *upper = hi;
-    const int span = hi->rootMidi - lo->rootMidi;
-    xfade = span > 0 ? juce::jlimit(0.0f, 1.0f,
-        static_cast<float>(midi - lo->rootMidi) / static_cast<float>(span)) : 0.0f;
+    *lower = nearest;
 }
 
 //==============================================================================
