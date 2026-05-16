@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Users, CreditCard, Music, Shield, Monitor, Bell, LayoutDashboard, Settings, Scissors, FileAudio, Package, GitBranch, Gift } from "lucide-react";
+import { Users, CreditCard, Music, Shield, Monitor, Bell, LayoutDashboard, Settings, Scissors, FileAudio, Package, GitBranch, Gift, Layers } from "lucide-react";
 import logo from "@/assets/diditagain-logo.png";
 
 const navItems = [
@@ -12,6 +12,7 @@ const navItems = [
   { to: "/entitlements", icon: Gift, label: "Entitlements" },
   { to: "/factory-samples", icon: FileAudio, label: "Factory One-Shots" },
   { to: "/samples", icon: Scissors, label: "User Samples" },
+  { to: "/multisample-upload", icon: Layers, label: "Multisample Upload" },
   { to: "/activations", icon: Monitor, label: "Activations" },
   { to: "/security", icon: Shield, label: "Security" },
   { to: "/announcements", icon: Bell, label: "Announcements" },
