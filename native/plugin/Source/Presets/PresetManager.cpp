@@ -140,7 +140,7 @@ static void scanCategoryFolder(const juce::File& categoryDir,
         // Avoid colliding with a subfolder of the same name.
         juce::String autoName = categoryName;
         if (findGroup(autoName) != nullptr) autoName += " (loose)";
-        groups.add({ autoName, looseFiltered, true });
+        groups.add({ autoName, looseFiltered, false });
     }
 
     const juce::String cat = categoryName;
@@ -201,7 +201,7 @@ static void scanCategoryFolder(const juce::File& categoryDir,
         info.sampleRootMidi = chosenRoot;
         info.sampleLooping = sustained;
         info.sampleFolderPath = g.isFolder ? juce::File(info.filePath).getParentDirectory().getFullPathName()
-                                           : categoryDir.getFullPathName();
+                                           : juce::String();
         if (g.files.size() > 1)
         {
             for (auto& f : g.files)
