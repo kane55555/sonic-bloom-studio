@@ -265,6 +265,8 @@ bool SynthEngine::setMultisampleSources(const juce::Array<juce::File>& files,
 
     return ms != nullptr || files.isEmpty();
 }
+
+void SynthEngine::setFallbackSynthesisEnabled(bool enabled)
 {
     fallbackSynthesisEnabled = enabled;
     forEachSynthVoice([enabled](SynthVoice& v)
