@@ -350,4 +350,69 @@ std::shared_ptr<const Multisample> SampleLibrary::loadSampleSource(const juce::S
     return ms;
 }
 
+std::shared_ptr<const Multisample> SampleLibrary::loadMultisampleFromFiles(const juce::Array<juce::File>& files,
+                                                                           const juce::String& displayName)
+{
+    if (files.isEmpty()) return nullptr;
+
+    // Cache key: sorted absolute paths joined. Cheap dedupe across reloads.
+    juce::StringArray paths;
+    for (auto& f : files) paths.add(f.getFullPathName());
+    paths.sort(true);
+    const auto cacheKey = (juce::String("multi:") + displayName + "|" + paths.joinIntoString("|")).toStdString();
+
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex());
+        auto it = cache().find(cacheKey);
+        if (it != cache().end()) return it->second;
+    }
+
+    auto ms = std::make_shared<Multisample>();
+    ms->instrumentName = displayName.isNotEmpty() ? displayName : "Multisample";
+
+    for (auto& file : files)
+    {
+        int rootMidi = 60;
+        int hiVel = 127;
+        if (! parseSampleName(file.getFileNameWithoutExtension(), rootMidi, hiVel))
+            continue; // need a note token to know where this file lives
+
+        SampleZone zone;
+        if (readSampleZoneFromFile(file, rootMidi, hiVel, zone))
+            ms->zones.push_back(std::move(zone));
+    }
+
+    if (ms->zones.empty()) return nullptr;
+
+    std::sort(ms->zones.begin(), ms->zones.end(),
+        [](const SampleZone& a, const SampleZone& b)
+        {
+            if (a.rootMidi != b.rootMidi) return a.rootMidi < b.rootMidi;
+            return a.hiVel < b.hiVel;
+        });
+
+    // Build velocity lo bounds within each root group.
+    int i = 0;
+    while (i < (int) ms->zones.size())
+    {
+        int j = i;
+        while (j < (int) ms->zones.size() && ms->zones[j].rootMidi == ms->zones[i].rootMidi)
+            ++j;
+        int prevHi = -1;
+        for (int k = i; k < j; ++k)
+        {
+            ms->zones[k].loVel = prevHi + 1;
+            prevHi = ms->zones[k].hiVel;
+        }
+        ms->zones[j - 1].hiVel = 127;
+        i = j;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex());
+        cache()[cacheKey] = ms;
+    }
+    return ms;
+}
+
 } // namespace dida
