@@ -252,9 +252,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createP
 void DiditagainProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     synthEngine.prepare(sampleRate, samplesPerBlock);
+    // Ensure MIDI produces sound on a fresh instance before any preset/sample
+    // has been loaded — this is the "test tone" fallback path.
+    synthEngine.setFallbackSynthesisEnabled(true);
+    didaAudioLog(juce::String("prepareToPlay sampleRate=") + juce::String(sampleRate)
+        + " blockSize=" + juce::String(samplesPerBlock)
+        + " voices=" + juce::String(synthEngine.getNumVoices()));
 }
 
-void DiditagainProcessor::releaseResources() {}
+void DiditagainProcessor::releaseResources()
+{
+    synthEngine.allNotesOff(0, false);
+}
 
 bool DiditagainProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
