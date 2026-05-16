@@ -15,6 +15,9 @@ import AnnouncementsPage from "./pages/AnnouncementsPage";
 import SettingsPage from "./pages/SettingsPage";
 import SampleLibraryPage from "./pages/SampleLibraryPage";
 import FactorySamplesPage from "./pages/FactorySamplesPage";
+import PackBrowserPage from "./pages/PackBrowserPage";
+import PackVersionsPage from "./pages/PackVersionsPage";
+import EntitlementsPage from "./pages/EntitlementsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +35,9 @@ const App = () => (
             <Route path="/subscriptions" element={<SubscriptionsPage />} />
             <Route path="/presets" element={<PresetsPage />} />
             <Route path="/presets/admin" element={<PresetAdminPage />} />
+            <Route path="/packs" element={<PackBrowserPage />} />
+            <Route path="/pack-versions" element={<PackVersionsPage />} />
+            <Route path="/entitlements" element={<EntitlementsPage />} />
             <Route path="/samples" element={<SampleLibraryPage />} />
             <Route path="/factory-samples" element={<FactorySamplesPage />} />
             <Route path="/activations" element={<ActivationsPage />} />
