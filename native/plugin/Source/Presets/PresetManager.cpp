@@ -200,6 +200,8 @@ static void scanCategoryFolder(const juce::File& categoryDir,
         info.sampleSourcePath = chosen.getFullPathName();
         info.sampleRootMidi = chosenRoot;
         info.sampleLooping = sustained;
+        info.sampleFolderPath = g.isFolder ? juce::File(info.filePath).getParentDirectory().getFullPathName()
+                                           : categoryDir.getFullPathName();
         if (g.files.size() > 1)
         {
             for (auto& f : g.files)
@@ -405,6 +407,7 @@ void PresetManager::loadPreset(int index)
         requestedInstrument        = {};
         requestedSampleSource      = info.sampleSourcePath;
         requestedSampleSources     = info.sampleSourcePaths;
+        requestedSampleFolderPath  = info.sampleFolderPath;
         requestedSampleDisplayName = info.name;
         requestedSampleRootMidi    = info.sampleRootMidi;
         requestedSampleLooping     = info.sampleLooping;
@@ -464,6 +467,7 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
             requestedInstrument = {};
             requestedSampleSource = {};
             requestedSampleSources.clear();
+            requestedSampleFolderPath = {};
             requestedSampleDisplayName = {};
             requestedSampleRootMidi = 60;
             requestedSampleLooping = false;
@@ -498,6 +502,7 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
     requestedInstrument = {};
     requestedSampleSource = {};
     requestedSampleSources.clear();
+    requestedSampleFolderPath = {};
     requestedSampleDisplayName = {};
     requestedSampleRootMidi = 60;
     auto sampler = json.getProperty(key::sampler, juce::var());
