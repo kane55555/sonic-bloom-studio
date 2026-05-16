@@ -47,6 +47,9 @@ public:
     // DIDITAGAIN STUDIO/Samples). Empty name = silence. Returns true on success.
     bool setInstrument(const juce::String& instrumentName);
     bool setSampleSource(const juce::String& sourcePath, int rootMidi, const juce::String& displayName = {});
+    // Multi-zone (true multisample) load from an explicit file list. The roots
+    // are parsed from each filename's note suffix.
+    bool setMultisampleSources(const juce::Array<juce::File>& files, const juce::String& displayName);
     void setFallbackSynthesisEnabled(bool enabled);
     void setSampleLooping(bool shouldLoop);
     void setSampleCropLoop(float cropStart, float cropEnd,

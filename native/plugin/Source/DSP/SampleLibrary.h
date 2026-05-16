@@ -78,6 +78,14 @@ public:
                                                               int rootMidi,
                                                               const juce::String& displayName = {});
 
+    // Build a Multisample from an explicit list of audio files. Root MIDI is
+    // parsed from each filename's trailing note token (e.g. "_C3", "_F#4").
+    // Files without a parseable note token are skipped. Used by the preset
+    // browser to play a user-dropped sub-folder ("Guitars/Guitar 1/") as a
+    // single multisampled instrument stretched across the keyboard.
+    static std::shared_ptr<const Multisample> loadMultisampleFromFiles(const juce::Array<juce::File>& files,
+                                                                       const juce::String& displayName);
+
     // Force a rescan (clears the in-memory cache).
     static void invalidateCache();
 

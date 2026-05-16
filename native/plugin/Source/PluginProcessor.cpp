@@ -382,9 +382,18 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
                 // Swap the active multisample instrument requested by the preset.
                 const auto& requestedSample = presetManager.getRequestedSampleSource();
+                const auto& requestedSampleList = presetManager.getRequestedSampleSources();
                 const auto& requested = presetManager.getRequestedInstrument();
-                synthEngine.setFallbackSynthesisEnabled(requestedSample.isEmpty());
-                if (requestedSample.isNotEmpty())
+                synthEngine.setFallbackSynthesisEnabled(requestedSample.isEmpty() && requestedSampleList.isEmpty());
+                if (requestedSampleList.size() > 1)
+                {
+                    juce::Array<juce::File> files;
+                    for (auto& p : requestedSampleList) files.add(juce::File(p));
+                    synthEngine.setMultisampleSources(files,
+                                                     presetManager.getRequestedSampleDisplayName());
+                    synthEngine.setSampleLooping(presetManager.getRequestedSampleLooping());
+                }
+                else if (requestedSample.isNotEmpty())
                 {
                     synthEngine.setSampleSource(requestedSample,
                                                 presetManager.getRequestedSampleRootMidi(),

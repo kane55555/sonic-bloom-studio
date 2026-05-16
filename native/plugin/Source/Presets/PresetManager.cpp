@@ -162,6 +162,19 @@ void PresetManager::loadDroppedSamples()
             info.sampleSourcePath = chosen.getFullPathName();
             info.sampleRootMidi = chosenRoot;
             info.sampleLooping = sustained;
+            if (g.isFolder && g.files.size() > 1)
+            {
+                for (auto& f : g.files)
+                {
+                    // Only include files that have a parseable root note so
+                    // the multisample loader can map them to a key.
+                    if (parseRootMidiFromStem(f.getFileNameWithoutExtension()) >= 0)
+                        info.sampleSourcePaths.add(f.getFullPathName());
+                }
+                // If nothing parsed, leave empty so we fall back to single-sample mode.
+                if (info.sampleSourcePaths.size() < 2)
+                    info.sampleSourcePaths.clear();
+            }
             presets.push_back(info);
         }
     }
@@ -314,6 +327,7 @@ void PresetManager::loadPreset(int index)
         // No JSON to parse — just route the dropped one-shot into the engine.
         requestedInstrument        = {};
         requestedSampleSource      = info.sampleSourcePath;
+        requestedSampleSources     = info.sampleSourcePaths;
         requestedSampleDisplayName = info.name;
         requestedSampleRootMidi    = info.sampleRootMidi;
         requestedSampleLooping     = info.sampleLooping;
@@ -372,6 +386,7 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
         {
             requestedInstrument = {};
             requestedSampleSource = {};
+            requestedSampleSources.clear();
             requestedSampleDisplayName = {};
             requestedSampleRootMidi = 60;
             requestedSampleLooping = false;
@@ -405,6 +420,7 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
     // Sampler instrument (legacy)
     requestedInstrument = {};
     requestedSampleSource = {};
+    requestedSampleSources.clear();
     requestedSampleDisplayName = {};
     requestedSampleRootMidi = 60;
     auto sampler = json.getProperty(key::sampler, juce::var());

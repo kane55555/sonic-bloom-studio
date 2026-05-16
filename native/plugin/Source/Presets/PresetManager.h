@@ -20,9 +20,13 @@ struct PresetInfo
     // category subfolders under Samples/Presets/User/<Category>/. When loaded, the
     // engine swaps to this sample directly — no .didasynthpreset required.
     bool isSampleDrop = false;
-    juce::String sampleSourcePath; // absolute path to the audio file
+    juce::String sampleSourcePath; // absolute path to the audio file (representative)
     int  sampleRootMidi = 60;
     bool sampleLooping = false;
+    // When the drop is a folder of per-note samples ("Guitars/Guitar 1/_C3.wav"
+    // ..."_A5.wav"), this holds every file in the group so the engine can
+    // build a true multisampled instrument stretched across the keyboard.
+    juce::StringArray sampleSourcePaths;
 };
 
 namespace dida { namespace preset {
@@ -72,6 +76,7 @@ public:
     // Most recent instrument folder requested by a preset (empty if none).
     const juce::String& getRequestedInstrument() const noexcept { return requestedInstrument; }
     const juce::String& getRequestedSampleSource() const noexcept { return requestedSampleSource; }
+    const juce::StringArray& getRequestedSampleSources() const noexcept { return requestedSampleSources; }
     int getRequestedSampleRootMidi() const noexcept { return requestedSampleRootMidi; }
     const juce::String& getRequestedSampleDisplayName() const noexcept { return requestedSampleDisplayName; }
     bool isCurrentPresetSampleSourceDriven() const noexcept { return requestedSampleSource.isNotEmpty(); }
@@ -97,6 +102,7 @@ private:
     int currentIndex = 0;
     juce::String requestedInstrument;
     juce::String requestedSampleSource;
+    juce::StringArray requestedSampleSources;
     juce::String requestedSampleDisplayName;
     int requestedSampleRootMidi = 60;
     bool requestedSampleLooping = false;
