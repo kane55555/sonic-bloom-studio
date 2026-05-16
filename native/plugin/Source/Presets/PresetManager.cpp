@@ -386,6 +386,7 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
         {
             requestedInstrument = {};
             requestedSampleSource = {};
+            requestedSampleSources.clear();
             requestedSampleDisplayName = {};
             requestedSampleRootMidi = 60;
             requestedSampleLooping = false;
