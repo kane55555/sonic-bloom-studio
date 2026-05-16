@@ -348,51 +348,8 @@ std::shared_ptr<const Multisample> SampleLibrary::loadInstrument(const juce::Str
     auto files = folder.findChildFiles(juce::File::findFiles, false, wildcards);
     if (files.isEmpty()) return nullptr;
 
-    auto ms = std::make_shared<Multisample>();
-    ms->instrumentName = name;
-
-    for (auto& file : files)
-    {
-        int rootMidi = 60;
-        int hiVel = 127;
-        if (! parseSampleName(file.getFileNameWithoutExtension(), rootMidi, hiVel))
-        {
-            // Skip files that don't follow the naming convention.
-            continue;
-        }
-
-        SampleZone zone;
-        if (readSampleZoneFromFile(file, rootMidi, hiVel, zone))
-            ms->zones.push_back(std::move(zone));
-    }
-
-    if (ms->zones.empty()) return nullptr;
-
-    // Sort zones by root, then by hiVel — makes lookups predictable.
-    std::sort(ms->zones.begin(), ms->zones.end(),
-        [](const SampleZone& a, const SampleZone& b)
-        {
-            if (a.rootMidi != b.rootMidi) return a.rootMidi < b.rootMidi;
-            return a.hiVel < b.hiVel;
-        });
-
-    // Build velocity lo bounds within each root group.
-    int i = 0;
-    while (i < (int) ms->zones.size())
-    {
-        int j = i;
-        while (j < (int) ms->zones.size() && ms->zones[j].rootMidi == ms->zones[i].rootMidi)
-            ++j;
-        int prevHi = -1;
-        for (int k = i; k < j; ++k)
-        {
-            ms->zones[k].loVel = prevHi + 1;
-            prevHi = ms->zones[k].hiVel;
-        }
-        // Stretch the top layer to 127 in case file said v100.
-        ms->zones[j - 1].hiVel = 127;
-        i = j;
-    }
+    auto ms = buildMultisampleFromFiles(files, name);
+    if (ms == nullptr) return nullptr;
 
     {
         std::lock_guard<std::mutex> lock(cacheMutex());
@@ -450,46 +407,38 @@ std::shared_ptr<const Multisample> SampleLibrary::loadMultisampleFromFiles(const
         if (it != cache().end()) return it->second;
     }
 
-    auto ms = std::make_shared<Multisample>();
-    ms->instrumentName = displayName.isNotEmpty() ? displayName : "Multisample";
+    auto ms = buildMultisampleFromFiles(files, displayName);
+    if (ms == nullptr) return nullptr;
 
-    for (auto& file : files)
     {
-        int rootMidi = 60;
-        int hiVel = 127;
-        if (! parseSampleName(file.getFileNameWithoutExtension(), rootMidi, hiVel))
-            continue; // need a note token to know where this file lives
+        std::lock_guard<std::mutex> lock(cacheMutex());
+        cache()[cacheKey] = ms;
+    }
+    return ms;
+}
 
-        SampleZone zone;
-        if (readSampleZoneFromFile(file, rootMidi, hiVel, zone))
-            ms->zones.push_back(std::move(zone));
+std::shared_ptr<const Multisample> SampleLibrary::loadMultisamplePreset(const juce::String& category,
+                                                                        const juce::String& presetName,
+                                                                        const juce::String& folderPath)
+{
+    juce::File folder(folderPath);
+    if (! folder.isDirectory()) return nullptr;
+
+    const auto cacheKey = (juce::String("folder:") + category + ":" + presetName + ":" + folder.getFullPathName()).toStdString();
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex());
+        auto it = cache().find(cacheKey);
+        if (it != cache().end()) return it->second;
     }
 
-    if (ms->zones.empty()) return nullptr;
+    auto files = folder.findChildFiles(juce::File::findFiles, true, "*.wav");
+    if (files.isEmpty()) return nullptr;
+    std::sort(files.begin(), files.end(), [](const juce::File& a, const juce::File& b) {
+        return a.getFileName().compareNatural(b.getFileName()) < 0;
+    });
 
-    std::sort(ms->zones.begin(), ms->zones.end(),
-        [](const SampleZone& a, const SampleZone& b)
-        {
-            if (a.rootMidi != b.rootMidi) return a.rootMidi < b.rootMidi;
-            return a.hiVel < b.hiVel;
-        });
-
-    // Build velocity lo bounds within each root group.
-    int i = 0;
-    while (i < (int) ms->zones.size())
-    {
-        int j = i;
-        while (j < (int) ms->zones.size() && ms->zones[j].rootMidi == ms->zones[i].rootMidi)
-            ++j;
-        int prevHi = -1;
-        for (int k = i; k < j; ++k)
-        {
-            ms->zones[k].loVel = prevHi + 1;
-            prevHi = ms->zones[k].hiVel;
-        }
-        ms->zones[j - 1].hiVel = 127;
-        i = j;
-    }
+    auto ms = buildMultisampleFromFiles(files, presetName.isNotEmpty() ? presetName : folder.getFileName());
+    if (ms == nullptr) return nullptr;
 
     {
         std::lock_guard<std::mutex> lock(cacheMutex());
