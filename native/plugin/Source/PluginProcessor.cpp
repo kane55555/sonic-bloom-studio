@@ -553,8 +553,35 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         });
     }
 
+    // ---- Debug: trace incoming MIDI note-ons ----
+   #if JUCE_DEBUG
+    for (const auto meta : midiMessages)
+    {
+        const auto m = meta.getMessage();
+        if (m.isNoteOn())
+            didaAudioLog(juce::String("noteOn ch=") + juce::String(m.getChannel())
+                + " note=" + juce::String(m.getNoteNumber())
+                + " vel=" + juce::String(m.getFloatVelocity(), 2)
+                + " instrument=" + (synthEngine.getInstrumentName().isEmpty()
+                                        ? juce::String("<none/fallback>")
+                                        : synthEngine.getInstrumentName()));
+    }
+   #endif
+
     // ---- Render voices + FX (master gain + limiter applied inside FX chain) ----
     synthEngine.renderBlockWithFx(buffer, midiMessages, 0, buffer.getNumSamples());
+
+   #if JUCE_DEBUG
+    static int s_renderTraceCounter = 0;
+    if ((++s_renderTraceCounter % 512) == 0)
+    {
+        didaAudioLog(juce::String("render activeVoices=") + juce::String(synthEngine.getActiveVoiceCount())
+            + " held=" + juce::String(synthEngine.getHeldNoteCount())
+            + " instrument=" + (synthEngine.getInstrumentName().isEmpty()
+                                    ? juce::String("<none/fallback>")
+                                    : synthEngine.getInstrumentName()));
+    }
+   #endif
 }
 
 juce::AudioProcessorEditor* DiditagainProcessor::createEditor()
