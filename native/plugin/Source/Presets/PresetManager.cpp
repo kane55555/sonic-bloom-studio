@@ -327,6 +327,7 @@ void PresetManager::loadPreset(int index)
         // No JSON to parse — just route the dropped one-shot into the engine.
         requestedInstrument        = {};
         requestedSampleSource      = info.sampleSourcePath;
+        requestedSampleSources     = info.sampleSourcePaths;
         requestedSampleDisplayName = info.name;
         requestedSampleRootMidi    = info.sampleRootMidi;
         requestedSampleLooping     = info.sampleLooping;
