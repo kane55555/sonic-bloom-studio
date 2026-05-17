@@ -245,7 +245,11 @@ bool SynthEngine::setMultisampleSources(const juce::Array<juce::File>& files,
     paths.sort(true);
     const auto sourceName = juce::String("multi:") + paths.joinIntoString("|");
     if (sourceName == currentInstrumentName && activeMultisample != nullptr)
+    {
+        juce::Logger::writeToLog("[DIDITAGAIN multisample] loaded multisample zones: "
+            + juce::String((int) activeMultisample->zones.size()) + " name=" + displayName + " (reused)");
         return true;
+    }
 
     auto ms = files.isEmpty()
         ? std::shared_ptr<const dida::Multisample>{}
@@ -281,7 +285,11 @@ bool SynthEngine::loadMultisamplePreset(const juce::String& category,
     // Guitar 1 instead of clearing/reloading the sample map for each variant.
     const auto sourceName = juce::String("folder:") + folderPath;
     if (sourceName == currentInstrumentName && activeMultisample != nullptr)
+    {
+        juce::Logger::writeToLog("[DIDITAGAIN multisample] loaded multisample zones: "
+            + juce::String((int) activeMultisample->zones.size()) + " name=" + presetName + " (reused)");
         return true;
+    }
 
     auto ms = folderPath.isEmpty()
         ? std::shared_ptr<const dida::Multisample>{}
