@@ -399,6 +399,9 @@ static juce::String getParamDebugValue(juce::AudioProcessor& proc, const char* i
             {
                 if (auto* choice = dynamic_cast<juce::AudioParameterChoice*>(withId))
                 {
+                    if (choice->choices.isEmpty())
+                        return juce::String(withId->getValue(), 4);
+
                     const int idx = juce::jlimit(0, choice->choices.size() - 1,
                         static_cast<int>(std::round(choice->convertFrom0to1(choice->getValue()))));
                     return choice->choices[idx] + "(" + juce::String(idx) + ")";
@@ -415,8 +418,8 @@ static juce::String getParamDebugValue(juce::AudioProcessor& proc, const char* i
 
 static void logFinalActivePresetParams(juce::AudioProcessor& proc, const juce::String& presetName)
 {
-    didaPresetManagerLog("FINAL ACTIVE PRESET PARAMS"
-        " presetName=" + presetName
+    didaPresetManagerLog(juce::String("FINAL ACTIVE PRESET PARAMS")
+        + " presetName=" + presetName
         + " filter1Type=" + getParamDebugValue(proc, "filter1Type")
         + " filter1Cutoff=" + getParamDebugValue(proc, "filter1Cutoff")
         + " env1Attack=" + getParamDebugValue(proc, "env1Attack")
