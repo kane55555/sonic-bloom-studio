@@ -255,6 +255,8 @@ juce::File resolveSourcePath(const juce::String& rawPath)
     while ((src.startsWithChar('"') && src.endsWithChar('"'))
         || (src.startsWithChar('\'') && src.endsWithChar('\'')))
         src = src.substring(1, src.length() - 1).trim();
+    while (src.endsWithChar('/') && src.length() > 1)
+        src = src.dropLastCharacters(1);
     if (src.isEmpty()) return {};
 
     auto samplesRoot = dida::SampleLibrary::getSamplesRoot();
