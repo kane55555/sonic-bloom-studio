@@ -389,9 +389,12 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                     appliedPolyphony = deferredPresetChange.polyphony;
             }
 
-            if (applied)
+            // Sample-folder swap must happen regardless of whether the voice
+            // pool mutation succeeded — otherwise a failed setMaxPolyphony
+            // would leave the engine pointed at the previous preset's samples
+            // and the new preset would be silent.
             {
-                if (deferredPresetChange.resetState && (canApplyVoiceMutation || forceApply))
+                if (applied && deferredPresetChange.resetState && (canApplyVoiceMutation || forceApply))
                     synthEngine.resetForPresetChange();
 
                 // Swap the active multisample instrument requested by the preset.
@@ -428,9 +431,6 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                 }
                 if (! sampleLoaded)
                 {
-                    // Single-sample fallback (also covers the case where the
-                    // multisample path returned no zones, e.g. files had no
-                    // parseable note suffix).
                     if (requestedSample.isNotEmpty())
                     {
                         synthEngine.setSampleSource(requestedSample,
@@ -457,6 +457,7 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                     + " mono=" + (deferredPresetChange.monoMode ? "true" : "false")
                     + " poly=" + juce::String(deferredPresetChange.polyphony)
                     + " mutatedVoices=" + (voicePoolNeedsMutation ? "true" : "false")
+                    + " voiceMutationApplied=" + (applied ? "true" : "false")
                     + " forced=" + (forceApply ? "true" : "false")
                     + " waitedBlocks=" + juce::String(deferredPresetChange.ageInBlocks)
                     + " instrument=" + synthEngine.getInstrumentName());
