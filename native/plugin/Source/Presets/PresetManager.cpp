@@ -508,15 +508,23 @@ void PresetManager::loadPreset(int index)
 
         didaPresetManagerLog("loading diapreset: " + up.presetName);
 
+        // Resolution order for the multisample source:
+        //   1. The path stored in the .diapreset itself (works on the
+        //      author's machine).
+        //   2. An already-indexed sample-drop instrument with the same leaf
+        //      folder name (e.g. "Guitar 1") regardless of category.
+        //   3. ANY instrument subfolder dropped under
+        //      <UserPresetDir>/<Category>/  — this is what lets the user
+        //      simply drop one instrument folder per category (Guitars/Guitar 1,
+        //      Pianos/Grand 1, Pads/Warm 1, ...) and have every .diapreset
+        //      in that category auto-route to it.
+        //   4. None — apply the preset's sound design to the factory synth
+        //      (used by the Synths category, where there is no sample folder).
         auto resolved = dida::userpreset::resolveSourcePath(up.source.path);
         if (! resolved.isDirectory())
         {
             didaPresetManagerLog("diapreset source folder missing path=" + up.source.path);
 
-            // If the JSON path was created on a different machine, route to an
-            // already-indexed instrument folder with the same leaf name (for
-            // example every guitar preset should resolve to the visible
-            // "Guitar 1" sample-drop instrument).
             const auto sourceLeaf = juce::File(up.source.path.replaceCharacter('\\', '/')).getFileName();
             for (const auto& candidate : presets)
             {
@@ -534,41 +542,45 @@ void PresetManager::loadPreset(int index)
             }
         }
 
-        didaPresetManagerLog("resolved source folder: " + resolved.getFullPathName());
-
-        auto files = resolved.findChildFiles(juce::File::findFiles, true, "*.wav");
-        std::sort(files.begin(), files.end(), [](const juce::File& a, const juce::File& b) {
-            return a.getFileName().compareNatural(b.getFileName()) < 0;
-        });
-
-        requestedSampleSources.clear();
-        for (auto& f : files)
-            if (parseRootMidiFromStem(f.getFileNameWithoutExtension()) >= 0)
-                requestedSampleSources.add(f.getFullPathName());
-
-        didaPresetManagerLog("found WAV count: " + juce::String(files.size()));
-        didaPresetManagerLog("valid mapped WAV count: " + juce::String(requestedSampleSources.size()));
-
-        if (requestedSampleSources.isEmpty())
+        // Step 3: scan <UserPresetDir>/<Category>/ for any subfolder that
+        // contains mapped WAVs and use the first one. This is the "drop one
+        // instrument folder per category" behaviour the user asked for.
+        if (! resolved.isDirectory())
         {
-            didaPresetManagerLog("diapreset source has no valid mapped WAV files; aborting load name="
-                + up.presetName + " folder=" + resolved.getFullPathName());
-            return;
+            const auto cat = up.category.isNotEmpty()
+                ? up.category
+                : juce::File(info.filePath).getParentDirectory().getFileName();
+            auto catDir = getUserPresetDirectory().getChildFile(cat);
+            if (catDir.isDirectory())
+            {
+                auto subdirs = catDir.findChildFiles(juce::File::findDirectories, false);
+                std::sort(subdirs.begin(), subdirs.end(), [](const juce::File& a, const juce::File& b) {
+                    return a.getFileName().compareNatural(b.getFileName()) < 0;
+                });
+                for (auto& sub : subdirs)
+                {
+                    auto wavs = sub.findChildFiles(juce::File::findFiles, true, "*.wav");
+                    bool anyMapped = false;
+                    for (auto& w : wavs)
+                        if (parseRootMidiFromStem(w.getFileNameWithoutExtension()) >= 0)
+                        { anyMapped = true; break; }
+                    if (anyMapped)
+                    {
+                        resolved = sub;
+                        didaPresetManagerLog("diapreset auto-routed to category instrument folder=" + resolved.getFullPathName());
+                        break;
+                    }
+                }
+            }
         }
 
-        juce::Array<juce::File> mappedFiles;
-        for (auto& p : requestedSampleSources)
-            mappedFiles.add(juce::File(p));
-
-        int representativeRoot = 60;
-        const auto representative = chooseRepresentativeMappedWav(mappedFiles, representativeRoot);
-
-        // Route the multisample folder via the existing engine path.
+        // Common reset of sample state; we re-fill it below when we have a folder.
         requestedInstrument        = {};
-        requestedSampleSource      = representative.getFullPathName();
-        requestedSampleFolderPath  = resolved.getFullPathName();
+        requestedSampleSource      = {};
+        requestedSampleSources.clear();
+        requestedSampleFolderPath  = {};
         requestedSampleDisplayName = up.presetName;
-        requestedSampleRootMidi    = representativeRoot;
+        requestedSampleRootMidi    = 60;
         requestedSampleLooping     = isSustainedSampleCategory(up.category);
         requestedCategory          = up.category;
         macroMapper.clear();
@@ -576,9 +588,54 @@ void PresetManager::loadPreset(int index)
         pendingUserDiapreset = up;
         pendingUserDiapresetApply = true;
 
+        if (resolved.isDirectory())
+        {
+            didaPresetManagerLog("resolved source folder: " + resolved.getFullPathName());
+
+            auto files = resolved.findChildFiles(juce::File::findFiles, true, "*.wav");
+            std::sort(files.begin(), files.end(), [](const juce::File& a, const juce::File& b) {
+                return a.getFileName().compareNatural(b.getFileName()) < 0;
+            });
+
+            for (auto& f : files)
+                if (parseRootMidiFromStem(f.getFileNameWithoutExtension()) >= 0)
+                    requestedSampleSources.add(f.getFullPathName());
+
+            didaPresetManagerLog("found WAV count: " + juce::String(files.size()));
+            didaPresetManagerLog("valid mapped WAV count: " + juce::String(requestedSampleSources.size()));
+
+            if (! requestedSampleSources.isEmpty())
+            {
+                juce::Array<juce::File> mappedFiles;
+                for (auto& p : requestedSampleSources)
+                    mappedFiles.add(juce::File(p));
+
+                int representativeRoot = 60;
+                const auto representative = chooseRepresentativeMappedWav(mappedFiles, representativeRoot);
+
+                requestedSampleSource      = representative.getFullPathName();
+                requestedSampleFolderPath  = resolved.getFullPathName();
+                requestedSampleRootMidi    = representativeRoot;
+            }
+            else
+            {
+                didaPresetManagerLog("diapreset source folder has no mapped WAVs; falling back to factory synth name="
+                    + up.presetName);
+            }
+        }
+        else
+        {
+            // No instrument folder available (e.g. Synths category with no
+            // dropped sample folder). The factory synth will play the preset's
+            // sound-design directly.
+            didaPresetManagerLog("diapreset has no resolvable sample folder; using factory synth for name="
+                + up.presetName + " category=" + up.category);
+        }
+
         didaPresetManagerLog("queued diapreset source-first load name=" + up.presetName
             + " category=" + up.category
-            + " folder=" + requestedSampleFolderPath);
+            + " folder=" + (requestedSampleFolderPath.isNotEmpty() ? requestedSampleFolderPath
+                                                                  : juce::String("<factory synth>")));
 
         if (onPresetLoaded) onPresetLoaded();
         else applyPendingUserDiapresetAfterSampleLoad();
