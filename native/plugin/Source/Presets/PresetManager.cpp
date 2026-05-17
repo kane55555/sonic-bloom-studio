@@ -209,7 +209,9 @@ static void scanCategoryFolder(const juce::File& categoryDir,
             continue;
         }
         if (parseable == 0 && g.files.size() > 1)
+        {
             DBG("Preset folder has no parseable root notes: " << g.name);
+        }
 
         // Duplicate root-note warning.
         {
@@ -399,17 +401,17 @@ static juce::String getParamDebugValue(juce::AudioProcessor& proc, const char* i
             {
                 if (auto* choice = dynamic_cast<juce::AudioParameterChoice*>(withId))
                 {
+                    const int idx = choice->getIndex();
                     if (choice->choices.isEmpty())
-                        return juce::String(withId->getValue(), 4);
-
-                    const int idx = juce::jlimit(0, choice->choices.size() - 1,
-                        static_cast<int>(std::round(choice->convertFrom0to1(choice->getValue()))));
-                    return choice->choices[idx] + "(" + juce::String(idx) + ")";
+                        return juce::String(idx);
+                    const int clamped = juce::jlimit(0, choice->choices.size() - 1, idx);
+                    return choice->choices[clamped] + "(" + juce::String(clamped) + ")";
                 }
+                auto* base = static_cast<juce::AudioProcessorParameter*>(param);
                 if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*>(withId))
-                    return juce::String(ranged->convertFrom0to1(ranged->getValue()), 4);
+                    return juce::String(ranged->convertFrom0to1(base->getValue()), 4);
 
-                return juce::String(withId->getValue(), 4);
+                return juce::String(base->getValue(), 4);
             }
         }
     }
