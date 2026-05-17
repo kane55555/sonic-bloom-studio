@@ -447,6 +447,8 @@ void PresetManager::loadPreset(int index)
             return;
         }
 
+        didaPresetManagerLog("loading diapreset: " + up.presetName);
+
         auto resolved = dida::userpreset::resolveSourcePath(up.source.path);
         if (! resolved.isDirectory())
         {
@@ -473,14 +475,42 @@ void PresetManager::loadPreset(int index)
             }
         }
 
+        didaPresetManagerLog("resolved source folder: " + resolved.getFullPathName());
+
+        auto files = resolved.findChildFiles(juce::File::findFiles, true, "*.wav");
+        std::sort(files.begin(), files.end(), [](const juce::File& a, const juce::File& b) {
+            return a.getFileName().compareNatural(b.getFileName()) < 0;
+        });
+
+        requestedSampleSources.clear();
+        for (auto& f : files)
+            if (parseRootMidiFromStem(f.getFileNameWithoutExtension()) >= 0)
+                requestedSampleSources.add(f.getFullPathName());
+
+        didaPresetManagerLog("found WAV count: " + juce::String(files.size()));
+        didaPresetManagerLog("valid mapped WAV count: " + juce::String(requestedSampleSources.size()));
+
+        if (requestedSampleSources.isEmpty())
+        {
+            didaPresetManagerLog("diapreset source has no valid mapped WAV files; aborting load name="
+                + up.presetName + " folder=" + resolved.getFullPathName());
+            return;
+        }
+
+        juce::Array<juce::File> mappedFiles;
+        for (auto& p : requestedSampleSources)
+            mappedFiles.add(juce::File(p));
+
+        int representativeRoot = 60;
+        const auto representative = chooseRepresentativeMappedWav(mappedFiles, representativeRoot);
+
         // Route the multisample folder via the existing engine path.
         requestedInstrument        = {};
-        requestedSampleSource      = {};
-        requestedSampleSources.clear();
+        requestedSampleSource      = representative.getFullPathName();
         requestedSampleFolderPath  = resolved.getFullPathName();
         requestedSampleDisplayName = up.presetName;
-        requestedSampleRootMidi    = 60;
-        requestedSampleLooping     = false;
+        requestedSampleRootMidi    = representativeRoot;
+        requestedSampleLooping     = isSustainedSampleCategory(up.category);
         requestedCategory          = up.category;
         macroMapper.clear();
 
