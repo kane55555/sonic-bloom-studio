@@ -745,3 +745,75 @@ juce::String PresetManager::computeChecksum(const juce::String& jsonContent)
 {
     return juce::String::toHexString((juce::int64) jsonContent.hashCode64());
 }
+
+void PresetManager::loadDiapresetFiles()
+{
+    // Scan <Samples>/Presets/User/<Category>/*.diapreset and add one entry
+    // per file. Categories are inferred from the immediate parent folder.
+    auto root = getUserPresetDirectory();
+    if (! root.isDirectory()) return;
+
+    auto categoryDirs = root.findChildFiles(juce::File::findDirectories, false);
+    std::sort(categoryDirs.begin(), categoryDirs.end(),
+        [](const juce::File& a, const juce::File& b)
+        { return a.getFileName().compareNatural(b.getFileName()) < 0; });
+
+    for (auto& catDir : categoryDirs)
+    {
+        const auto cat = catDir.getFileName();
+        auto files = catDir.findChildFiles(juce::File::findFiles, false, "*.diapreset");
+        std::sort(files.begin(), files.end(),
+            [](const juce::File& a, const juce::File& b)
+            { return a.getFileName().compareNatural(b.getFileName()) < 0; });
+
+        for (auto& f : files)
+        {
+            dida::userpreset::UserPreset up;
+            juce::String err;
+            if (! dida::userpreset::parseFile(f, up, err))
+            {
+                didaPresetManagerLog("skipping invalid diapreset file=" + f.getFullPathName() + " err=" + err);
+                continue;
+            }
+
+            PresetInfo info;
+            info.name           = up.presetName;
+            info.author         = "User";
+            info.category       = up.category.isNotEmpty() ? up.category : cat;
+            info.description    = "User preset (" + up.source.type + ")";
+            info.filePath       = f.getFullPathName();
+            info.isFactory      = false;
+            info.isSampleDrop   = false;
+            info.isUserPreset   = true;
+            info.userPresetFile = f.getFullPathName();
+            presets.push_back(info);
+        }
+    }
+}
+
+void PresetManager::seedGuitarPresetBankIfMissing()
+{
+    auto root = getUserPresetDirectory();
+    auto guitarsDir = root.getChildFile("Guitars");
+    guitarsDir.createDirectory();
+
+    // Default source folder: <Samples>/Guitars/Guitar 1. We seed against the
+    // actual on-disk path so users get a working bank out of the box.
+    auto sourceFolder = dida::SampleLibrary::getSamplesRoot()
+                            .getChildFile("Guitars").getChildFile("Guitar 1");
+
+    const auto srcPath = sourceFolder.getFullPathName().replaceCharacter('\\', '/');
+    auto bank = dida::userpreset::buildGuitarBank(srcPath);
+
+    int written = 0;
+    for (auto& p : bank)
+    {
+        auto file = guitarsDir.getChildFile(p.presetName + ".diapreset");
+        if (file.existsAsFile()) continue;
+        file.replaceWithText(dida::userpreset::toJson(p));
+        ++written;
+    }
+    if (written > 0)
+        didaPresetManagerLog("seeded guitar preset bank count=" + juce::String(written)
+            + " dir=" + guitarsDir.getFullPathName());
+}
