@@ -295,7 +295,12 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     setChoiceById(proc, "lfo2Shape", lfoShapeIndex(p.lfo2.shape));
 
     // -- Advanced
-    setParamById(proc, "polyphony", static_cast<float>(juce::jlimit(1, 16, p.advanced.polyphony)));
+    // NOTE: we deliberately do NOT push "polyphony" into APVTS here. Polyphony
+    // is a global engine setting; writing it on every preset load triggers the
+    // deferred voice-pool mutation path in PluginProcessor, which can refuse
+    // to apply while the user is holding notes — and that gate previously
+    // suppressed the sample-folder swap, leaving subsequent presets silent.
+    juce::ignoreUnused(p.advanced.polyphony);
 
     didaUserPresetLog("applied name=" + p.presetName
         + " category=" + p.category
