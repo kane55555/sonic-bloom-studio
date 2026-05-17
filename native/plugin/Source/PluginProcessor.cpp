@@ -453,6 +453,10 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                     }
                 }
 
+                // .diapreset variants must win over the sample-drop defaults:
+                // source first, then amp/filter/layer/FX/modulation values.
+                presetManager.applyPendingUserDiapresetAfterSampleLoad();
+
                 didaPresetLog(juce::String("applied serial=") + juce::String(deferredPresetChange.presetSerial)
                     + " mono=" + (deferredPresetChange.monoMode ? "true" : "false")
                     + " poly=" + juce::String(deferredPresetChange.polyphony)
