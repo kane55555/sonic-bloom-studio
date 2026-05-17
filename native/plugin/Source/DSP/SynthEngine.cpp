@@ -243,7 +243,7 @@ bool SynthEngine::setMultisampleSources(const juce::Array<juce::File>& files,
     juce::StringArray paths;
     for (auto& f : files) paths.add(f.getFullPathName());
     paths.sort(true);
-    const auto sourceName = juce::String("multi:") + displayName + "|" + paths.joinIntoString("|");
+    const auto sourceName = juce::String("multi:") + paths.joinIntoString("|");
     if (sourceName == currentInstrumentName && activeMultisample != nullptr)
         return true;
 
