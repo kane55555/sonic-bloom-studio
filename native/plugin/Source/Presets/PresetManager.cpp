@@ -4,6 +4,9 @@
 #include "HybridPresetV2.h"
 #include "PresetMigration.h"
 #include "HybridPresetApplier.h"
+#include "UserPresetLoader.h"
+#include "UserPresetFormat.h"
+#include "GuitarPresetBank.h"
 #include "../DSP/SampleLibrary.h"
 
 // JUCE made AudioParameterChoice::setValue() private to discourage direct
