@@ -209,7 +209,9 @@ static void scanCategoryFolder(const juce::File& categoryDir,
             continue;
         }
         if (parseable == 0 && g.files.size() > 1)
+        {
             DBG("Preset folder has no parseable root notes: " << g.name);
+        }
 
         // Duplicate root-note warning.
         {
