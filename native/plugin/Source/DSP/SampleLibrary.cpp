@@ -421,10 +421,16 @@ std::shared_ptr<const Multisample> SampleLibrary::loadMultisamplePreset(const ju
                                                                         const juce::String& presetName,
                                                                         const juce::String& folderPath)
 {
+    juce::ignoreUnused(category);
+
     juce::File folder(folderPath);
     if (! folder.isDirectory()) return nullptr;
 
-    const auto cacheKey = (juce::String("folder:") + category + ":" + presetName + ":" + folder.getFullPathName()).toStdString();
+    // One physical preset folder is one source instrument. Different
+    // .diapreset files may point at the same Guitar 1 folder, so cache by the
+    // folder path only instead of the user preset name. This prevents every
+    // guitar preset from loading a separate copy of the same WAV buffers.
+    const auto cacheKey = (juce::String("folder:") + folder.getFullPathName()).toStdString();
     {
         std::lock_guard<std::mutex> lock(cacheMutex());
         auto it = cache().find(cacheKey);

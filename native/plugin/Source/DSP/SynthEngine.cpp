@@ -270,7 +270,13 @@ bool SynthEngine::loadMultisamplePreset(const juce::String& category,
                                         const juce::String& presetName,
                                         const juce::String& folderPath)
 {
-    const auto sourceName = juce::String("folder:") + category + ":" + presetName + ":" + folderPath;
+    juce::ignoreUnused(category, presetName);
+
+    // A .diapreset changes processor parameters, but all guitar variants point
+    // to the same base multisample folder. Keep the loaded source identity tied
+    // to the folder path, not the cosmetic preset name, so preset changes reuse
+    // Guitar 1 instead of clearing/reloading the sample map for each variant.
+    const auto sourceName = juce::String("folder:") + folderPath;
     if (sourceName == currentInstrumentName && activeMultisample != nullptr)
         return true;
 

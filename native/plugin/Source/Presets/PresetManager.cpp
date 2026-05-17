@@ -419,7 +419,29 @@ void PresetManager::loadPreset(int index)
 
         auto resolved = dida::userpreset::resolveSourcePath(up.source.path);
         if (! resolved.isDirectory())
+        {
             didaPresetManagerLog("diapreset source folder missing path=" + up.source.path);
+
+            // If the JSON path was created on a different machine, route to an
+            // already-indexed instrument folder with the same leaf name (for
+            // example every guitar preset should resolve to the visible
+            // "Guitar 1" sample-drop instrument).
+            const auto sourceLeaf = juce::File(up.source.path.replaceCharacter('\\', '/')).getFileName();
+            for (const auto& candidate : presets)
+            {
+                if (! candidate.isSampleDrop || candidate.sampleFolderPath.isEmpty())
+                    continue;
+
+                const auto candidateFolder = juce::File(candidate.sampleFolderPath);
+                if (candidate.name.equalsIgnoreCase(sourceLeaf) && candidateFolder.isDirectory())
+                {
+                    resolved = candidateFolder;
+                    didaPresetManagerLog("diapreset routed to indexed source " + candidate.name
+                        + " folder=" + resolved.getFullPathName());
+                    break;
+                }
+            }
+        }
 
         // Route the multisample folder via the existing engine path.
         requestedInstrument        = {};
