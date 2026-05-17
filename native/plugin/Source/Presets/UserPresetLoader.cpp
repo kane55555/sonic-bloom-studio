@@ -325,7 +325,8 @@ juce::File resolveSourcePath(const juce::String& rawPath)
 // ---- APVTS setters (mirror PresetManager.cpp helpers) ---------------------
 static void setParamRaw(juce::AudioProcessorParameter* p, float normalised)
 {
-    if (p != nullptr) p->setValue(juce::jlimit(0.0f, 1.0f, normalised));
+    if (p != nullptr)
+        p->setValueNotifyingHost(juce::jlimit(0.0f, 1.0f, normalised));
 }
 
 static void setParamById(juce::AudioProcessor& proc, const char* id, float value)

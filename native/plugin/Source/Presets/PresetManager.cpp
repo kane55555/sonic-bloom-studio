@@ -952,14 +952,34 @@ void PresetManager::seedGuitarPresetBankIfMissing()
     auto bank = dida::userpreset::buildGuitarBank(srcPath);
 
     int written = 0;
+    int refreshed = 0;
     for (auto& p : bank)
     {
         auto file = guitarsDir.getChildFile(p.presetName + ".diapreset");
-        if (file.existsAsFile()) continue;
+        if (file.existsAsFile())
+        {
+            // These 20 named guitar presets are a generated factory bank stored
+            // in the user-visible preset folder. Older builds seeded them with
+            // the correct Guitar 1 source but incomplete/default sound-design
+            // values, so they all sounded exactly like the base folder preset.
+            dida::userpreset::UserPreset existing;
+            juce::String err;
+            if (dida::userpreset::parseFile(file, existing, err)
+                && existing.presetName == p.presetName
+                && juce::File(existing.source.path.replaceCharacter('\\', '/')).getFileName().equalsIgnoreCase("Guitar 1"))
+            {
+                file.replaceWithText(dida::userpreset::toJson(p));
+                ++refreshed;
+            }
+            continue;
+        }
         file.replaceWithText(dida::userpreset::toJson(p));
         ++written;
     }
     if (written > 0)
         didaPresetManagerLog("seeded guitar preset bank count=" + juce::String(written)
+            + " dir=" + guitarsDir.getFullPathName());
+    if (refreshed > 0)
+        didaPresetManagerLog("refreshed guitar preset bank sound-design count=" + juce::String(refreshed)
             + " dir=" + guitarsDir.getFullPathName());
 }
