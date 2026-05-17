@@ -621,6 +621,9 @@ void PresetManager::loadPreset(int index)
 
 void PresetManager::loadPresetFromFile(const juce::File& file)
 {
+    requestedPresetIsUserDiapreset = false;
+    pendingUserDiapresetApply = false;
+
     if (!validatePresetFile(file))
     {
         didaPresetManagerLog(juce::String("validation failed file=") + file.getFullPathName());
