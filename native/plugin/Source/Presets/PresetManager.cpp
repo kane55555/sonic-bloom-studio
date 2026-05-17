@@ -9,6 +9,7 @@
 #include "GuitarPresetBank.h"
 #include "../DSP/SampleLibrary.h"
 #include <limits>
+#include <cmath>
 
 // JUCE made AudioParameterChoice::setValue() private to discourage direct
 // writes; it's still accessible through the AudioProcessorParameter base.
@@ -388,6 +389,59 @@ static void setParam(juce::AudioProcessor& proc, const char* id, const juce::var
     }
 }
 
+static juce::String getParamDebugValue(juce::AudioProcessor& proc, const char* id)
+{
+    for (auto* param : proc.getParameters())
+    {
+        if (auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
+        {
+            if (withId->paramID == id)
+            {
+                if (auto* choice = dynamic_cast<juce::AudioParameterChoice*>(withId))
+                {
+                    if (choice->choices.isEmpty())
+                        return juce::String(withId->getValue(), 4);
+
+                    const int idx = juce::jlimit(0, choice->choices.size() - 1,
+                        static_cast<int>(std::round(choice->convertFrom0to1(choice->getValue()))));
+                    return choice->choices[idx] + "(" + juce::String(idx) + ")";
+                }
+                if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*>(withId))
+                    return juce::String(ranged->convertFrom0to1(ranged->getValue()), 4);
+
+                return juce::String(withId->getValue(), 4);
+            }
+        }
+    }
+    return "<missing>";
+}
+
+static void logFinalActivePresetParams(juce::AudioProcessor& proc, const juce::String& presetName)
+{
+    didaPresetManagerLog(juce::String("FINAL ACTIVE PRESET PARAMS")
+        + " presetName=" + presetName
+        + " filter1Type=" + getParamDebugValue(proc, "filter1Type")
+        + " filter1Cutoff=" + getParamDebugValue(proc, "filter1Cutoff")
+        + " env1Attack=" + getParamDebugValue(proc, "env1Attack")
+        + " env1Release=" + getParamDebugValue(proc, "env1Release")
+        + " fxChorusMix=" + getParamDebugValue(proc, "fxChorusMix")
+        + " fxDelayMix=" + getParamDebugValue(proc, "fxDelayMix")
+        + " fxReverbMix=" + getParamDebugValue(proc, "fxReverbMix")
+        + " fxDistortionAmount=" + getParamDebugValue(proc, "fxDistortionAmount")
+        + " oscBLevel=" + getParamDebugValue(proc, "oscBLevel"));
+}
+
+void PresetManager::applyPendingUserDiapresetAfterSampleLoad()
+{
+    if (! pendingUserDiapresetApply)
+        return;
+
+    pendingUserDiapresetApply = false;
+    didaPresetManagerLog("applying diapreset sound design after source load: " + pendingUserDiapreset.presetName);
+    dida::userpreset::applyToProcessor(pendingUserDiapreset, processor);
+    logFinalActivePresetParams(processor, pendingUserDiapreset.presetName);
+}
+
 static void applyOscBlock(juce::AudioProcessor& proc, const juce::var& obj,
                           const char* wfId, const char* lvlId, const char* detId,
                           const char* octId, const char* semiId, const char* pwId = nullptr)
@@ -434,8 +488,11 @@ void PresetManager::loadPreset(int index)
     juce::String logMessage;
     logMessage << "load index=" << index << " name=" << info.name << " file=" << info.filePath;
     didaPresetManagerLog(logMessage);
+    requestedPresetIsUserDiapreset = false;
+    pendingUserDiapresetApply = false;
 
-    // ".diapreset" JSON preset → apply param snapshot + route multisample folder.
+    // ".diapreset" JSON preset → route the multisample folder first; the
+    // processor applies the sound-design params after the source is active.
     if (info.isUserPreset)
     {
         dida::userpreset::UserPreset up;
@@ -513,14 +570,16 @@ void PresetManager::loadPreset(int index)
         requestedSampleLooping     = isSustainedSampleCategory(up.category);
         requestedCategory          = up.category;
         macroMapper.clear();
+        requestedPresetIsUserDiapreset = true;
+        pendingUserDiapreset = up;
+        pendingUserDiapresetApply = true;
 
-        dida::userpreset::applyToProcessor(up, processor);
-
-        didaPresetManagerLog("loaded diapreset name=" + up.presetName
+        didaPresetManagerLog("queued diapreset source-first load name=" + up.presetName
             + " category=" + up.category
             + " folder=" + requestedSampleFolderPath);
 
         if (onPresetLoaded) onPresetLoaded();
+        else applyPendingUserDiapresetAfterSampleLoad();
         return;
     }
 
@@ -562,6 +621,9 @@ void PresetManager::loadPreset(int index)
 
 void PresetManager::loadPresetFromFile(const juce::File& file)
 {
+    requestedPresetIsUserDiapreset = false;
+    pendingUserDiapresetApply = false;
+
     if (!validatePresetFile(file))
     {
         didaPresetManagerLog(juce::String("validation failed file=") + file.getFullPathName());
