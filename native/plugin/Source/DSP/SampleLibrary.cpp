@@ -399,7 +399,7 @@ std::shared_ptr<const Multisample> SampleLibrary::loadMultisampleFromFiles(const
     juce::StringArray paths;
     for (auto& f : files) paths.add(f.getFullPathName());
     paths.sort(true);
-    const auto cacheKey = (juce::String("multi:") + displayName + "|" + paths.joinIntoString("|")).toStdString();
+    const auto cacheKey = (juce::String("multi:") + paths.joinIntoString("|")).toStdString();
 
     {
         std::lock_guard<std::mutex> lock(cacheMutex());

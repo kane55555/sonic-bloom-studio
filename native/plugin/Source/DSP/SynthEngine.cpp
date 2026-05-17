@@ -243,9 +243,13 @@ bool SynthEngine::setMultisampleSources(const juce::Array<juce::File>& files,
     juce::StringArray paths;
     for (auto& f : files) paths.add(f.getFullPathName());
     paths.sort(true);
-    const auto sourceName = juce::String("multi:") + displayName + "|" + paths.joinIntoString("|");
+    const auto sourceName = juce::String("multi:") + paths.joinIntoString("|");
     if (sourceName == currentInstrumentName && activeMultisample != nullptr)
+    {
+        juce::Logger::writeToLog("[DIDITAGAIN multisample] loaded multisample zones: "
+            + juce::String((int) activeMultisample->zones.size()) + " name=" + displayName + " (reused)");
         return true;
+    }
 
     auto ms = files.isEmpty()
         ? std::shared_ptr<const dida::Multisample>{}
@@ -254,6 +258,9 @@ bool SynthEngine::setMultisampleSources(const juce::Array<juce::File>& files,
     if (! files.isEmpty() && ms == nullptr)
         juce::Logger::writeToLog("[DIDITAGAIN sample] failed to load multisample group: " + displayName
             + " files=" + juce::String(files.size()));
+    else if (ms != nullptr)
+        juce::Logger::writeToLog("[DIDITAGAIN multisample] loaded multisample zones: "
+            + juce::String((int) ms->zones.size()) + " name=" + displayName);
 
     activeMultisample = ms;
     currentInstrumentName = sourceName;
@@ -278,7 +285,11 @@ bool SynthEngine::loadMultisamplePreset(const juce::String& category,
     // Guitar 1 instead of clearing/reloading the sample map for each variant.
     const auto sourceName = juce::String("folder:") + folderPath;
     if (sourceName == currentInstrumentName && activeMultisample != nullptr)
+    {
+        juce::Logger::writeToLog("[DIDITAGAIN multisample] loaded multisample zones: "
+            + juce::String((int) activeMultisample->zones.size()) + " name=" + presetName + " (reused)");
         return true;
+    }
 
     auto ms = folderPath.isEmpty()
         ? std::shared_ptr<const dida::Multisample>{}
@@ -287,6 +298,9 @@ bool SynthEngine::loadMultisamplePreset(const juce::String& category,
     if (folderPath.isNotEmpty() && ms == nullptr)
         juce::Logger::writeToLog("[DIDITAGAIN sample] failed to load multisample preset folder: "
             + category + " > " + presetName + " path=" + folderPath);
+    else if (ms != nullptr)
+        juce::Logger::writeToLog("[DIDITAGAIN multisample] loaded multisample zones: "
+            + juce::String((int) ms->zones.size()) + " name=" + presetName);
 
     activeMultisample = ms;
     currentInstrumentName = sourceName;

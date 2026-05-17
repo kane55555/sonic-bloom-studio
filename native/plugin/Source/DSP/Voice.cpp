@@ -89,8 +89,8 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
         {
             const bool fallbackNearest = playedMidi < loZone->lowKey || playedMidi > loZone->highKey;
             juce::String message;
-            message << "NoteOn " << midiToNoteName(midiNoteNumber)
-                    << " -> selected " << loZone->fileName
+            message << "selected note " << midiToNoteName(midiNoteNumber)
+                    << " uses " << loZone->fileName
                     << " root=" << midiToNoteName(loZone->rootMidi)
                     << " zone=" << midiToNoteName(loZone->lowKey) << "-" << midiToNoteName(loZone->highKey)
                     << " offset=" << signedSemitoneOffset(playedMidi - loZone->rootMidi);

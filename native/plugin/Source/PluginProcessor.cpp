@@ -406,18 +406,7 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                     && requestedSampleList.isEmpty()
                     && requestedFolder.isEmpty());
                 bool sampleLoaded = false;
-                if (requestedFolder.isNotEmpty())
-                {
-                    sampleLoaded = synthEngine.loadMultisamplePreset(presetManager.getRequestedCategory(),
-                                                                     presetManager.getRequestedSampleDisplayName(),
-                                                                     requestedFolder);
-                    synthEngine.setSampleLooping(presetManager.getRequestedSampleLooping());
-                    if (! sampleLoaded)
-                        didaAudioLog("multisample folder load FAILED path=" + requestedFolder
-                            + " name=" + presetManager.getRequestedSampleDisplayName()
-                            + " -> falling back to explicit file list");
-                }
-                if (! sampleLoaded && requestedSampleList.size() > 1)
+                if (requestedSampleList.size() > 1)
                 {
                     juce::Array<juce::File> files;
                     for (auto& p : requestedSampleList) files.add(juce::File(p));
@@ -425,7 +414,18 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                                                      presetManager.getRequestedSampleDisplayName());
                     synthEngine.setSampleLooping(presetManager.getRequestedSampleLooping());
                     if (! sampleLoaded)
-                        didaAudioLog(juce::String("multisample load FAILED files=") + juce::String(files.size())
+                        didaAudioLog(juce::String("multisample file-list load FAILED files=") + juce::String(files.size())
+                            + " name=" + presetManager.getRequestedSampleDisplayName()
+                            + " -> falling back to folder scan");
+                }
+                if (! sampleLoaded && requestedFolder.isNotEmpty())
+                {
+                    sampleLoaded = synthEngine.loadMultisamplePreset(presetManager.getRequestedCategory(),
+                                                                     presetManager.getRequestedSampleDisplayName(),
+                                                                     requestedFolder);
+                    synthEngine.setSampleLooping(presetManager.getRequestedSampleLooping());
+                    if (! sampleLoaded)
+                        didaAudioLog("multisample folder load FAILED path=" + requestedFolder
                             + " name=" + presetManager.getRequestedSampleDisplayName()
                             + " -> falling back to single-sample path");
                 }
