@@ -447,6 +447,39 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         }
     }
 
+    const auto engineMode = static_cast<SynthVoice::EngineMode>(
+        static_cast<int>(getF("engineMode")));
+    const float fmAmount = getF("fmAmount");
+    const float fmRatio  = getF("fmRatio");
+    const float oscALevel = getF("oscALevel");
+    const float oscBLevel = getF("oscBLevel");
+    const int   oscAOct   = static_cast<int>(getF("oscAOctave"));
+    const int   oscASemi  = static_cast<int>(getF("oscASemi"));
+    const int   oscBOct   = static_cast<int>(getF("oscBOctave"));
+    const int   oscBSemi  = static_cast<int>(getF("oscBSemi"));
+    const float subLevel  = getF("subOscEnabled") > 0.5f ? getF("subOscLevel") : 0.0f;
+    const float noiseLvl  = getF("noiseLevel");
+    const int   noiseType = static_cast<int>(getF("noiseType"));
+    const float glide     = getF("glideTime");
+    const float cutoff    = getF("filter1Cutoff");
+    const float reso      = getF("filter1Resonance");
+    const auto  filterType = static_cast<FilterBlock::Type>(static_cast<int>(getF("filter1Type")));
+    const float fDrive    = getF("filter1Drive");
+    const float fEnvAmt   = getF("filter1EnvAmount");
+    const float keyTrk    = getF("filter1KeyTrack");
+
+    // Envelopes
+    const float ampA = getF("env1Attack"),  ampD = getF("env1Decay"),
+                ampS = getF("env1Sustain"), ampR = getF("env1Release");
+    const float fA = getF("env2Attack"),  fD = getF("env2Decay"),
+                fS = getF("env2Sustain"), fR = getF("env2Release");
+    const float mA = getF("env3Attack"),  mD = getF("env3Decay"),
+                mS = getF("env3Sustain"), mR = getF("env3Release");
+
+    const int   unisonVoices = juce::jlimit(1, 8, static_cast<int>(getF("unisonVoices")));
+    const float unisonDetune = getF("unisonDetune");
+    const float unisonSpread = getF("unisonSpread");
+
     synthEngine.forEachSynthVoice([&](SynthVoice& v)
     {
         v.setEngineMode(engineMode);
