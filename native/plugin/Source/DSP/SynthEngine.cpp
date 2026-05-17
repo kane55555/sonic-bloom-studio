@@ -254,6 +254,9 @@ bool SynthEngine::setMultisampleSources(const juce::Array<juce::File>& files,
     if (! files.isEmpty() && ms == nullptr)
         juce::Logger::writeToLog("[DIDITAGAIN sample] failed to load multisample group: " + displayName
             + " files=" + juce::String(files.size()));
+    else if (ms != nullptr)
+        juce::Logger::writeToLog("[DIDITAGAIN multisample] loaded multisample zones: "
+            + juce::String((int) ms->zones.size()) + " name=" + displayName);
 
     activeMultisample = ms;
     currentInstrumentName = sourceName;
@@ -287,6 +290,9 @@ bool SynthEngine::loadMultisamplePreset(const juce::String& category,
     if (folderPath.isNotEmpty() && ms == nullptr)
         juce::Logger::writeToLog("[DIDITAGAIN sample] failed to load multisample preset folder: "
             + category + " > " + presetName + " path=" + folderPath);
+    else if (ms != nullptr)
+        juce::Logger::writeToLog("[DIDITAGAIN multisample] loaded multisample zones: "
+            + juce::String((int) ms->zones.size()) + " name=" + presetName);
 
     activeMultisample = ms;
     currentInstrumentName = sourceName;
