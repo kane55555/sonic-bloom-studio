@@ -251,7 +251,10 @@ static juce::File findMultisampleFolderByName(const juce::String& folderName,
 
 juce::File resolveSourcePath(const juce::String& rawPath)
 {
-    auto src = rawPath.replaceCharacter('\\', '/').trim().trimCharactersAtStartAndEnd("\"'");
+    auto src = rawPath.replaceCharacter('\\', '/').trim();
+    while ((src.startsWithChar('"') && src.endsWithChar('"'))
+        || (src.startsWithChar('\'') && src.endsWithChar('\'')))
+        src = src.substring(1, src.length() - 1).trim();
     if (src.isEmpty()) return {};
 
     auto samplesRoot = dida::SampleLibrary::getSamplesRoot();
