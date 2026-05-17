@@ -8,6 +8,7 @@
 #include "UserPresetFormat.h"
 #include "GuitarPresetBank.h"
 #include "../DSP/SampleLibrary.h"
+#include <limits>
 
 // JUCE made AudioParameterChoice::setValue() private to discourage direct
 // writes; it's still accessible through the AudioProcessorParameter base.
