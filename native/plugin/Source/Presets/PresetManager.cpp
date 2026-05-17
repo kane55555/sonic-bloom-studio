@@ -40,6 +40,7 @@ PresetManager::PresetManager(juce::AudioProcessor& proc) : processor(proc)
     for (auto& cat : dida::preset::dropCategories())
         userPresetDir.getChildFile(cat).createDirectory();
 
+    seedGuitarPresetBankIfMissing();
     scanPresetDirectory();
 }
 
@@ -48,6 +49,7 @@ void PresetManager::scanPresetDirectory()
     presets.clear();
     loadFactoryPresets();
     loadUserPresets();
+    loadDiapresetFiles();
     loadDroppedSamples();
 }
 
