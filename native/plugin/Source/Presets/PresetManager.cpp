@@ -405,10 +405,11 @@ static juce::String getParamDebugValue(juce::AudioProcessor& proc, const char* i
                     const int clamped = juce::jlimit(0, choice->choices.size() - 1, idx);
                     return choice->choices[clamped] + "(" + juce::String(clamped) + ")";
                 }
+                auto* base = static_cast<juce::AudioProcessorParameter*>(param);
                 if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*>(withId))
-                    return juce::String(ranged->convertFrom0to1(ranged->getNormalisableRange().convertTo0to1(0.0f) == 0.0f ? ranged->convertTo0to1(0.0f) : 0.0f), 4);
+                    return juce::String(ranged->convertFrom0to1(base->getValue()), 4);
 
-                return juce::String(static_cast<juce::AudioProcessorParameter*>(withId)->getValue(), 4);
+                return juce::String(base->getValue(), 4);
             }
         }
     }
