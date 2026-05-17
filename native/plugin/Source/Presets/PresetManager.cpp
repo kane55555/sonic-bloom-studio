@@ -485,8 +485,11 @@ void PresetManager::loadPreset(int index)
     juce::String logMessage;
     logMessage << "load index=" << index << " name=" << info.name << " file=" << info.filePath;
     didaPresetManagerLog(logMessage);
+    requestedPresetIsUserDiapreset = false;
+    pendingUserDiapresetApply = false;
 
-    // ".diapreset" JSON preset → apply param snapshot + route multisample folder.
+    // ".diapreset" JSON preset → route the multisample folder first; the
+    // processor applies the sound-design params after the source is active.
     if (info.isUserPreset)
     {
         dida::userpreset::UserPreset up;
@@ -564,14 +567,16 @@ void PresetManager::loadPreset(int index)
         requestedSampleLooping     = isSustainedSampleCategory(up.category);
         requestedCategory          = up.category;
         macroMapper.clear();
+        requestedPresetIsUserDiapreset = true;
+        pendingUserDiapreset = up;
+        pendingUserDiapresetApply = true;
 
-        dida::userpreset::applyToProcessor(up, processor);
-
-        didaPresetManagerLog("loaded diapreset name=" + up.presetName
+        didaPresetManagerLog("queued diapreset source-first load name=" + up.presetName
             + " category=" + up.category
             + " folder=" + requestedSampleFolderPath);
 
         if (onPresetLoaded) onPresetLoaded();
+        else applyPendingUserDiapresetAfterSampleLoad();
         return;
     }
 
