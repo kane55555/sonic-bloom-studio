@@ -405,6 +405,43 @@ void PresetManager::loadPreset(int index)
     logMessage << "load index=" << index << " name=" << info.name << " file=" << info.filePath;
     didaPresetManagerLog(logMessage);
 
+    // ".diapreset" JSON preset → apply param snapshot + route multisample folder.
+    if (info.isUserPreset)
+    {
+        dida::userpreset::UserPreset up;
+        juce::String err;
+        juce::File file(info.userPresetFile);
+        if (! dida::userpreset::parseFile(file, up, err))
+        {
+            didaPresetManagerLog("diapreset parse failed file=" + file.getFullPathName() + " err=" + err);
+            return;
+        }
+
+        auto resolved = dida::userpreset::resolveSourcePath(up.source.path);
+        if (! resolved.isDirectory())
+            didaPresetManagerLog("diapreset source folder missing path=" + up.source.path);
+
+        // Route the multisample folder via the existing engine path.
+        requestedInstrument        = {};
+        requestedSampleSource      = {};
+        requestedSampleSources.clear();
+        requestedSampleFolderPath  = resolved.getFullPathName();
+        requestedSampleDisplayName = up.presetName;
+        requestedSampleRootMidi    = 60;
+        requestedSampleLooping     = false;
+        requestedCategory          = up.category;
+        macroMapper.clear();
+
+        dida::userpreset::applyToProcessor(up, processor);
+
+        didaPresetManagerLog("loaded diapreset name=" + up.presetName
+            + " category=" + up.category
+            + " folder=" + requestedSampleFolderPath);
+
+        if (onPresetLoaded) onPresetLoaded();
+        return;
+    }
+
     if (info.isSampleDrop)
     {
         // No JSON to parse — just route the dropped one-shot into the engine.
@@ -420,8 +457,6 @@ void PresetManager::loadPreset(int index)
 
         // Reset the synth voice so the dropped sample is what you hear — not
         // whatever oscillator/sub/noise levels the previous preset left armed.
-        // Voice multiplies sample output by oscALevel, so push it to unity and
-        // silence Osc B / Sub / Noise. Filter wide open, sensible amp env.
         setParam(processor, "oscALevel",       1.0);
         setParam(processor, "oscBLevel",       0.0);
         setParam(processor, "subOscLevel",     0.0);
