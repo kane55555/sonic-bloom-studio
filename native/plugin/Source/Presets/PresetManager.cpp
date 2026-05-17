@@ -93,6 +93,37 @@ static int parseRootMidiFromStem(const juce::String& stem)
     return (midi >= 0 && midi <= 127) ? midi : -1;
 }
 
+static bool isSustainedSampleCategory(const juce::String& category)
+{
+    return category == "Pads" || category == "Strings"
+        || category == "Choirs" || category == "Brass"
+        || category == "Winds"  || category == "Synths";
+}
+
+static juce::File chooseRepresentativeMappedWav(const juce::Array<juce::File>& files, int& rootMidiOut)
+{
+    juce::File chosen = files.getFirst();
+    rootMidiOut = 60;
+    int bestScore = std::numeric_limits<int>::max();
+
+    for (auto& f : files)
+    {
+        const int midi = parseRootMidiFromStem(f.getFileNameWithoutExtension());
+        if (midi < 0) continue;
+
+        // Prefer C4 if present, otherwise C3, then the nearest mapped root.
+        const int score = juce::jmin(std::abs(midi - 60), std::abs(midi - 48) + 1);
+        if (score < bestScore)
+        {
+            bestScore = score;
+            chosen = f;
+            rootMidiOut = midi;
+        }
+    }
+
+    return chosen;
+}
+
 // Scan one "category root" directory. Each immediate subfolder is treated as
 // a preset (multisample group of every WAV inside). Loose WAVs sitting
 // directly in the category folder are collapsed into a single backward-compat
@@ -149,9 +180,7 @@ static void scanCategoryFolder(const juce::File& categoryDir,
     }
 
     const juce::String cat = categoryName;
-    const bool sustained = (cat == "Pads" || cat == "Strings"
-                            || cat == "Choirs" || cat == "Brass"
-                            || cat == "Winds"  || cat == "Synths");
+    const bool sustained = isSustainedSampleCategory(cat);
 
     for (auto& g : groups)
     {
