@@ -399,17 +399,16 @@ static juce::String getParamDebugValue(juce::AudioProcessor& proc, const char* i
             {
                 if (auto* choice = dynamic_cast<juce::AudioParameterChoice*>(withId))
                 {
+                    const int idx = choice->getIndex();
                     if (choice->choices.isEmpty())
-                        return juce::String(withId->getValue(), 4);
-
-                    const int idx = juce::jlimit(0, choice->choices.size() - 1,
-                        static_cast<int>(std::round(choice->convertFrom0to1(choice->getValue()))));
-                    return choice->choices[idx] + "(" + juce::String(idx) + ")";
+                        return juce::String(idx);
+                    const int clamped = juce::jlimit(0, choice->choices.size() - 1, idx);
+                    return choice->choices[clamped] + "(" + juce::String(clamped) + ")";
                 }
                 if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*>(withId))
-                    return juce::String(ranged->convertFrom0to1(ranged->getValue()), 4);
+                    return juce::String(ranged->convertFrom0to1(ranged->getNormalisableRange().convertTo0to1(0.0f) == 0.0f ? ranged->convertTo0to1(0.0f) : 0.0f), 4);
 
-                return juce::String(withId->getValue(), 4);
+                return juce::String(static_cast<juce::AudioProcessorParameter*>(withId)->getValue(), 4);
             }
         }
     }
