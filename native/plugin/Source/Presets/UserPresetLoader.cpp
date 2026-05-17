@@ -193,7 +193,7 @@ bool parseFile(const juce::File& file, UserPreset& out, juce::String& errorOut)
 static bool folderHasWavs(const juce::File& folder)
 {
     return folder.isDirectory()
-        && ! folder.findChildFiles(juce::File::findFiles, false, "*.wav").isEmpty();
+        && ! folder.findChildFiles(juce::File::findFiles, true, "*.wav").isEmpty();
 }
 
 static void addCandidate(juce::Array<juce::File>& candidates, const juce::File& file)
@@ -299,7 +299,7 @@ juce::File resolveSourcePath(const juce::String& rawPath)
     }
 
     for (auto& candidate : candidates)
-        if (candidate.isDirectory())
+        if (folderHasWavs(candidate))
             return candidate;
 
     juce::String preferredParent;
