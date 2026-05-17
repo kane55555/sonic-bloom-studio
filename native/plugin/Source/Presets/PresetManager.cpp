@@ -388,6 +388,45 @@ static void setParam(juce::AudioProcessor& proc, const char* id, const juce::var
     }
 }
 
+static juce::String getParamDebugValue(juce::AudioProcessor& proc, const char* id)
+{
+    for (auto* param : proc.getParameters())
+    {
+        if (auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
+        {
+            if (withId->paramID == id)
+            {
+                if (auto* choice = dynamic_cast<juce::AudioParameterChoice*>(withId))
+                {
+                    const int idx = juce::jlimit(0, choice->choices.size() - 1,
+                        static_cast<int>(std::round(choice->convertFrom0to1(choice->getValue()))));
+                    return choice->choices[idx] + "(" + juce::String(idx) + ")";
+                }
+                if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*>(withId))
+                    return juce::String(ranged->convertFrom0to1(ranged->getValue()), 4);
+
+                return juce::String(withId->getValue(), 4);
+            }
+        }
+    }
+    return "<missing>";
+}
+
+static void logFinalActivePresetParams(juce::AudioProcessor& proc, const juce::String& presetName)
+{
+    didaPresetManagerLog("FINAL ACTIVE PRESET PARAMS"
+        " presetName=" + presetName
+        + " filter1Type=" + getParamDebugValue(proc, "filter1Type")
+        + " filter1Cutoff=" + getParamDebugValue(proc, "filter1Cutoff")
+        + " env1Attack=" + getParamDebugValue(proc, "env1Attack")
+        + " env1Release=" + getParamDebugValue(proc, "env1Release")
+        + " fxChorusMix=" + getParamDebugValue(proc, "fxChorusMix")
+        + " fxDelayMix=" + getParamDebugValue(proc, "fxDelayMix")
+        + " fxReverbMix=" + getParamDebugValue(proc, "fxReverbMix")
+        + " fxDistortionAmount=" + getParamDebugValue(proc, "fxDistortionAmount")
+        + " oscBLevel=" + getParamDebugValue(proc, "oscBLevel"));
+}
+
 static void applyOscBlock(juce::AudioProcessor& proc, const juce::var& obj,
                           const char* wfId, const char* lvlId, const char* detId,
                           const char* octId, const char* semiId, const char* pwId = nullptr)
