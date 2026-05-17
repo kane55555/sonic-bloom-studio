@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include "MacroMapper.h"
+#include "UserPresetFormat.h"
 
 struct PresetInfo
 {
@@ -94,6 +95,12 @@ public:
     const juce::String& getRequestedCategory() const noexcept { return requestedCategory; }
     dida::preset::MacroMapper& getMacroMapper() noexcept { return macroMapper; }
 
+    // .diapreset presets load their multisample source first, then apply their
+    // sound-design parameters so the plain sample-drop defaults cannot win.
+    bool isCurrentPresetUserDiapreset() const noexcept { return requestedPresetIsUserDiapreset; }
+    bool shouldApplyUserDiapresetAfterSampleLoad() const noexcept { return pendingUserDiapresetApply; }
+    void applyPendingUserDiapresetAfterSampleLoad();
+
     void toggleFavorite(int index);
     std::vector<int> searchByTag(const juce::String& tag) const;
     std::vector<int> searchByName(const juce::String& query) const;
@@ -117,6 +124,9 @@ private:
     bool requestedSampleLooping = false;
     juce::String requestedCategory;
     dida::preset::MacroMapper macroMapper;
+    bool requestedPresetIsUserDiapreset = false;
+    bool pendingUserDiapresetApply = false;
+    dida::userpreset::UserPreset pendingUserDiapreset;
 
     void loadFactoryPresets();
     void loadUserPresets();
