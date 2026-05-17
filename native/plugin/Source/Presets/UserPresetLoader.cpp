@@ -189,14 +189,131 @@ bool parseFile(const juce::File& file, UserPreset& out, juce::String& errorOut)
     return true;
 }
 
+static bool folderHasWavs(const juce::File& folder)
+{
+    return folder.isDirectory()
+        && ! folder.findChildFiles(juce::File::findFiles, false, "*.wav").isEmpty();
+}
+
+static void addCandidate(juce::Array<juce::File>& candidates, const juce::File& file)
+{
+    const auto path = file.getFullPathName();
+    if (path.isEmpty()) return;
+
+    for (auto& existing : candidates)
+        if (existing.getFullPathName().equalsIgnoreCase(path))
+            return;
+
+    candidates.add(file);
+}
+
+static juce::File findMultisampleFolderByName(const juce::String& folderName,
+                                              const juce::String& preferredParent)
+{
+    if (folderName.isEmpty()) return {};
+
+    auto root = dida::SampleLibrary::getSamplesRoot();
+    if (! root.isDirectory()) return {};
+
+    auto dirs = root.findChildFiles(juce::File::findDirectories, true);
+    std::sort(dirs.begin(), dirs.end(), [](const juce::File& a, const juce::File& b)
+    {
+        return a.getFullPathName().length() < b.getFullPathName().length();
+    });
+
+    auto parentMatches = [&](const juce::File& dir)
+    {
+        if (preferredParent.isEmpty()) return true;
+        const auto parent = dir.getParentDirectory().getFileName();
+        return parent.equalsIgnoreCase(preferredParent)
+            || (preferredParent.endsWithIgnoreCase("s") && parent.equalsIgnoreCase(preferredParent.dropLastCharacters(1)))
+            || (! preferredParent.endsWithIgnoreCase("s") && parent.equalsIgnoreCase(preferredParent + "s"));
+    };
+
+    for (auto& dir : dirs)
+    {
+        const auto normalised = dir.getFullPathName().replaceCharacter('\\', '/');
+        if (normalised.containsIgnoreCase("/Samples/Presets/")) continue;
+        if (! dir.getFileName().equalsIgnoreCase(folderName)) continue;
+        if (parentMatches(dir) && folderHasWavs(dir)) return dir;
+    }
+
+    for (auto& dir : dirs)
+    {
+        const auto normalised = dir.getFullPathName().replaceCharacter('\\', '/');
+        if (normalised.containsIgnoreCase("/Samples/Presets/")) continue;
+        if (dir.getFileName().equalsIgnoreCase(folderName) && folderHasWavs(dir)) return dir;
+    }
+
+    return {};
+}
+
 juce::File resolveSourcePath(const juce::String& rawPath)
 {
-    if (rawPath.isEmpty()) return {};
-    juce::File f(rawPath);
-    if (f.isAbsolutePath(rawPath)) return f;
-    // Treat as relative to Documents/DIDITAGAIN STUDIO
-    return dida::SampleLibrary::getSamplesRoot().getParentDirectory()
-            .getChildFile(rawPath);
+    auto src = rawPath.replaceCharacter('\\', '/').trim().trimCharactersAtStartAndEnd("\"'");
+    if (src.isEmpty()) return {};
+
+    auto samplesRoot = dida::SampleLibrary::getSamplesRoot();
+    auto docsRoot = samplesRoot.getParentDirectory();
+    juce::Array<juce::File> candidates;
+
+    auto expanded = src;
+    expanded = expanded.replace("{DocsRoot}", docsRoot.getFullPathName().replaceCharacter('\\', '/'), true);
+    expanded = expanded.replace("{Docs}",     docsRoot.getFullPathName().replaceCharacter('\\', '/'), true);
+    expanded = expanded.replace("{Documents}", docsRoot.getFullPathName().replaceCharacter('\\', '/'), true);
+    expanded = expanded.replace("{Samples}",  samplesRoot.getFullPathName().replaceCharacter('\\', '/'), true);
+
+    if (juce::File::isAbsolutePath(expanded))
+        addCandidate(candidates, juce::File(expanded));
+
+    if (expanded.startsWithIgnoreCase("Samples/"))
+        addCandidate(candidates, samplesRoot.getChildFile(expanded.substring(8)));
+
+    addCandidate(candidates, docsRoot.getChildFile(expanded));
+    addCandidate(candidates, samplesRoot.getChildFile(expanded));
+
+    juce::String samplesRelative;
+    const int samplesMarker = expanded.indexOfIgnoreCase("/Samples/");
+    if (samplesMarker >= 0)
+        samplesRelative = expanded.substring(samplesMarker + 9);
+    else if (expanded.startsWithIgnoreCase("Samples/"))
+        samplesRelative = expanded.substring(8);
+
+    if (samplesRelative.isNotEmpty())
+    {
+        addCandidate(candidates, samplesRoot.getChildFile(samplesRelative));
+        const int slash = samplesRelative.indexOfChar('/');
+        if (slash > 0)
+        {
+            const auto category = samplesRelative.substring(0, slash);
+            const auto rest = samplesRelative.substring(slash + 1);
+            if (category.endsWithIgnoreCase("s"))
+                addCandidate(candidates, samplesRoot.getChildFile(category.dropLastCharacters(1)).getChildFile(rest));
+            else
+                addCandidate(candidates, samplesRoot.getChildFile(category + "s").getChildFile(rest));
+        }
+    }
+
+    for (auto& candidate : candidates)
+        if (candidate.isDirectory())
+            return candidate;
+
+    juce::String preferredParent;
+    juce::String folderName;
+    auto rel = samplesRelative.isNotEmpty() ? samplesRelative : expanded;
+    const int lastSlash = rel.lastIndexOfChar('/');
+    folderName = lastSlash >= 0 ? rel.substring(lastSlash + 1) : juce::File(rel).getFileName();
+    const int firstSlash = rel.indexOfChar('/');
+    if (firstSlash > 0) preferredParent = rel.substring(0, firstSlash);
+
+    auto discovered = findMultisampleFolderByName(folderName, preferredParent);
+    if (discovered.isDirectory())
+    {
+        didaUserPresetLog("resolved missing source " + rawPath + " -> " + discovered.getFullPathName());
+        return discovered;
+    }
+
+    return candidates.isEmpty() ? juce::File(expanded) : candidates.getFirst();
 }
 
 // ---- APVTS setters (mirror PresetManager.cpp helpers) ---------------------
