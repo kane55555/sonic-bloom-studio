@@ -277,7 +277,7 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     setParamById(proc, "noiseLevel",   0.0f);
     for (auto* param : proc.getParameters())
         if (auto* b = dynamic_cast<juce::AudioParameterBool*>(param))
-            if (b->paramID == "subOscEnabled") b->setValue(0.0f);
+            if (b->paramID == "subOscEnabled") setParamRaw(b, 0.0f);
 
     // -- FX
     setParamById(proc, "fxChorusMix",        p.chorus.enabled    ? p.chorus.mix     : 0.0f);
