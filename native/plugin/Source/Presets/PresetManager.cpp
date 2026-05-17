@@ -9,6 +9,7 @@
 #include "GuitarPresetBank.h"
 #include "../DSP/SampleLibrary.h"
 #include <limits>
+#include <cmath>
 
 // JUCE made AudioParameterChoice::setValue() private to discourage direct
 // writes; it's still accessible through the AudioProcessorParameter base.
@@ -425,6 +426,17 @@ static void logFinalActivePresetParams(juce::AudioProcessor& proc, const juce::S
         + " fxReverbMix=" + getParamDebugValue(proc, "fxReverbMix")
         + " fxDistortionAmount=" + getParamDebugValue(proc, "fxDistortionAmount")
         + " oscBLevel=" + getParamDebugValue(proc, "oscBLevel"));
+}
+
+void PresetManager::applyPendingUserDiapresetAfterSampleLoad()
+{
+    if (! pendingUserDiapresetApply)
+        return;
+
+    pendingUserDiapresetApply = false;
+    didaPresetManagerLog("applying diapreset sound design after source load: " + pendingUserDiapreset.presetName);
+    dida::userpreset::applyToProcessor(pendingUserDiapreset, processor);
+    logFinalActivePresetParams(processor, pendingUserDiapreset.presetName);
 }
 
 static void applyOscBlock(juce::AudioProcessor& proc, const juce::var& obj,
