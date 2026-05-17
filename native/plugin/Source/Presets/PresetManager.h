@@ -28,6 +28,12 @@ struct PresetInfo
     // build a true multisampled instrument stretched across the keyboard.
     juce::StringArray sampleSourcePaths;
     juce::String sampleFolderPath;
+
+    // ".diapreset" user preset (JSON + multisample folder reference). When
+    // set, the preset's parameter snapshot is applied on load and the
+    // referenced folder is routed into the engine as a multisample.
+    bool isUserPreset = false;
+    juce::String userPresetFile; // .diapreset path on disk
 };
 
 namespace dida { namespace preset {
@@ -115,4 +121,6 @@ private:
     void loadFactoryPresets();
     void loadUserPresets();
     void loadDroppedSamples();
+    void loadDiapresetFiles();
+    void seedGuitarPresetBankIfMissing();
 };
