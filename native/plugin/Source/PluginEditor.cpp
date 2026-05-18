@@ -97,13 +97,14 @@ bool DiditagainEditor::keyPressed(const juce::KeyPress& key)
 
 bool DiditagainEditor::keyPressed(const juce::KeyPress& key, juce::Component* /*origin*/)
 {
+    // Spacebar must reach the DAW for transport play/pause. Never consume it,
+    // even when this editor is attached as a KeyListener to the preset list.
+    if (key == juce::KeyPress::spaceKey) return false;
+
     // Modal overlay or text-field editing — let the focused widget handle keys.
     if (overlayPanel != nullptr) return false;
     if (auto* focused = juce::Component::getCurrentlyFocusedComponent())
         if (dynamic_cast<juce::TextEditor*>(focused) != nullptr) return false;
-
-    // Spacebar must reach the DAW for transport play/pause. Never consume it.
-    if (key == juce::KeyPress::spaceKey) return false;
 
     int delta = 0;
     if      (key == juce::KeyPress::downKey  || key == juce::KeyPress::rightKey) delta =  1;
