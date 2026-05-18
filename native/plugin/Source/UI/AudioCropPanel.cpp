@@ -448,6 +448,12 @@ AudioCropPanel::AudioCropPanel()
     addAndMakeVisible(resetView);
     addAndMakeVisible(snapZero);
 
+    zoomIn.onClick    = [this]() { if (waveform) waveform->zoomBy(0.5,
+        waveform->viewStart + waveform->viewSpan * 0.5); };
+    zoomOut.onClick   = [this]() { if (waveform) waveform->zoomBy(2.0,
+        waveform->viewStart + waveform->viewSpan * 0.5); };
+    resetView.onClick = [this]() { if (waveform) waveform->resetZoom(); };
+
     // ---- right controls ----
     auto setupSlider = [this](juce::Slider& s, juce::Label& l, const juce::String& name,
                               double min, double max, double step) {
