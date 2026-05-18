@@ -132,6 +132,22 @@ public:
         return true;
     }
 
+    bool keyPressed(const juce::KeyPress& key) override
+    {
+        if (key == juce::KeyPress::spaceKey) return false;
+
+        int delta = 0;
+        if      (key == juce::KeyPress::downKey  || key == juce::KeyPress::rightKey) delta =  1;
+        else if (key == juce::KeyPress::upKey    || key == juce::KeyPress::leftKey)  delta = -1;
+        else if (key == juce::KeyPress::pageDownKey) delta =  10;
+        else if (key == juce::KeyPress::pageUpKey)   delta = -10;
+        else return false;
+
+        return stepSelection(delta);
+    }
+
+    bool keyStateChanged(bool /*isKeyDown*/) override { return false; }
+
     void resized() override
     {
         auto area = getLocalBounds().reduced(8);
