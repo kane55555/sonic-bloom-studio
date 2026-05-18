@@ -73,6 +73,8 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
 
     overlayClose.setColour(juce::TextButton::buttonColourId, Theme::getColors().surfaceElevated);
     overlayClose.setColour(juce::TextButton::textColourOffId, Theme::getColors().textPrimary);
+    overlayClose.setWantsKeyboardFocus(false);
+    overlayClose.setMouseClickGrabsKeyboardFocus(false);
     overlayClose.onClick = [this]() { hideOverlay(); };
     overlayTitle.setFont(Theme::getHeadingFont(16.0f));
     overlayTitle.setColour(juce::Label::textColourId, Theme::getColors().accentTeal);
@@ -154,6 +156,8 @@ void DiditagainEditor::setupTabs()
     auto& C = Theme::getColors();
     auto setupTab = [this, &C](juce::TextButton& btn, Tab tab) {
         btn.onClick = [this, tab]() { switchTab(tab); };
+        btn.setWantsKeyboardFocus(false);
+        btn.setMouseClickGrabsKeyboardFocus(false);
         btn.setColour(juce::TextButton::buttonColourId, C.surface);
         btn.setColour(juce::TextButton::textColourOnId, C.accentTeal);
         btn.setColour(juce::TextButton::textColourOffId, C.textSecondary);
@@ -166,13 +170,19 @@ void DiditagainEditor::setupTabs()
 
     menuButton.setColour(juce::TextButton::buttonColourId, C.surface);
     menuButton.setColour(juce::TextButton::textColourOffId, C.accentTeal);
+    menuButton.setWantsKeyboardFocus(false);
+    menuButton.setMouseClickGrabsKeyboardFocus(false);
     menuButton.onClick = [this]() { openMenu(); };
     addAndMakeVisible(menuButton);
 
+    savePreset.setWantsKeyboardFocus(false);
+    savePreset.setMouseClickGrabsKeyboardFocus(false);
     addAndMakeVisible(savePreset);
 
     directMonitorButton.setClickingTogglesState(true);
     directMonitorButton.setTooltip("Bypass reverb + delay for low-latency tracking. Turn off for mixdown.");
+    directMonitorButton.setWantsKeyboardFocus(false);
+    directMonitorButton.setMouseClickGrabsKeyboardFocus(false);
     directMonitorButton.setColour(juce::TextButton::buttonColourId, C.surface);
     directMonitorButton.setColour(juce::TextButton::buttonOnColourId, C.accentTeal);
     directMonitorButton.setColour(juce::TextButton::textColourOffId, C.accentTeal);
