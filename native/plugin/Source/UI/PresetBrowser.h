@@ -32,19 +32,16 @@ public:
 
         addAndMakeVisible(list);
         list.setModel(this);
+        list.onKeyPressed = [this](const juce::KeyPress& key) { return keyPressed(key); };
         list.setRowHeight(28);
         list.setColour(juce::ListBox::backgroundColourId, Theme::getColors().background);
 
-        // The ListBox must want keyboard focus so the attached KeyListener
-        // (the top-level editor) can intercept arrow keys for preset stepping.
-        // The editor's keyPressed returns false for spacebar so it bubbles to
-        // the host (DAW play/pause). The search field must NOT auto-grab focus
-        // on open — otherwise clicking a preset row would still leave the
-        // caret in the search box. setWantsKeyboardFocus(false) removes it
-        // from the focus traversal order while still allowing click-to-focus
-        // (TextEditor handles its own mouse focus regardless of this flag).
+        // The ListBox must want keyboard focus so arrow keys keep stepping
+        // presets after a row click. The search field remains focusable only
+        // through a direct click; no preset/category action grabs it.
         list.setWantsKeyboardFocus(true);
-        searchBox.setWantsKeyboardFocus(false);
+        searchBox.setWantsKeyboardFocus(true);
+        searchBox.setMouseClickGrabsKeyboardFocus(true);
         setWantsKeyboardFocus(false);
     }
 
@@ -135,6 +132,22 @@ public:
         if (onPresetSelected) onPresetSelected(selectedGlobal);
         return true;
     }
+
+    bool keyPressed(const juce::KeyPress& key) override
+    {
+        if (key == juce::KeyPress::spaceKey) return false;
+
+        int delta = 0;
+        if      (key == juce::KeyPress::downKey  || key == juce::KeyPress::rightKey) delta =  1;
+        else if (key == juce::KeyPress::upKey    || key == juce::KeyPress::leftKey)  delta = -1;
+        else if (key == juce::KeyPress::pageDownKey) delta =  10;
+        else if (key == juce::KeyPress::pageUpKey)   delta = -10;
+        else return false;
+
+        return stepSelection(delta);
+    }
+
+    bool keyStateChanged(bool /*isKeyDown*/) override { return false; }
 
     void resized() override
     {
@@ -350,9 +363,13 @@ private:
     void listBoxItemClicked(int rowNumber, const juce::MouseEvent&) override
     {
         if (rowNumber < 0 || rowNumber >= rows.size()) return;
+        // Preset/category clicks should keep keyboard focus on the browser list
+        // so arrow stepping continues. Never move focus to the search box here.
+        list.grabKeyboardFocus();
         const auto r = rows[rowNumber];
         if (r.kind == Row::Header)
         {
+            list.selectRow(rowNumber);
             if (openCategories.count(r.category)) openCategories.erase(r.category);
             else openCategories.insert(r.category);
             rebuildRows();
@@ -360,6 +377,7 @@ private:
         else
         {
             selectedGlobal = r.globalIndex;
+            list.selectRow(rowNumber);
             list.repaint();
             if (onPresetSelected) onPresetSelected(r.globalIndex);
         }
@@ -373,8 +391,19 @@ private:
         bool keyPressed(const juce::KeyPress& k) override
         {
             if (k == juce::KeyPress::spaceKey) return false;
+            if (onKeyPressed && onKeyPressed(k)) return true;
             return juce::ListBox::keyPressed(k);
         }
+
+        bool keyStateChanged(bool /*isKeyDown*/) override
+        {
+            // Do not consume raw key-state changes. In FL Studio this is
+            // important for allowing transport shortcuts (spacebar) to stay
+            // host-owned while the list has focus for arrow browsing.
+            return false;
+        }
+
+        std::function<bool(const juce::KeyPress&)> onKeyPressed;
     };
 
     juce::TextEditor searchBox;
