@@ -350,9 +350,13 @@ private:
     void listBoxItemClicked(int rowNumber, const juce::MouseEvent&) override
     {
         if (rowNumber < 0 || rowNumber >= rows.size()) return;
+        // Preset/category clicks should keep keyboard focus on the browser list
+        // so arrow stepping continues. Never move focus to the search box here.
+        list.grabKeyboardFocus();
         const auto r = rows[rowNumber];
         if (r.kind == Row::Header)
         {
+            list.selectRow(rowNumber, false, false);
             if (openCategories.count(r.category)) openCategories.erase(r.category);
             else openCategories.insert(r.category);
             rebuildRows();
@@ -360,6 +364,7 @@ private:
         else
         {
             selectedGlobal = r.globalIndex;
+            list.selectRow(rowNumber, false, false);
             list.repaint();
             if (onPresetSelected) onPresetSelected(r.globalIndex);
         }
@@ -374,6 +379,14 @@ private:
         {
             if (k == juce::KeyPress::spaceKey) return false;
             return juce::ListBox::keyPressed(k);
+        }
+
+        bool keyStateChanged(bool /*isKeyDown*/) override
+        {
+            // Do not consume raw key-state changes. In FL Studio this is
+            // important for allowing transport shortcuts (spacebar) to stay
+            // host-owned while the list has focus for arrow browsing.
+            return false;
         }
     };
 
