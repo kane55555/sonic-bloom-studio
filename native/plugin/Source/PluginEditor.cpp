@@ -7,10 +7,14 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     setSize(1200, 760);
     setResizable(true, true);
     setResizeLimits(960, 640, 1920, 1200);
-    // Editor owns top-level focus so arrow keys reach keyPressed even after the
-    // user clicks on a child. Spacebar is returned as unhandled below so the
-    // host DAW receives it for transport play/pause.
-    setWantsKeyboardFocus(true);
+    // CRITICAL: do NOT take keyboard focus at the editor level. Hosts like
+    // Ableton Live, FL Studio and Logic only forward the spacebar (transport
+    // play/pause) to the DAW when the plugin window does not own focus. We
+    // still receive arrow keys for preset stepping because PresetBrowser
+    // attaches us as a juce::KeyListener on its child components — that path
+    // fires regardless of which component has focus, and we can return false
+    // for unhandled keys so the host still gets them.
+    setWantsKeyboardFocus(false);
 
     layerPanel = std::make_unique<LayerEditor>(processor.getAPVTS());
     addAndMakeVisible(*layerPanel);
@@ -98,9 +102,7 @@ bool DiditagainEditor::keyPressed(const juce::KeyPress& key, juce::Component* /*
     if (auto* focused = juce::Component::getCurrentlyFocusedComponent())
         if (dynamic_cast<juce::TextEditor*>(focused) != nullptr) return false;
 
-    // Spacebar must pass through to the DAW so the piano roll can play/pause
-    // even while the plugin window has focus. Returning false lets JUCE bubble
-    // the event up to the host wrapper.
+    // Spacebar must reach the DAW for transport play/pause. Never consume it.
     if (key == juce::KeyPress::spaceKey) return false;
 
     int delta = 0;
