@@ -70,6 +70,7 @@ private:
         void mouseDown(const juce::MouseEvent& e) override;
         void mouseDrag(const juce::MouseEvent& e) override;
         void mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override;
+        void mouseMagnify(const juce::MouseEvent& e, float scaleFactor) override;
         void loadFor(const juce::File& f);
 
         // Zoom controls

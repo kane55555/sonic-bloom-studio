@@ -237,6 +237,9 @@ double AudioCropPanel::Waveform::screenToFrac(int x) const
 
 void AudioCropPanel::Waveform::zoomBy(double factor, double anchorFrac)
 {
+    if (buffer.getNumSamples() == 0)
+        return;
+
     const double newSpan = juce::jlimit(0.0005, 1.0, viewSpan * factor);
     // keep anchorFrac (in buffer space) stationary on screen
     const double anchorScreen = (anchorFrac - viewStart) / juce::jmax(1e-9, viewSpan); // 0..1
@@ -256,6 +259,9 @@ void AudioCropPanel::Waveform::resetZoom()
 
 void AudioCropPanel::Waveform::panBy(double deltaFrac)
 {
+    if (viewSpan >= 1.0)
+        return;
+
     viewStart = juce::jlimit(0.0, 1.0 - viewSpan, viewStart + deltaFrac);
     repaint();
 }
@@ -278,17 +284,18 @@ void AudioCropPanel::Waveform::paint(juce::Graphics& g)
     // Waveform — only render samples inside view window
     g.setColour(C.accentTeal.withAlpha(0.55f));
     const int n = buffer.getNumSamples();
-    const int viewS0 = (int) juce::jlimit(0.0, (double) (n - 1), viewStart * n);
-    const int viewLen = juce::jmax(1, (int) (viewSpan * n));
-    const int step = juce::jmax(1, viewLen / w);
+    const int viewS0 = (int) juce::jlimit(0.0, (double) (n - 1), std::floor(viewStart * (double) n));
+    const int viewS1 = (int) juce::jlimit((double) viewS0 + 1.0, (double) n, std::ceil((viewStart + viewSpan) * (double) n));
+    const int viewLen = juce::jmax(1, viewS1 - viewS0);
     auto* d = buffer.getReadPointer(0);
     for (int x = 0; x < w; ++x)
     {
         float lo = 1.f, hi = -1.f;
-        const int s0 = viewS0 + x * step;
-        for (int i = 0; i < step && (s0 + i) < n; ++i)
+        const int s0 = viewS0 + (int) std::floor(((double) x / (double) w) * (double) viewLen);
+        const int s1 = viewS0 + (int) std::ceil (((double) (x + 1) / (double) w) * (double) viewLen);
+        for (int i = s0; i < s1 && i < viewS1; ++i)
         {
-            float s = d[s0 + i];
+            float s = d[i];
             if (s < lo) lo = s; if (s > hi) hi = s;
         }
         const int yHi = (int) ((1.f - (hi + 1.f) * 0.5f) * h);
@@ -384,7 +391,15 @@ void AudioCropPanel::Waveform::mouseWheelMove(const juce::MouseEvent& e,
                                               const juce::MouseWheelDetails& w)
 {
     const double anchor = screenToFrac(e.x);
-    const double factor = (w.deltaY > 0.0f) ? 0.8 : 1.25;
+    const float wheelDelta = std::abs(w.deltaY) > std::abs(w.deltaX) ? w.deltaY : w.deltaX;
+    const double factor = (wheelDelta > 0.0f) ? 0.65 : 1.35;
+    zoomBy(factor, anchor);
+}
+
+void AudioCropPanel::Waveform::mouseMagnify(const juce::MouseEvent& e, float scaleFactor)
+{
+    const double anchor = screenToFrac(e.x);
+    const double factor = scaleFactor > 1.0f ? 1.0 / (double) scaleFactor : 1.0 + (1.0 - (double) scaleFactor);
     zoomBy(factor, anchor);
 }
 
