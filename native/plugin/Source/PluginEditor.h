@@ -14,7 +14,8 @@
 #include "DSP/SampleLibrary.h"
 
 // Visible top-level tabs. Everything else lives in the header MENU dropdown.
-class DiditagainEditor : public juce::AudioProcessorEditor
+class DiditagainEditor : public juce::AudioProcessorEditor,
+                         public juce::KeyListener
 {
 public:
     explicit DiditagainEditor(DiditagainProcessor& p);
@@ -23,6 +24,7 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
     bool keyPressed(const juce::KeyPress& key) override;
+    bool keyPressed(const juce::KeyPress& key, juce::Component* origin) override;
 
 private:
     DiditagainProcessor& processor;
