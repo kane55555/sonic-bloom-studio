@@ -224,6 +224,39 @@ void AudioCropPanel::Waveform::loadFor(const juce::File& f)
         buffer.setSize(numCh, len);
         r->read(&buffer, 0, len, 0, true, numCh > 1);
     }
+    viewStart = 0.0;
+    viewSpan  = 1.0;
+    repaint();
+}
+
+double AudioCropPanel::Waveform::screenToFrac(int x) const
+{
+    const double f = (double) x / (double) juce::jmax(1, getWidth());
+    return juce::jlimit(0.0, 1.0, viewStart + juce::jlimit(0.0, 1.0, f) * viewSpan);
+}
+
+void AudioCropPanel::Waveform::zoomBy(double factor, double anchorFrac)
+{
+    const double newSpan = juce::jlimit(0.0005, 1.0, viewSpan * factor);
+    // keep anchorFrac (in buffer space) stationary on screen
+    const double anchorScreen = (anchorFrac - viewStart) / juce::jmax(1e-9, viewSpan); // 0..1
+    double newStart = anchorFrac - anchorScreen * newSpan;
+    newStart = juce::jlimit(0.0, 1.0 - newSpan, newStart);
+    viewStart = newStart;
+    viewSpan  = newSpan;
+    repaint();
+}
+
+void AudioCropPanel::Waveform::resetZoom()
+{
+    viewStart = 0.0;
+    viewSpan  = 1.0;
+    repaint();
+}
+
+void AudioCropPanel::Waveform::panBy(double deltaFrac)
+{
+    viewStart = juce::jlimit(0.0, 1.0 - viewSpan, viewStart + deltaFrac);
     repaint();
 }
 
@@ -242,15 +275,17 @@ void AudioCropPanel::Waveform::paint(juce::Graphics& g)
         return;
     }
 
-    // Waveform
+    // Waveform — only render samples inside view window
     g.setColour(C.accentTeal.withAlpha(0.55f));
     const int n = buffer.getNumSamples();
-    const int step = juce::jmax(1, n / w);
+    const int viewS0 = (int) juce::jlimit(0.0, (double) (n - 1), viewStart * n);
+    const int viewLen = juce::jmax(1, (int) (viewSpan * n));
+    const int step = juce::jmax(1, viewLen / w);
     auto* d = buffer.getReadPointer(0);
     for (int x = 0; x < w; ++x)
     {
         float lo = 1.f, hi = -1.f;
-        const int s0 = x * step;
+        const int s0 = viewS0 + x * step;
         for (int i = 0; i < step && (s0 + i) < n; ++i)
         {
             float s = d[s0 + i];
@@ -264,17 +299,26 @@ void AudioCropPanel::Waveform::paint(juce::Graphics& g)
     if (owner.selectedIndex < 0) return;
     auto& m = owner.samples[(size_t) owner.selectedIndex];
 
+    auto fracToX = [&](double frac) -> int {
+        return (int) (((frac - viewStart) / juce::jmax(1e-9, viewSpan)) * w);
+    };
+
     // Loop region fill
     g.setColour(C.accentTeal.withAlpha(0.12f));
-    g.fillRect((int)(m.loopStart * w), 0, (int)((m.loopEnd - m.loopStart) * w), h);
+    const int lx0 = fracToX(m.loopStart);
+    const int lx1 = fracToX(m.loopEnd);
+    g.fillRect(lx0, 0, lx1 - lx0, h);
 
     // Crop dim
     g.setColour(juce::Colour(0xaa000000));
-    g.fillRect(0, 0, (int)(m.cropStart * w), h);
-    g.fillRect((int)(m.cropEnd * w), 0, w - (int)(m.cropEnd * w), h);
+    const int cx0 = fracToX(m.cropStart);
+    const int cx1 = fracToX(m.cropEnd);
+    if (cx0 > 0) g.fillRect(0, 0, cx0, h);
+    if (cx1 < w) g.fillRect(cx1, 0, w - cx1, h);
 
     auto marker = [&](double frac, juce::Colour col, const juce::String& label) {
-        int x = (int)(frac * w);
+        int x = fracToX(frac);
+        if (x < -8 || x > w + 8) return;
         g.setColour(col); g.drawVerticalLine(x, 0.0f, (float) h);
         g.fillRect(x - 4, 0, 8, 6);
         g.setColour(C.textPrimary);
@@ -289,9 +333,19 @@ void AudioCropPanel::Waveform::paint(juce::Graphics& g)
 
 void AudioCropPanel::Waveform::mouseDown(const juce::MouseEvent& e)
 {
+    // Right-click or middle-click = pan
+    if (e.mods.isRightButtonDown() || e.mods.isMiddleButtonDown())
+    {
+        panning = true;
+        panLastX = e.x;
+        dragHandle = -1;
+        return;
+    }
+    panning = false;
+
     if (owner.selectedIndex < 0) { dragHandle = -1; return; }
     auto& m = owner.samples[(size_t) owner.selectedIndex];
-    const double frac = juce::jlimit(0.0, 1.0, (double) e.x / juce::jmax(1, getWidth()));
+    const double frac = screenToFrac(e.x);
     const double dists[4] = {
         std::abs(frac - m.cropStart),
         std::abs(frac - m.cropEnd),
@@ -305,9 +359,16 @@ void AudioCropPanel::Waveform::mouseDown(const juce::MouseEvent& e)
 
 void AudioCropPanel::Waveform::mouseDrag(const juce::MouseEvent& e)
 {
+    if (panning)
+    {
+        const double dx = (double) (panLastX - e.x) / (double) juce::jmax(1, getWidth());
+        panBy(dx * viewSpan);
+        panLastX = e.x;
+        return;
+    }
     if (dragHandle < 0 || owner.selectedIndex < 0) return;
     auto& m = owner.samples[(size_t) owner.selectedIndex];
-    const double frac = juce::jlimit(0.0, 1.0, (double) e.x / juce::jmax(1, getWidth()));
+    const double frac = screenToFrac(e.x);
     switch (dragHandle)
     {
         case 0: m.cropStart = juce::jmin(frac, m.cropEnd);    break;
@@ -317,6 +378,14 @@ void AudioCropPanel::Waveform::mouseDrag(const juce::MouseEvent& e)
     }
     owner.pushUiFromMeta(m);
     repaint();
+}
+
+void AudioCropPanel::Waveform::mouseWheelMove(const juce::MouseEvent& e,
+                                              const juce::MouseWheelDetails& w)
+{
+    const double anchor = screenToFrac(e.x);
+    const double factor = (w.deltaY > 0.0f) ? 0.8 : 1.25;
+    zoomBy(factor, anchor);
 }
 
 // =============================================================================
@@ -378,6 +447,12 @@ AudioCropPanel::AudioCropPanel()
     addAndMakeVisible(zoomOut);
     addAndMakeVisible(resetView);
     addAndMakeVisible(snapZero);
+
+    zoomIn.onClick    = [this]() { if (waveform) waveform->zoomBy(0.5,
+        waveform->viewStart + waveform->viewSpan * 0.5); };
+    zoomOut.onClick   = [this]() { if (waveform) waveform->zoomBy(2.0,
+        waveform->viewStart + waveform->viewSpan * 0.5); };
+    resetView.onClick = [this]() { if (waveform) waveform->resetZoom(); };
 
     // ---- right controls ----
     auto setupSlider = [this](juce::Slider& s, juce::Label& l, const juce::String& name,
