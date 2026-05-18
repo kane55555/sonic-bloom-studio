@@ -7,6 +7,9 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     setSize(1200, 760);
     setResizable(true, true);
     setResizeLimits(960, 640, 1920, 1200);
+    // Editor owns top-level focus so arrow keys reach keyPressed even after the
+    // user clicks on a child. Spacebar is returned as unhandled below so the
+    // host DAW receives it for transport play/pause.
     setWantsKeyboardFocus(true);
 
     layerPanel = std::make_unique<LayerEditor>(processor.getAPVTS());
