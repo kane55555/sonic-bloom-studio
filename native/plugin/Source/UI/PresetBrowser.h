@@ -366,8 +366,19 @@ private:
     }
 
     //--------------------------------------------------------------------------
+    // ListBox subclass that refuses to swallow the spacebar so the DAW still
+    // receives transport play/pause while the preset list has keyboard focus.
+    struct TransportFriendlyListBox : public juce::ListBox
+    {
+        bool keyPressed(const juce::KeyPress& k) override
+        {
+            if (k == juce::KeyPress::spaceKey) return false;
+            return juce::ListBox::keyPressed(k);
+        }
+    };
+
     juce::TextEditor searchBox;
-    juce::ListBox    list;
+    TransportFriendlyListBox list;
     juce::Array<Item> items;
     juce::Array<Row>  rows;
     std::set<juce::String> openCategories;
