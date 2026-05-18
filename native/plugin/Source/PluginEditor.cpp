@@ -102,6 +102,9 @@ bool DiditagainEditor::keyPressed(const juce::KeyPress& key, juce::Component* /*
     if (auto* focused = juce::Component::getCurrentlyFocusedComponent())
         if (dynamic_cast<juce::TextEditor*>(focused) != nullptr) return false;
 
+    // Spacebar must reach the DAW for transport play/pause. Never consume it.
+    if (key == juce::KeyPress::spaceKey) return false;
+
     // Spacebar must pass through to the DAW so the piano roll can play/pause
     // even while the plugin window has focus. Returning false lets JUCE bubble
     // the event up to the host wrapper.
