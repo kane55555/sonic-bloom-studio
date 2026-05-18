@@ -7,6 +7,7 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     setSize(1200, 760);
     setResizable(true, true);
     setResizeLimits(960, 640, 1920, 1200);
+    setWantsKeyboardFocus(true);
 
     layerPanel = std::make_unique<LayerEditor>(processor.getAPVTS());
     addAndMakeVisible(*layerPanel);
