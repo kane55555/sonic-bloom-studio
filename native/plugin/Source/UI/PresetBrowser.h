@@ -39,7 +39,7 @@ public:
         // presets after a row click. The search field remains focusable only
         // through a direct click; no preset/category action grabs it.
         list.setWantsKeyboardFocus(true);
-        searchBox.setWantsKeyboardFocus(false);
+        searchBox.setWantsKeyboardFocus(true);
         searchBox.setMouseClickGrabsKeyboardFocus(true);
         setWantsKeyboardFocus(false);
     }
