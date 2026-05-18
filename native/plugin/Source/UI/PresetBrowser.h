@@ -34,6 +34,22 @@ public:
         list.setModel(this);
         list.setRowHeight(28);
         list.setColour(juce::ListBox::backgroundColourId, Theme::getColors().background);
+
+        // Do NOT let the browser steal keyboard focus from the top-level editor.
+        // The editor owns arrow-key preset stepping and must let the spacebar
+        // bubble back to the host (DAW play/pause). If the ListBox or search
+        // field grab focus, arrows scroll the list silently and space toggles
+        // row selection — both swallow the keys before the editor sees them.
+        list.setWantsKeyboardFocus(false);
+        setWantsKeyboardFocus(false);
+    }
+
+    /** Allow the editor to intercept arrow keys regardless of which child has focus. */
+    void attachKeyListener(juce::KeyListener* l)
+    {
+        addKeyListener(l);
+        list.addKeyListener(l);
+        searchBox.addKeyListener(l);
     }
 
     /** Editor calls this with one entry per preset (parallel arrays). */

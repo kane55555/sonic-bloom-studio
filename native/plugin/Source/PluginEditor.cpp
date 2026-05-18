@@ -7,6 +7,9 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     setSize(1200, 760);
     setResizable(true, true);
     setResizeLimits(960, 640, 1920, 1200);
+    // Editor owns top-level focus so arrow keys reach keyPressed even after the
+    // user clicks on a child. Spacebar is returned as unhandled below so the
+    // host DAW receives it for transport play/pause.
     setWantsKeyboardFocus(true);
 
     layerPanel = std::make_unique<LayerEditor>(processor.getAPVTS());
@@ -60,6 +63,8 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     presetBrowserPanel->onPresetSelected = [this](int idx) {
         processor.getPresetManager().loadPreset(idx);
     };
+    // Catch arrow keys even when a child (search box, list) has focus.
+    presetBrowserPanel->attachKeyListener(this);
     refreshBrowserPresets();
 
     overlayClose.setColour(juce::TextButton::buttonColourId, Theme::getColors().surfaceElevated);
@@ -83,12 +88,20 @@ DiditagainEditor::~DiditagainEditor() {}
 
 bool DiditagainEditor::keyPressed(const juce::KeyPress& key)
 {
-    // Arrow keys step through presets in the Browser list so the user can
-    // audition variations while a piano-roll clip keeps playing.
-    // Skip while a text field is focused or a modal overlay is up.
+    return keyPressed(key, this);
+}
+
+bool DiditagainEditor::keyPressed(const juce::KeyPress& key, juce::Component* /*origin*/)
+{
+    // Modal overlay or text-field editing — let the focused widget handle keys.
     if (overlayPanel != nullptr) return false;
     if (auto* focused = juce::Component::getCurrentlyFocusedComponent())
         if (dynamic_cast<juce::TextEditor*>(focused) != nullptr) return false;
+
+    // Spacebar must pass through to the DAW so the piano roll can play/pause
+    // even while the plugin window has focus. Returning false lets JUCE bubble
+    // the event up to the host wrapper.
+    if (key == juce::KeyPress::spaceKey) return false;
 
     int delta = 0;
     if      (key == juce::KeyPress::downKey  || key == juce::KeyPress::rightKey) delta =  1;
