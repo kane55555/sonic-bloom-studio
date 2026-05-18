@@ -35,16 +35,12 @@ public:
         list.setRowHeight(28);
         list.setColour(juce::ListBox::backgroundColourId, Theme::getColors().background);
 
-        // The ListBox must want keyboard focus so the attached KeyListener
-        // (the top-level editor) can intercept arrow keys for preset stepping.
-        // The editor's keyPressed returns false for spacebar so it bubbles to
-        // the host (DAW play/pause). The search field must NOT auto-grab focus
-        // on open — otherwise clicking a preset row would still leave the
-        // caret in the search box. setWantsKeyboardFocus(false) removes it
-        // from the focus traversal order while still allowing click-to-focus
-        // (TextEditor handles its own mouse focus regardless of this flag).
+        // The ListBox must want keyboard focus so arrow keys keep stepping
+        // presets after a row click. The search field remains focusable only
+        // through a direct click; no preset/category action grabs it.
         list.setWantsKeyboardFocus(true);
-        searchBox.setWantsKeyboardFocus(false);
+        searchBox.setWantsKeyboardFocus(true);
+        searchBox.setMouseClickGrabsKeyboardFocus(true);
         setWantsKeyboardFocus(false);
     }
 
