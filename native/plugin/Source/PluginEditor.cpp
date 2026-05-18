@@ -63,6 +63,8 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     presetBrowserPanel->onPresetSelected = [this](int idx) {
         processor.getPresetManager().loadPreset(idx);
     };
+    // Catch arrow keys even when a child (search box, list) has focus.
+    presetBrowserPanel->attachKeyListener(this);
     refreshBrowserPresets();
 
     overlayClose.setColour(juce::TextButton::buttonColourId, Theme::getColors().surfaceElevated);
