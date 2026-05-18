@@ -39,7 +39,7 @@ public:
         // presets after a row click. The search field remains focusable only
         // through a direct click; no preset/category action grabs it.
         list.setWantsKeyboardFocus(true);
-        searchBox.setWantsKeyboardFocus(true);
+        searchBox.setWantsKeyboardFocus(false);
         searchBox.setMouseClickGrabsKeyboardFocus(true);
         setWantsKeyboardFocus(false);
     }
@@ -352,7 +352,7 @@ private:
         const auto r = rows[rowNumber];
         if (r.kind == Row::Header)
         {
-            list.selectRow(rowNumber, false, false);
+            list.selectRow(rowNumber);
             if (openCategories.count(r.category)) openCategories.erase(r.category);
             else openCategories.insert(r.category);
             rebuildRows();
@@ -360,7 +360,7 @@ private:
         else
         {
             selectedGlobal = r.globalIndex;
-            list.selectRow(rowNumber, false, false);
+            list.selectRow(rowNumber);
             list.repaint();
             if (onPresetSelected) onPresetSelected(r.globalIndex);
         }
