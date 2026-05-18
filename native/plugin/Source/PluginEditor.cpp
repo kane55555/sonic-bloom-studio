@@ -7,6 +7,7 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     setSize(1200, 760);
     setResizable(true, true);
     setResizeLimits(960, 640, 1920, 1200);
+    setWantsKeyboardFocus(true);
 
     layerPanel = std::make_unique<LayerEditor>(processor.getAPVTS());
     addAndMakeVisible(*layerPanel);
@@ -79,6 +80,27 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
 }
 
 DiditagainEditor::~DiditagainEditor() {}
+
+bool DiditagainEditor::keyPressed(const juce::KeyPress& key)
+{
+    // Arrow keys step through presets in the Browser list so the user can
+    // audition variations while a piano-roll clip keeps playing.
+    // Skip while a text field is focused or a modal overlay is up.
+    if (overlayPanel != nullptr) return false;
+    if (auto* focused = juce::Component::getCurrentlyFocusedComponent())
+        if (dynamic_cast<juce::TextEditor*>(focused) != nullptr) return false;
+
+    int delta = 0;
+    if      (key == juce::KeyPress::downKey  || key == juce::KeyPress::rightKey) delta =  1;
+    else if (key == juce::KeyPress::upKey    || key == juce::KeyPress::leftKey)  delta = -1;
+    else if (key == juce::KeyPress::pageDownKey) delta =  10;
+    else if (key == juce::KeyPress::pageUpKey)   delta = -10;
+    else return false;
+
+    if (presetBrowserPanel == nullptr) return false;
+    if (currentTab != Tab::Browser) switchTab(Tab::Browser);
+    return presetBrowserPanel->stepSelection(delta);
+}
 
 void DiditagainEditor::refreshPresetCombo()
 {
