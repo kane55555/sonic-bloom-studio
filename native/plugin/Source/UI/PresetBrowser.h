@@ -32,6 +32,7 @@ public:
 
         addAndMakeVisible(list);
         list.setModel(this);
+        list.onKeyPressed = [this](const juce::KeyPress& key) { return keyPressed(key); };
         list.setRowHeight(28);
         list.setColour(juce::ListBox::backgroundColourId, Theme::getColors().background);
 
@@ -390,6 +391,7 @@ private:
         bool keyPressed(const juce::KeyPress& k) override
         {
             if (k == juce::KeyPress::spaceKey) return false;
+            if (onKeyPressed && onKeyPressed(k)) return true;
             return juce::ListBox::keyPressed(k);
         }
 
@@ -400,6 +402,8 @@ private:
             // host-owned while the list has focus for arrow browsing.
             return false;
         }
+
+        std::function<bool(const juce::KeyPress&)> onKeyPressed;
     };
 
     juce::TextEditor searchBox;
