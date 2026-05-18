@@ -224,6 +224,8 @@ void AudioCropPanel::Waveform::loadFor(const juce::File& f)
         buffer.setSize(numCh, len);
         r->read(&buffer, 0, len, 0, true, numCh > 1);
     }
+    viewStart = 0.0;
+    viewSpan  = 1.0;
     repaint();
 }
 
