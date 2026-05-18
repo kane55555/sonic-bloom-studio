@@ -43,6 +43,17 @@ PresetManager::PresetManager(juce::AudioProcessor& proc) : processor(proc)
         userPresetDir.getChildFile(cat).createDirectory();
 
     seedGuitarPresetBankIfMissing();
+
+    // Drop a one-time .seeded marker into every User category folder. Any
+    // future auto-seeding logic for these folders must check this marker and
+    // skip when present, so presets the user deletes never reappear.
+    for (auto& cat : dida::preset::dropCategories())
+    {
+        auto marker = userPresetDir.getChildFile(cat).getChildFile(".seeded");
+        if (! marker.existsAsFile())
+            marker.replaceWithText("1");
+    }
+
     scanPresetDirectory();
 }
 
