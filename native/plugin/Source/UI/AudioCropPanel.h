@@ -69,12 +69,28 @@ private:
         void paint(juce::Graphics& g) override;
         void mouseDown(const juce::MouseEvent& e) override;
         void mouseDrag(const juce::MouseEvent& e) override;
+        void mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override;
         void loadFor(const juce::File& f);
+
+        // Zoom controls
+        void zoomBy(double factor, double anchorFrac);
+        void resetZoom();
+        void panBy(double deltaFrac);
+
         juce::AudioBuffer<float> buffer;
         double sampleRate = 44100.0;
+
+        // View window in [0..1] of buffer
+        double viewStart = 0.0;
+        double viewSpan  = 1.0; // 1.0 = full, smaller = zoomed in
+
     private:
         AudioCropPanel& owner;
         int dragHandle = -1; // 0..3 = cropStart, cropEnd, loopStart, loopEnd
+        bool panning = false;
+        int  panLastX = 0;
+
+        double screenToFrac(int x) const;
     };
     std::unique_ptr<Waveform> waveform;
     juce::TextButton zoomIn   { "+" };
