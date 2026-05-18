@@ -81,6 +81,41 @@ public:
 
     std::function<void(int)> onPresetSelected;
 
+    /** Move selection to the next/previous preset row (skips category headers).
+        Opens collapsed categories as needed and fires onPresetSelected. */
+    bool stepSelection(int delta)
+    {
+        if (rows.isEmpty() || delta == 0) return false;
+
+        // Build a flat list of all presets in display order, opening every
+        // category so arrow-key navigation can flow across category boundaries
+        // even when sections are collapsed.
+        bool anyClosed = false;
+        for (auto& cat : categoryOrder())
+            if (openCategories.find(cat) == openCategories.end()) { openCategories.insert(cat); anyClosed = true; }
+        if (anyClosed) rebuildRows();
+
+        juce::Array<int> presetRowIdx;
+        for (int i = 0; i < rows.size(); ++i)
+            if (rows[i].kind == Row::Preset && rows[i].category == "All Sounds")
+                presetRowIdx.add(i);
+        if (presetRowIdx.isEmpty()) return false;
+
+        int curPos = -1;
+        for (int i = 0; i < presetRowIdx.size(); ++i)
+            if (rows[presetRowIdx[i]].globalIndex == selectedGlobal) { curPos = i; break; }
+
+        int next = (curPos < 0) ? (delta > 0 ? 0 : presetRowIdx.size() - 1)
+                                : juce::jlimit(0, presetRowIdx.size() - 1, curPos + delta);
+        const int rowIdx = presetRowIdx[next];
+        selectedGlobal = rows[rowIdx].globalIndex;
+        list.selectRow(rowIdx);
+        list.scrollToEnsureRowIsOnscreen(rowIdx);
+        list.repaint();
+        if (onPresetSelected) onPresetSelected(selectedGlobal);
+        return true;
+    }
+
     void resized() override
     {
         auto area = getLocalBounds().reduced(8);
