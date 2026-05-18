@@ -391,7 +391,15 @@ void AudioCropPanel::Waveform::mouseWheelMove(const juce::MouseEvent& e,
                                               const juce::MouseWheelDetails& w)
 {
     const double anchor = screenToFrac(e.x);
-    const double factor = (w.deltaY > 0.0f) ? 0.8 : 1.25;
+    const float wheelDelta = std::abs(w.deltaY) > std::abs(w.deltaX) ? w.deltaY : w.deltaX;
+    const double factor = (wheelDelta > 0.0f) ? 0.65 : 1.35;
+    zoomBy(factor, anchor);
+}
+
+void AudioCropPanel::Waveform::mouseMagnify(const juce::MouseEvent& e, float scaleFactor)
+{
+    const double anchor = screenToFrac(e.x);
+    const double factor = scaleFactor > 1.0f ? 1.0 / (double) scaleFactor : 1.0 + (1.0 - (double) scaleFactor);
     zoomBy(factor, anchor);
 }
 
