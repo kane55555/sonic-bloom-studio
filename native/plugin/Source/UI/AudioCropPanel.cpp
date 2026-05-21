@@ -616,67 +616,6 @@ void AudioCropPanel::pullMetaFromUi(CropMeta& m)
     m.loopEnabled     = m.autoLoop && ! m.oneShotMode;
 }
 
-// Write a trimmed WAV containing only the [cropStart..cropEnd] portion of
-// `src` to `dest`. Returns true on success.
-static bool writeTrimmedWav(const juce::File& src, const juce::File& dest,
-                            double cropStart, double cropEnd)
-{
-    juce::AudioFormatManager fm; fm.registerBasicFormats();
-    std::unique_ptr<juce::AudioFormatReader> reader(fm.createReaderFor(src));
-    if (! reader) return false;
-
-    const int64_t total = reader->lengthInSamples;
-    if (total <= 0) return false;
-    const int64_t s0  = (int64_t) (juce::jlimit(0.0, 1.0, cropStart) * (double) total);
-    const int64_t s1  = (int64_t) (juce::jlimit(0.0, 1.0, cropEnd)   * (double) total);
-    const int64_t len = juce::jmax<int64_t>(0, s1 - s0);
-    if (len <= 0) return false;
-
-    const int numCh = (int) reader->numChannels;
-    juce::AudioBuffer<float> buf(numCh, (int) len);
-    if (! reader->read(&buf, 0, (int) len, s0, true, numCh > 1))
-        return false;
-
-    const double srcSampleRate = reader->sampleRate;
-    const int srcBitsPerSample = juce::jmax(16, (int) reader->bitsPerSample);
-    reader.reset();
-
-    const bool replacingSource = src.getFullPathName() == dest.getFullPathName();
-    const auto writeTarget = replacingSource
-        ? dest.getSiblingFile(dest.getFileNameWithoutExtension() + ".cropping" + dest.getFileExtension())
-        : dest;
-
-    writeTarget.deleteFile();
-
-    auto out = std::unique_ptr<juce::FileOutputStream>(writeTarget.createOutputStream());
-    if (! out) return false;
-    juce::WavAudioFormat wav;
-    std::unique_ptr<juce::AudioFormatWriter> writer(
-        wav.createWriterFor(out.get(), srcSampleRate, (unsigned) numCh,
-                            srcBitsPerSample, {}, 0));
-    if (! writer) return false;
-    out.release(); // writer owns the stream now
-    const bool wrote = writer->writeFromAudioSampleBuffer(buf, 0, (int) len);
-    writer.reset();
-
-    if (! wrote)
-    {
-        if (replacingSource) writeTarget.deleteFile();
-        return false;
-    }
-
-    if (replacingSource)
-    {
-        if (! writeTarget.replaceFileIn(dest))
-        {
-            writeTarget.deleteFile();
-            return false;
-        }
-    }
-
-    return true;
-}
-
 void AudioCropPanel::persistSelected()
 {
     if (selectedIndex < 0) return;
