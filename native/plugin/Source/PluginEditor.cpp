@@ -60,7 +60,14 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     addChildComponent(*audioCropPanel);
     audioCropPanel->onLibraryChanged = [this]() {
         dida::SampleLibrary::invalidateCache();
-        processor.getPresetManager().scanPresetDirectory();
+        // Drop the engine's cached instrument identity so reloading the
+        // current preset actually re-reads the (now trimmed) WAV from disk
+        // instead of reusing the stale in-memory multisample buffer.
+        processor.getSynthEngine().invalidateActiveInstrumentCache();
+        auto& pm = processor.getPresetManager();
+        pm.scanPresetDirectory();
+        const int idx = pm.getCurrentPresetIndex();
+        if (idx >= 0) pm.loadPreset(idx);
         refreshBrowserPresets();
     };
 

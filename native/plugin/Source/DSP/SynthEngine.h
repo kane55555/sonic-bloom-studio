@@ -60,6 +60,17 @@ public:
                            float crossfadeMs, bool oneShot, bool pitchTracking);
     const juce::String& getInstrumentName() const noexcept { return currentInstrumentName; }
 
+    // Drops the cached instrument identity so the next setInstrument/
+    // setSampleSource/setMultisampleSources/loadMultisamplePreset call is
+    // forced to re-read sample data from disk instead of reusing the
+    // already-loaded shared_ptr. Used after the Audio Crop tab rewrites a
+    // WAV so playback picks up the trimmed file immediately.
+    void invalidateActiveInstrumentCache() noexcept
+    {
+        currentInstrumentName.clear();
+        activeMultisample.reset();
+    }
+
     // Apply config to every voice (called when APVTS changes).
     template <typename Fn>
     void forEachSynthVoice(Fn&& fn)
