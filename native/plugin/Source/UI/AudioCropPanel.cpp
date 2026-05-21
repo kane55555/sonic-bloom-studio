@@ -62,7 +62,7 @@ AudioCropPanel::CropMeta AudioCropPanel::readMeta(const juce::File& audio)
     auto mf = metaFileFor(audio);
     if (mf.existsAsFile())
     {
-        auto v = juce::JSON::parse(mf);
+        auto v = juce::JSON::parse(mf.loadFileAsString());
         if (auto* obj = v.getDynamicObject())
         {
             auto get = [&](const char* k, auto& dst) {
