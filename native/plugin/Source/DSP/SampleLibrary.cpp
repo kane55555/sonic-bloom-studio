@@ -230,7 +230,7 @@ namespace {
             auto sidecar = file.withFileExtension("dida-crop.json");
             if (sidecar.existsAsFile())
             {
-                auto v = juce::JSON::parse(sidecar);
+                auto v = juce::JSON::parse(sidecar.loadFileAsString());
                 if (auto* obj = v.getDynamicObject())
                 {
                     if (obj->hasProperty("cropStart"))
