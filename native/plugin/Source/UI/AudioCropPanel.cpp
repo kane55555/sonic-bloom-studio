@@ -450,7 +450,14 @@ AudioCropPanel::AudioCropPanel()
     };
     rescanButton.onClick  = [this]() { rescan(); };
     saveAllButton.onClick = [this]() {
-        for (auto& m : samples) writeMeta(m);
+        if (selectedIndex >= 0 && selectedIndex < (int) samples.size())
+            pullMetaFromUi(samples[(size_t) selectedIndex]);
+
+        for (auto& m : samples)
+            writeMeta(m);
+
+        dida::SampleLibrary::invalidateCache();
+        if (onLibraryChanged) onLibraryChanged();
     };
     addAndMakeVisible(importButton);
     addAndMakeVisible(rescanButton);
@@ -685,20 +692,7 @@ void AudioCropPanel::persistSelected()
         return;
     }
 
-    // Overwrite the original with the cropped audio. No backup, no new versions.
-    if (! writeTrimmedWav(src, src, m.cropStart, m.cropEnd))
-    {
-        juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
-            "Save crop failed", "Could not write trimmed audio to:\n" + src.getFullPathName());
-        return;
-    }
-
-    // After writing the trimmed file, the crop now covers the whole file.
-    m.cropStart         = 0.0;
-    m.cropEnd           = 1.0;
-
     samples[(size_t) selectedIndex] = m;
-    if (waveform) waveform->loadFor(src);
     pushUiFromMeta(m);
     writeMeta(m);
     sampleList.repaint();
