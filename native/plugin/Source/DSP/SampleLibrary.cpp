@@ -215,10 +215,39 @@ namespace {
         std::unique_ptr<juce::AudioFormatReader> reader(fm.createReaderFor(file));
         if (reader == nullptr) return false;
 
-        const int numSamples = static_cast<int>(reader->lengthInSamples);
-        if (numSamples <= 0) return false;
+        const int totalSamples = static_cast<int>(reader->lengthInSamples);
+        if (totalSamples <= 0) return false;
 
         const int srcChannels = juce::jmax(1, (int) reader->numChannels);
+
+        // Honor an AudioCropPanel sidecar (<file>.dida-crop.json) so the
+        // user-trimmed region is what gets baked into the multisample buffer.
+        // Without this, imported brass / piano / etc. samples play back with
+        // their original head silence and sound delayed in the DAW.
+        double cropStartFrac = 0.0;
+        double cropEndFrac   = 1.0;
+        {
+            auto sidecar = file.withFileExtension("dida-crop.json");
+            if (sidecar.existsAsFile())
+            {
+                auto v = juce::JSON::parse(sidecar);
+                if (auto* obj = v.getDynamicObject())
+                {
+                    if (obj->hasProperty("cropStart"))
+                        cropStartFrac = juce::jlimit(0.0, 1.0, (double) obj->getProperty("cropStart"));
+                    if (obj->hasProperty("cropEnd"))
+                        cropEndFrac   = juce::jlimit(0.0, 1.0, (double) obj->getProperty("cropEnd"));
+                }
+            }
+        }
+        if (cropEndFrac <= cropStartFrac) { cropStartFrac = 0.0; cropEndFrac = 1.0; }
+
+        const int startSample = juce::jlimit(0, totalSamples - 1,
+                                             (int) std::floor(cropStartFrac * (double) totalSamples));
+        const int endSample   = juce::jlimit(startSample + 1, totalSamples,
+                                             (int) std::ceil (cropEndFrac   * (double) totalSamples));
+        const int numSamples  = endSample - startSample;
+        if (numSamples <= 0) return false;
 
         zone.sourceSampleRate = reader->sampleRate > 0.0 ? reader->sampleRate : 44100.0;
         zone.rootMidi = juce::jlimit(0, 127, rootMidi);
@@ -235,14 +264,14 @@ namespace {
         if (srcChannels == 1)
         {
             juce::AudioBuffer<float> tmp(1, numSamples);
-            if (! reader->read(&tmp, 0, numSamples, 0, true, false))
+            if (! reader->read(&tmp, 0, numSamples, startSample, true, false))
                 return false;
             zone.buffer.copyFrom(0, 0, tmp, 0, 0, numSamples);
             zone.buffer.copyFrom(1, 0, tmp, 0, 0, numSamples);
         }
         else
         {
-            if (! reader->read(&zone.buffer, 0, numSamples, 0, true, true))
+            if (! reader->read(&zone.buffer, 0, numSamples, startSample, true, true))
                 return false;
         }
 
