@@ -627,18 +627,46 @@ static bool writeTrimmedWav(const juce::File& src, const juce::File& dest,
 
     const int numCh = (int) reader->numChannels;
     juce::AudioBuffer<float> buf(numCh, (int) len);
-    reader->read(&buf, 0, (int) len, s0, true, numCh > 1);
+    if (! reader->read(&buf, 0, (int) len, s0, true, numCh > 1))
+        return false;
 
-    dest.deleteFile();
-    auto out = std::unique_ptr<juce::FileOutputStream>(dest.createOutputStream());
+    const double srcSampleRate = reader->sampleRate;
+    const int srcBitsPerSample = juce::jmax(16, (int) reader->bitsPerSample);
+    reader.reset();
+
+    const bool replacingSource = src.getFullPathName() == dest.getFullPathName();
+    const auto writeTarget = replacingSource
+        ? dest.getSiblingFile(dest.getFileNameWithoutExtension() + ".cropping" + dest.getFileExtension())
+        : dest;
+
+    writeTarget.deleteFile();
+
+    auto out = std::unique_ptr<juce::FileOutputStream>(writeTarget.createOutputStream());
     if (! out) return false;
     juce::WavAudioFormat wav;
     std::unique_ptr<juce::AudioFormatWriter> writer(
-        wav.createWriterFor(out.get(), reader->sampleRate, (unsigned) numCh,
-                            juce::jmax(16, (int) reader->bitsPerSample), {}, 0));
+        wav.createWriterFor(out.get(), srcSampleRate, (unsigned) numCh,
+                            srcBitsPerSample, {}, 0));
     if (! writer) return false;
     out.release(); // writer owns the stream now
-    writer->writeFromAudioSampleBuffer(buf, 0, (int) len);
+    const bool wrote = writer->writeFromAudioSampleBuffer(buf, 0, (int) len);
+    writer.reset();
+
+    if (! wrote)
+    {
+        if (replacingSource) writeTarget.deleteFile();
+        return false;
+    }
+
+    if (replacingSource)
+    {
+        if (! writeTarget.replaceFileIn(dest))
+        {
+            writeTarget.deleteFile();
+            return false;
+        }
+    }
+
     return true;
 }
 
