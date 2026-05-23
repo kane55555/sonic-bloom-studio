@@ -197,9 +197,15 @@ private:
         Samples/Presets/User/Pads always lands in "Pads" regardless of its filename. */
     static juce::String classify(const juce::String& nameIn, const juce::String& hintCat)
     {
-        // 1) Folder hint takes priority.
+        // 1) Folder hint takes priority — known bucket match.
         for (auto& c : categoryOrder())
             if (c.equalsIgnoreCase(hintCat)) return c;
+
+        // 1b) Unknown but non-empty folder hint: preserve the user's exact
+        //     folder name so custom folders under Samples/Presets/User/
+        //     appear as their own category tab labelled as typed.
+        if (hintCat.trim().isNotEmpty()) return hintCat;
+
 
         // 2) Otherwise infer from the preset name.
         const auto n = nameIn.toLowerCase();
