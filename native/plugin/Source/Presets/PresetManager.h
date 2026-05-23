@@ -133,4 +133,5 @@ private:
     void loadDroppedSamples();
     void loadDiapresetFiles();
     void seedGuitarPresetBankIfMissing();
+    void seedVintageSynthBankIfMissing();
 };

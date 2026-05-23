@@ -7,6 +7,7 @@
 #include "UserPresetLoader.h"
 #include "UserPresetFormat.h"
 #include "GuitarPresetBank.h"
+#include "VintageSynthBank.h"
 #include "../DSP/SampleLibrary.h"
 #include "../PluginProcessor.h"
 #include "../DSP/SynthEngine.h"
@@ -45,6 +46,7 @@ PresetManager::PresetManager(juce::AudioProcessor& proc) : processor(proc)
         userPresetDir.getChildFile(cat).createDirectory();
 
     seedGuitarPresetBankIfMissing();
+    seedVintageSynthBankIfMissing();
 
     // Drop a one-time .seeded marker into every User category folder. Any
     // future auto-seeding logic for these folders must check this marker and
@@ -1117,4 +1119,43 @@ void PresetManager::seedGuitarPresetBankIfMissing()
     if (written > 0)
         didaPresetManagerLog("seeded guitar preset bank count=" + juce::String(written)
             + " dir=" + guitarsDir.getFullPathName());
+}
+
+//==============================================================================
+// One-time seed of the 20 Vintage Synth presets. Mirrors the guitar bank
+// pattern: writes into <UserPresets>/VintageSynth/ behind a .seeded marker
+// so user deletions are persistent across sessions.
+//==============================================================================
+void PresetManager::seedVintageSynthBankIfMissing()
+{
+    auto root = getUserPresetDirectory();
+    auto dir  = root.getChildFile("VintageSynth");
+    dir.createDirectory();
+
+    auto seededMarker = dir.getChildFile(".seeded");
+    if (seededMarker.existsAsFile())
+        return;
+
+    // Use Synths/Lead 1 as the base sample source (matches preset spec).
+    auto sourceFolder = dida::SampleLibrary::getSamplesRoot()
+                            .getChildFile("Synths").getChildFile("Lead 1");
+
+    const auto srcPath = sourceFolder.getFullPathName().replaceCharacter('\\', '/');
+    auto bank = dida::userpreset::buildVintageSynthBank(srcPath);
+
+    int written = 0;
+    for (auto& p : bank)
+    {
+        auto file = dir.getChildFile(p.presetName + ".diapreset");
+        if (file.existsAsFile())
+            continue;
+        file.replaceWithText(dida::userpreset::toJson(p));
+        ++written;
+    }
+
+    seededMarker.replaceWithText("1");
+
+    if (written > 0)
+        didaPresetManagerLog("seeded vintage synth bank count=" + juce::String(written)
+            + " dir=" + dir.getFullPathName());
 }
