@@ -331,13 +331,16 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         // the same cheap synth sound.
         if (! hasSampleSource && fallbackSynthesisEnabled)
         {
+            // Card pitch + slow drift add 0..few cents of vintage life.
+            const double totalCents = (double) oscADetuneCents + (double) extraCentsNow();
             const double f = midiToHzD((double) currentMidiNote + (double) pitchOffsetSemis
-                                       + (double) oscADetuneCents / 100.0);
+                                       + totalCents / 100.0);
             sineFallbackPhase += f / sampleRate;
             if (sineFallbackPhase > 1.0) sineFallbackPhase -= 1.0;
             const float v = renderOscShape(oscAWave, (float) sineFallbackPhase, oscAPulseWidth) * 0.5f;
             sampL += v; sampR += v;
         }
+
 
         sampL *= oscALevel;
         sampR *= oscALevel;
