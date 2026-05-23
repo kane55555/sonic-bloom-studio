@@ -197,9 +197,15 @@ private:
         Samples/Presets/User/Pads always lands in "Pads" regardless of its filename. */
     static juce::String classify(const juce::String& nameIn, const juce::String& hintCat)
     {
-        // 1) Folder hint takes priority.
+        // 1) Folder hint takes priority — known bucket match.
         for (auto& c : categoryOrder())
             if (c.equalsIgnoreCase(hintCat)) return c;
+
+        // 1b) Unknown but non-empty folder hint: preserve the user's exact
+        //     folder name so custom folders under Samples/Presets/User/
+        //     appear as their own category tab labelled as typed.
+        if (hintCat.trim().isNotEmpty()) return hintCat;
+
 
         // 2) Otherwise infer from the preset name.
         const auto n = nameIn.toLowerCase();
@@ -299,9 +305,47 @@ private:
             }
         }
 
+        // Custom user folders: any category not in the built-in order gets
+        // appended at the bottom, displayed with its folder name as typed.
+        {
+            juce::StringArray customCats;
+            for (juce::HashMap<juce::String, juce::Array<const Item*>>::Iterator it(byCat); it.next();)
+            {
+                const auto& cat = it.getKey();
+                if (categoryOrder().contains(cat)) continue;
+                customCats.add(cat);
+            }
+            customCats.sort(true);
+            for (auto& cat : customCats)
+            {
+                auto& list = byCat.getReference(cat);
+                if (list.isEmpty()) continue;
+
+                Row h; h.kind = Row::Header; h.category = cat;
+                h.label = cat; h.countInCategory = list.size();
+                rows.add(h);
+
+                const bool open = openCategories.find(cat) != openCategories.end()
+                                  || query.isNotEmpty();
+                if (open)
+                {
+                    std::sort(list.begin(), list.end(), [](const Item* a, const Item* b) {
+                        return a->name.compareNatural(b->name) < 0;
+                    });
+                    for (auto* it : list)
+                    {
+                        Row r; r.kind = Row::Preset; r.category = cat;
+                        r.label = it->name; r.globalIndex = it->globalIndex;
+                        rows.add(r);
+                    }
+                }
+            }
+        }
+
         list.updateContent();
         list.repaint();
     }
+
 
     int rowIndexForPreset(int globalIndex) const
     {
