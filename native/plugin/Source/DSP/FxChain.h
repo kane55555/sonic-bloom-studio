@@ -94,6 +94,8 @@ public:
     void setChorusMix(float m) { chorus.setMix(m); }
     void setChorusRate(float r) { chorus.setRate(r); }
     void setChorusDepth(float d) { chorus.setDepth(d); }
+    void setChorusMode(int m) { chorus.setMode(m); }
+
 
     void setDelayMix(float m) { delay.setMix(m); delayActive = m > 0.001f; }
     void setDelayTime(float s) { delay.setTimeSeconds(s); }
