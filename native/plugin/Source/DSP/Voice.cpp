@@ -234,14 +234,24 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
     const double driftInc = (double) card.driftHz / sampleRate;
 
 
-    auto rateFor = [this](const dida::SampleZone* z) -> double
+    // Capture card pitch + drift in a per-block "extra cents" closure used
+    // by both the sample-rate computation and the synth fallback path.
+    auto extraCentsNow = [&]() {
+        const float driftCents = std::sin((float) driftPhase * juce::MathConstants<float>::twoPi)
+                               * (2.5f * vAmt);   // up to ±2.5c at full vintage
+        return cardPitchCents + driftCents;
+    };
+
+    auto rateFor = [&](const dida::SampleZone* z) -> double
     {
         if (z == nullptr) return 1.0;
-        const double playedHz = midiToHzD(currentMidiNote + (double) pitchOffsetSemis);
+        const double extraRatio = std::pow(2.0, (double) extraCentsNow() / 1200.0);
+        const double playedHz = midiToHzD(currentMidiNote + (double) pitchOffsetSemis) * extraRatio;
         const double rootHz   = midiToHzD((double) z->rootMidi);
         const double srRatio  = z->sourceSampleRate / sampleRate;
         return pitchTracking ? srRatio * (playedHz / rootHz) : srRatio;
     };
+
 
     // Helper: read a zone with crop/loop crossfade respected.
     auto readWithLoop = [this](const dida::SampleZone& z, double& pos, bool& finished,
