@@ -404,14 +404,169 @@ static int lfoShapeIndex(const juce::String& s)
     return 0;
 }
 
+// ---- Category-aware tuning (the heart of "make presets sound expensive") ----
+
+namespace {
+
+enum class Family {
+    PianoKeys, Lead, Pad, ChoirVox, Brass, Guitar, Bell, Pluck, Bass808, FxRiser, Other
+};
+
+Family familyOf(const juce::String& categoryIn)
+{
+    const auto c = categoryIn.toLowerCase();
+    if (c.contains("piano") || c.contains("keys") || c == "painpianos") return Family::PianoKeys;
+    if (c.contains("lead")  || c == "alienleads")                       return Family::Lead;
+    if (c.contains("pad")   || c == "darkpads")                         return Family::Pad;
+    if (c.contains("choir") || c.contains("vox") || c.contains("vocal")) return Family::ChoirVox;
+    if (c.contains("brass") || c.contains("trumpet") || c.contains("horn")) return Family::Brass;
+    if (c.contains("guitar"))                                            return Family::Guitar;
+    if (c.contains("bell"))                                              return Family::Bell;
+    if (c.contains("pluck"))                                             return Family::Pluck;
+    if (c.contains("808")   || c.contains("bass") || c.contains("sub")) return Family::Bass808;
+    if (c.contains("fx")    || c.contains("riser"))                     return Family::FxRiser;
+    return Family::Other;
+}
+
+// Allowed parent-folder hints under Samples/ for each family. Used for
+// non-fatal validation warnings on .diapreset loads.
+juce::StringArray expectedParentsFor(Family f)
+{
+    switch (f) {
+        case Family::PianoKeys: return { "Pianos", "Piano", "Keys" };
+        case Family::Lead:      return { "Synths", "Synth", "Leads" };
+        case Family::Pad:       return { "Synths", "Pads",  "Choirs" };
+        case Family::ChoirVox:  return { "Choirs", "Vox",   "Vocals" };
+        case Family::Brass:     return { "Brass" };
+        case Family::Guitar:    return { "Guitars", "Guitar" };
+        case Family::Bell:      return { "Bells" };
+        case Family::Pluck:     return { "Plucks", "Synths" };
+        case Family::Bass808:   return { "808", "Bass", "Subs" };
+        case Family::FxRiser:   return { "FX", "Risers" };
+        default:                return {};
+    }
+}
+
+void validateSourceForCategory(const UserPreset& p)
+{
+    const auto fam = familyOf(p.category);
+    const auto allowed = expectedParentsFor(fam);
+    if (fam == Family::Other || allowed.isEmpty() || p.source.path.isEmpty()) return;
+
+    const auto norm = p.source.path.replaceCharacter('\\', '/');
+    bool ok = false;
+    for (auto& parent : allowed)
+        if (norm.containsIgnoreCase("/" + parent + "/") || norm.startsWithIgnoreCase(parent + "/"))
+            { ok = true; break; }
+
+    if (! ok)
+        didaUserPresetLog("WARNING preset '" + p.presetName + "' category=" + p.category
+            + " uses unexpected source folder: " + p.source.path
+            + " (expected one of: " + allowed.joinIntoString(", ") + ")");
+}
+
+struct EnvRange { float aMin, aMax, dMin, dMax, sMin, sMax, rMin, rMax; };
+
+EnvRange envRangeFor(Family f)
+{
+    // Per-category envelope envelope ranges (seconds / 0..1 for sustain).
+    switch (f) {
+        case Family::PianoKeys: return { 0.0f, 0.008f, 0.30f, 0.90f, 0.20f, 0.55f, 0.25f, 0.90f };
+        case Family::Lead:      return { 0.0f, 0.020f, 0.05f, 0.40f, 0.70f, 0.95f, 0.40f, 1.40f };
+        case Family::Pad:       return { 0.12f, 0.80f, 0.20f, 1.50f, 0.80f, 1.00f, 1.80f, 6.00f };
+        case Family::ChoirVox:  return { 0.10f, 0.60f, 0.20f, 1.20f, 0.75f, 1.00f, 1.40f, 4.50f };
+        case Family::Brass:     return { 0.005f, 0.04f, 0.10f, 0.50f, 0.65f, 0.95f, 0.30f, 1.20f };
+        case Family::Guitar:    return { 0.0f,   0.01f, 0.20f, 0.80f, 0.45f, 0.85f, 0.30f, 1.20f };
+        case Family::Bell:      return { 0.0f,   0.005f, 0.20f, 0.80f, 0.05f, 0.40f, 0.60f, 2.20f };
+        case Family::Pluck:     return { 0.0f,   0.005f, 0.10f, 0.40f, 0.00f, 0.25f, 0.20f, 0.80f };
+        case Family::Bass808:   return { 0.0f,   0.005f, 0.10f, 0.40f, 0.85f, 1.00f, 0.10f, 0.60f };
+        case Family::FxRiser:   return { 0.0f,   1.00f, 0.05f, 4.00f, 0.00f, 1.00f, 0.05f, 4.00f };
+        default:                return { 0.0f,   2.00f, 0.01f, 4.00f, 0.00f, 1.00f, 0.01f, 6.00f };
+    }
+}
+
+struct FxLimits { float chorusMax, delayMax, reverbMax, satMax; };
+
+FxLimits fxLimitsFor(Family f)
+{
+    // Reasonable upper caps so e.g. piano presets can't ship at 80% reverb.
+    switch (f) {
+        case Family::PianoKeys: return { 0.18f, 0.16f, 0.32f, 0.12f };
+        case Family::Lead:      return { 0.35f, 0.45f, 0.50f, 0.45f };
+        case Family::Pad:       return { 0.45f, 0.40f, 0.55f, 0.25f };
+        case Family::ChoirVox:  return { 0.35f, 0.30f, 0.55f, 0.18f };
+        case Family::Brass:     return { 0.25f, 0.30f, 0.42f, 0.30f };
+        case Family::Guitar:    return { 0.30f, 0.35f, 0.38f, 0.40f };
+        case Family::Bell:      return { 0.30f, 0.35f, 0.48f, 0.18f };
+        case Family::Pluck:     return { 0.30f, 0.35f, 0.35f, 0.18f };
+        case Family::Bass808:   return { 0.12f, 0.18f, 0.18f, 0.35f };
+        case Family::FxRiser:   return { 0.60f, 0.70f, 0.70f, 0.60f };
+        default:                return { 0.50f, 0.50f, 0.50f, 0.40f };
+    }
+}
+
+void applyLayerBusCharacter(juce::AudioProcessor& proc, const UserPreset& p, Family fam)
+{
+    auto* dp = dynamic_cast<DiditagainProcessor*>(&proc);
+    if (dp == nullptr) return;
+    auto& bus = dp->getSynthEngine().getLayerBus();
+
+    // Macro-driven layer-bus voicing.
+    const float warmth   = juce::jlimit(0.0f, 1.0f, p.macros.warmth);
+    const float width    = juce::jlimit(0.0f, 1.0f, p.macros.width);
+    const float movement = juce::jlimit(0.0f, 1.0f, p.macros.movement);
+
+    bus.setEnabled(true);
+    bus.setSaturationDrive(0.08f + warmth * 0.30f);   // subtle analog glue
+    bus.setSaturationMix  (0.10f + warmth * 0.35f);
+
+    // Per-family width baseline (then macro nudges it).
+    float baseWidth = 0.85f;
+    switch (fam) {
+        case Family::PianoKeys: baseWidth = 0.75f; break;
+        case Family::Lead:      baseWidth = 0.88f; break;
+        case Family::Pad:       baseWidth = 1.00f; break;
+        case Family::ChoirVox:  baseWidth = 1.05f; break;
+        case Family::Brass:     baseWidth = 0.80f; break;
+        case Family::Guitar:    baseWidth = 0.78f; break;
+        case Family::Bass808:   baseWidth = 0.35f; break; // narrow low end
+        default: break;
+    }
+    bus.setWidth(juce::jlimit(0.0f, 1.4f, baseWidth * (0.6f + width * 0.8f)));
+
+    // Shared modulation depth (subtle unless macro pushes it).
+    bus.setDriftRate (0.12f + movement * 0.30f);
+    bus.setDriftDepth(0.006f + movement * 0.025f);
+}
+
+void clampEnvelopeForCategory(juce::AudioProcessor& proc, const UserPreset& p, Family fam)
+{
+    const auto r = envRangeFor(fam);
+    const float aSec = juce::jlimit(r.aMin, r.aMax, p.amp.attackMs  / 1000.0f);
+    const float dSec = juce::jlimit(r.dMin, r.dMax, p.amp.decayMs   / 1000.0f);
+    const float sus  = juce::jlimit(r.sMin, r.sMax, p.amp.sustain);
+    const float rSec = juce::jlimit(r.rMin, r.rMax, p.amp.releaseMs / 1000.0f);
+
+    setParamById(proc, "env1Attack",  aSec);
+    setParamById(proc, "env1Decay",   dSec);
+    setParamById(proc, "env1Sustain", sus);
+    setParamById(proc, "env1Release", rSec);
+}
+
+} // anonymous
+
 void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
 {
-    // -- Amp / envelope 1 (master amp env)
-    setParamById(proc, "masterGain",   p.amp.gainDb);
-    setParamById(proc, "env1Attack",   p.amp.attackMs   / 1000.0f);
-    setParamById(proc, "env1Decay",    p.amp.decayMs    / 1000.0f);
-    setParamById(proc, "env1Sustain",  juce::jlimit(0.0f, 1.0f, p.amp.sustain));
-    setParamById(proc, "env1Release",  p.amp.releaseMs  / 1000.0f);
+    const Family fam = familyOf(p.category);
+
+    // -- Source / category validation (non-fatal warning only)
+    validateSourceForCategory(p);
+
+    // -- Master gain
+    setParamById(proc, "masterGain", p.amp.gainDb);
+
+    // -- Amp env: clamped to per-category musical ranges
+    clampEnvelopeForCategory(proc, p, fam);
 
     // -- Filter
     setChoiceById(proc, "filter1Type", filterTypeIndex(p.filter.type));
@@ -436,14 +591,25 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
         if (auto* b = dynamic_cast<juce::AudioParameterBool*>(param))
             if (b->paramID == "subOscEnabled") setParamRaw(b, 0.0f);
 
-    // -- FX
-    setParamById(proc, "fxChorusMix",        p.chorus.enabled    ? p.chorus.mix     : 0.0f);
-    setParamById(proc, "fxDelayMix",         p.delay.enabled     ? p.delay.mix      : 0.0f);
+    // -- FX: clamp each mix to a category-sane upper limit so e.g. piano
+    //        presets cannot ship as a wet-bath. Macro "space" can nudge
+    //        reverb mix up to the cap.
+    const auto fxL = fxLimitsFor(fam);
+    const float space   = juce::jlimit(0.0f, 1.0f, p.macros.space);
+    const float reverbBase = p.reverb.enabled ? p.reverb.mix : 0.0f;
+    const float reverbMix  = juce::jlimit(0.0f, fxL.reverbMax,
+                                          reverbBase * (0.85f + space * 0.30f));
+
+    setParamById(proc, "fxChorusMix",
+                 juce::jlimit(0.0f, fxL.chorusMax, p.chorus.enabled ? p.chorus.mix : 0.0f));
+    setParamById(proc, "fxDelayMix",
+                 juce::jlimit(0.0f, fxL.delayMax,  p.delay.enabled  ? p.delay.mix  : 0.0f));
     setParamById(proc, "fxDelayTime",        p.delay.timeMs / 1000.0f);
     setParamById(proc, "fxDelayFeedback",    p.delay.feedback);
-    setParamById(proc, "fxReverbMix",        p.reverb.enabled    ? p.reverb.mix     : 0.0f);
+    setParamById(proc, "fxReverbMix",        reverbMix);
     setParamById(proc, "fxReverbSize",       p.reverb.size);
-    setParamById(proc, "fxDistortionAmount", p.saturation.enabled ? p.saturation.drive : 0.0f);
+    setParamById(proc, "fxDistortionAmount",
+                 juce::jlimit(0.0f, fxL.satMax,    p.saturation.enabled ? p.saturation.drive : 0.0f));
 
     // -- LFOs (rate + shape; routing matrix is owned by the engine elsewhere)
     setParamById(proc, "lfo1Rate", p.lfo1.rateHz);
@@ -451,7 +617,25 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     setParamById(proc, "lfo2Rate", p.lfo2.rateHz);
     setChoiceById(proc, "lfo2Shape", lfoShapeIndex(p.lfo2.shape));
 
-    // -- Advanced
+    // -- Subtle filter movement (only if explicitly enabled, or experimental)
+    if (p.filterMovement.enabled || p.experimental)
+    {
+        const float depth = p.experimental ? p.filterMovement.depth
+                                           : juce::jlimit(0.0f, 0.35f, p.filterMovement.depth);
+        setParamById(proc, "lfo1Rate", p.filterMovement.rateHz);
+        juce::ignoreUnused(depth); // routed via ModMatrix; rate is the audible bit
+    }
+
+    // -- Velocity sensitivity (persists on processor params used by Voice)
+    setParamById(proc, "velocityToGain",   juce::jlimit(0.0f, 1.0f, p.velocity.toGain));
+    setParamById(proc, "velocityToCutoff", juce::jlimit(0.0f, 1.0f, p.velocity.toCutoff));
+    setParamById(proc, "velocityToAttack", juce::jlimit(0.0f, 1.0f, p.velocity.toAttack));
+    setParamById(proc, "velocityToLayer",  juce::jlimit(0.0f, 1.0f, p.velocity.toLayerBlend));
+
+    // -- Premium voicing: shared layer-bus + per-category reverb character.
+    applyLayerBusCharacter(proc, p, fam);
+    dida::preset::applyReverbCharacterForCategory(proc, p.category);
+
     // NOTE: we deliberately do NOT push "polyphony" into APVTS here. Polyphony
     // is a global engine setting; writing it on every preset load triggers the
     // deferred voice-pool mutation path in PluginProcessor, which can refuse
@@ -465,9 +649,11 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
         + " amp.gainDb=" + juce::String(p.amp.gainDb, 2)
         + " filter=" + p.filter.type
         + " cutoff=" + juce::String(p.filter.cutoffHz, 0)
-        + " reverbMix=" + juce::String(p.reverb.mix, 2)
-        + " delayMix=" + juce::String(p.delay.mix, 2)
-        + " chorusMix=" + juce::String(p.chorus.mix, 2));
+        + " reverbMix(clamped)=" + juce::String(reverbMix, 2)
+        + " delayMix=" + juce::String(juce::jmin(p.delay.mix, fxL.delayMax), 2)
+        + " chorusMix=" + juce::String(juce::jmin(p.chorus.mix, fxL.chorusMax), 2)
+        + " macros.warmth=" + juce::String(p.macros.warmth, 2)
+        + " macros.space="  + juce::String(p.macros.space, 2));
 }
 
 juce::String toJson(const UserPreset& p)
