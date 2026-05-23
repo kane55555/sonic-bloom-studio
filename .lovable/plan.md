@@ -1,91 +1,68 @@
-## DIDITAGAIN STUDIO — UI Simplification + Crop/Loop Import Refactor
+# Vintage Analog Engine Upgrade
 
-This is a multi-surface refactor: native JUCE plugin UI + DSP playback + React dashboard import editor + preset schema. To stay execution-ready I'm splitting it into 4 sequential phases, each independently shippable. Each phase ends in a buildable state.
+Transform the active plugin (`native/plugin`) from a basic subtractive synth into a vintage-inspired analog modeling engine, while preserving APVTS parameter IDs, MIDI playback, preset stepping, and VST3 build stability.
 
-### Logo
-Your uploaded `DIDITAGAIN_5X5_FT_FINAL.pdf` is white logotype on black with a globe + arrow accent. I'll extract it as PNG, place it in:
-- `native/plugin/Resources/diditagain_logo.png` (BinaryData → JUCE header)
-- `src/assets/diditagain-logo.png` (React dashboard)
-A clearly-named replacement slot stays so you can swap files without touching code.
+## Scope
 
----
+This is a deep DSP upgrade across voice, oscillator, filter, envelope, modulation, chorus, and preset layers. All changes land in `native/plugin/Source/DSP` and `native/plugin/Source/Presets`. Legacy files in `plugin_legacy_broken` are referenced for ideas only — nothing is wholesale restored.
 
-### Phase 1 — Visual identity + UI simplification (native plugin only)
+## Architecture overview
 
-**Goal:** Plugin looks premium dark/teal, only Browser/Layers/FX visible, advanced stuff in a header menu, Cycle Test gone.
+```text
+[Per-voice]
+ OscA + OscB + Sub + Noise (PolyBLEP, drift, phase rand)
+        |
+        v
+   Osc Mixer  --> Pre-filter Drive --> Filter (LP12/LP24/HPF/BP, dual)
+        |                                       |
+        |                                       v
+        |                               Post-filter Saturation
+        |                                       |
+        v                                       v
+                                   VCA (RC-curve amp env)
+                                                |
+[Global FX chain]                               v
+ BBD Chorus -> Delay -> Reverb -> EQ -> Glue Comp -> Limiter
 
-Files touched:
-- `Source/UI/Theme.h` — switch accent from purple `#8B5CF6` to teal `#14F1D9`, refine charcoal surface tokens (`#0A0C10` bg, `#12161D` panel, `#1A2028` elevated). Single source of truth for all panels.
-- `Source/PluginEditor.h/.cpp` — remove `tabSynth/tabMod/tabSettings/tabAccount/tabImport/modeToggle/cycleTest*` from the visible tab bar. Replace with a single `MenuButton` (☰) that opens a `juce::PopupMenu`:
-  - Import One-Shot…
-  - Advanced Sound Design (Synth)
-  - Modulation
-  - MIDI / Performance
-  - Library / Settings
-  - Account
-  - About
-  Each item shows the existing panel as a modal overlay (`addChildComponent` + dim background) so we don't lose features.
-- New `Source/UI/HeaderBar.h` — logo (left), big preset name + category chip (center), master volume + menu (right).
-- New `Source/UI/LogoComponent.h` — draws teal-tinted logo PNG via `juce::ImageCache`.
-- `Source/UI/MacroPanel.h` — restyle 8 knobs with teal rings, larger labels.
-- `Source/UI/LayerEditor.h` — collapse to 4 simplified rows (enable, vol, pan, pitch, source label, "Advanced ▾" expander that shows the existing dense controls).
-- `Source/UI/FxPanel.h` — rack of EQ/Sat/Chorus/Delay/Reverb/Width/Limiter cards, each card: on/off + 1–3 knobs + chevron for full controls.
-- `Source/Debug/PresetCycleTester.h` — left in tree, no UI hookup. (You said: don't delete the helper.)
-- `CMakeLists.txt` — add logo resource via `juce_add_binary_data`.
+[Voice cards]
+ 8 persistent calibration profiles scaled by global "Vintage" amount.
+```
 
-### Phase 2 — Crop/loop metadata (schema + DSP playback)
+## Implementation steps
 
-**Goal:** Engine respects `cropStart/cropEnd/loopStart/loopEnd/loopCrossfadeMs/autoLoop/oneShotMode/pitchTracking`.
+1. **VoiceCard system** — new `DSP/VoiceCard.h` holding 8 persistent calibration profiles (pitch/PW/gain/cutoff/res/env/VCA/pan offsets). Global `vintageAmount` (0–1) scales all offsets. `SynthEngine` assigns a card index round-robin to each `SynthVoice`. New APVTS param `vintage_amount` (additive, doesn't break existing IDs).
 
-- `packages/preset-schema/src/presetTypes.ts` — add the fields you specified to the sample layer type and a `SampleImportMetadata` interface. Update validators + tests.
-- `Source/Presets/HybridPresetV2.h` — mirror new fields.
-- `Source/Presets/HybridPresetApplier.cpp` — write fields into APVTS/voice state.
-- `Source/DSP/SampleLibrary.h/.cpp` — store per-sample crop/loop metadata.
-- `Source/DSP/Voice.h/.cpp` — replace today's full-buffer wrap with a proper looper:
-  - playback starts at `cropStart * length`
-  - reads to `loopEnd`, then jumps back to `loopStart`
-  - equal-power crossfade window of `loopCrossfadeMs` around the splice point (mix tail of pre-loop region with start of loop region)
-  - `oneShotMode = true` skips loop entirely, lets envelope finish
-  - `pitchTracking = false` ignores MIDI note ratio
-- `Source/Presets/PresetTemplateFactory.cpp` + `HybridPresetGenerator.cpp` — apply per-category autoloop defaults exactly as you listed (DrillBells/PainPianos/Choirs/Guitars/DarkPads/AlienLeads → autoloop on; Bass808 → off unless detected; FXRisers → off; Plucks → off if <500ms; etc.).
-- Default `loopStart = 0.2 * croppedLen`, `loopEnd = 0.95 * croppedLen`, `crossfade = 20ms` for melodic.
+2. **Oscillator upgrade** (`DSP/Oscillator.h`) — PolyBLEP saw/square/pulse/triangle, sine, noise. Phase randomization at note-on. Per-voice slow drift LFO (0.03–0.25 Hz). DCO vs VCO mode toggle. PWM input from LFO+env. Hard sync and cross-mod hooks for OscB. Sub osc square one octave down (already present, retune).
 
-### Phase 3 — React import review with waveform crop editor
+3. **Filter upgrade** (`DSP/FilterBlock.h`) — LP12/LP24/HPF/BP modes. Juno-style musical saturation in the ladder. CS-style dual HPF→LPF mode. Pre-filter drive + post-filter soft sat (tanh). Smoothed cutoff/res via one-pole to kill zipper. Key tracking + velocity-to-cutoff inputs. Bipolar env amount.
 
-**Goal:** Functional crop/loop editor in the dashboard that writes the schema from Phase 2.
+4. **Envelopes** (`DSP/Envelope.h`) — RC-curve analog stages (exponential). Click-free fast attack via min-time clamp + smoothing. Retrigger modes: reset / legato / analog-partial. Per-voice timing scaled by card offsets. Velocity-to-attack scaling.
 
-- `src/components/admin/PresetImportPanel.tsx` — extend with per-row "Edit ▾" that opens:
-- New `src/components/admin/SampleCropEditor.tsx`:
-  - Canvas waveform (decoded via WebAudio `AudioContext.decodeAudioData`)
-  - Draggable handles: Start, End, Loop Start, Loop End (teal regions)
-  - Numeric inputs as fallback (in seconds)
-  - "Smooth Loop" slider 0–50ms
-  - Toggles: Auto Loop, Play Across Keys, One-Shot Mode
-  - "Preview" button that plays cropped + looped buffer in-browser using a small WebAudio looper for hold-to-preview
-- Producer-friendly labels everywhere ("Start/End/Loop Start/Loop End/Smooth Loop/Auto Loop/Play Across Keys/One-Shot Mode").
-- Finalize writes the new metadata into the preset JSON (Phase 2 schema).
+5. **Modulation matrix** (`DSP/ModMatrix.h`) — Fixed-route matrix: LFO1→pitch/cutoff/PW, LFO2→pan, ENV1→cutoff/pitch, ENV2→amp, vel→amp/cutoff/envAmt, modWheel→vibrato, aftertouch→cutoff/vibrato. Evaluated once per block in `SynthVoice::renderNextBlock`.
 
-### Phase 4 — Wire native ImportReviewPanel to new metadata
+6. **BBD chorus** (`DSP/ChorusBlock.h`) — Replace `juce::dsp::Chorus` with two modulated delay lines (6–18 ms base), darkened wet (LP ~6 kHz), optional noise floor, stereo LFO phase offset, modes I / II / I+II. Mono-safe via mid/side handling.
 
-**Goal:** Native plugin import flow can also set crop/loop (minimum: numeric inputs + toggles; waveform optional, since drawing JUCE waveforms is heavier). Both surfaces produce identical preset JSON consumed by Phase 2 DSP.
+7. **Gain staging** — Add per-stage compensation constants in `Voice` and `FxChain` so signal hits each stage at ~−12 dBFS RMS. Document with comments.
 
-- `Source/UI/ImportReviewPanel.h` — add Start/End/Loop Start/Loop End numeric fields, autoLoop/oneShot/pitchTracking toggles, "Smooth Loop" ms knob, Preview button (triggers a held middle-C note via the engine).
-- `native/tools/import_samples.py` — also embeds defaults in generated metadata.
+8. **Category EQ curves** — Extend `HybridPresetApplier` with `applyToneCurveForCategory` (Bass/Brass/Pads/Keys/Leads) wiring into existing `EQBlock` + `setReverbInputHighPass*` helpers.
 
----
+9. **Vintage Synth factory bank** — New `Presets/VintageSynthBank.cpp/.h` with 20 sample-free presets (Juno pad, Jupiter brass, Prophet keys, CS pad, analog bass, mono lead, PWM pad, string machine, pluck, bell, dark choir, Reese, soft poly keys, horror lead, tape pad, analog init, +4 fillers). Registered in `PresetManager` under a "Vintage Synth" category. Each preset sets engine mode, osc waveforms, filter mode, env shapes, mod routes, chorus mode.
 
-### Acceptance check after each phase
-- After P1: open plugin → dark/teal, logo, 3 visible tabs, menu has the rest, no Cycle Test.
-- After P2: a hand-edited preset JSON with `loopStart/loopEnd/crossfade` plays smoothly across keys.
-- After P3: drop a WAV in the dashboard, set crop/loop, finalize → produces valid preset.
-- After P4: same flow inside the plugin.
+10. **Wire-up & safety** — `PluginProcessor`: register `vintage_amount` and any new IDs additively; attach listeners. `SynthEngine`: distribute voice cards; route new setters to voices. Confirm preset stepping during MIDI playback still uses existing `canSafelyMutateVoices` guard. CMake auto-globs new files.
 
-### What I'll NOT touch
-- Preset/import architecture you already approved (HybridPresetApplier, MacroMapper, PresetTemplateFactory categories) — only extended.
-- Browser/Layers/FX feature set — only restyled and reorganized.
-- Existing factory presets — unchanged.
+## Technical notes
 
-### Open question
-Crop editor lives only in the React dashboard (Phase 3, full waveform UI), and the native plugin import gets numeric/toggle controls (Phase 4, no drawn waveform). If you want a drawn waveform inside the JUCE import panel too, that's an extra ~half-phase of work — say the word and I'll add it. Otherwise I'll proceed with the split above.
+- **APVTS stability**: only *add* parameter IDs; never rename/remove. New IDs: `vintage_amount`, `osc_mode` (DCO/VCO), `filter_mode` (LP12/LP24/HPF/BP/Dual), `chorus_mode` (I/II/I+II), `env_retrigger`.
+- **Voice card persistence**: card table generated once at engine construction with a fixed seed so the same card always sounds the same across sessions.
+- **PolyBLEP**: standard 2-sample correction; avoids extra latency.
+- **Filter smoothing**: 5 ms one-pole on cutoff/res/envAmount.
+- **Legacy migration**: only `LFO.h` shape ideas and ModMatrix structure are referenced from `plugin_legacy_broken`; no files copied verbatim — all rewritten with comments noting origin.
+- **Build**: header-heavy DSP keeps CMake source globs happy; new `.cpp` stubs added where the existing pattern requires them (matches `LayerBusProcessor.cpp` precedent).
+- **No removals**: all current setters on `FxChain`, `Voice`, `SynthEngine` remain; new behavior is opt-in via new parameters defaulting to mild vintage (0.25).
 
-Approve and I'll start with Phase 1.
+## Validation
+
+- Build VST3 cleanly (`DIDITAGAIN_STUDIO_VST3` target).
+- Smoke-load each new factory preset and confirm no NaNs / silence.
+- Confirm preset switching mid-MIDI-playback still honors `canSafelyMutateVoices`.
+- A/B a chord on a Juno pad preset: voices should detune slightly, chorus should warble BBD-style, filter should saturate without harshness.
