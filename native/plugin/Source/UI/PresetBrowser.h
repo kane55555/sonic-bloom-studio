@@ -305,9 +305,47 @@ private:
             }
         }
 
+        // Custom user folders: any category not in the built-in order gets
+        // appended at the bottom, displayed with its folder name as typed.
+        {
+            juce::StringArray customCats;
+            for (juce::HashMap<juce::String, juce::Array<const Item*>>::Iterator it(byCat); it.next();)
+            {
+                const auto& cat = it.getKey();
+                if (categoryOrder().contains(cat)) continue;
+                customCats.add(cat);
+            }
+            customCats.sort(true);
+            for (auto& cat : customCats)
+            {
+                auto& list = byCat.getReference(cat);
+                if (list.isEmpty()) continue;
+
+                Row h; h.kind = Row::Header; h.category = cat;
+                h.label = cat; h.countInCategory = list.size();
+                rows.add(h);
+
+                const bool open = openCategories.find(cat) != openCategories.end()
+                                  || query.isNotEmpty();
+                if (open)
+                {
+                    std::sort(list.begin(), list.end(), [](const Item* a, const Item* b) {
+                        return a->name.compareNatural(b->name) < 0;
+                    });
+                    for (auto* it : list)
+                    {
+                        Row r; r.kind = Row::Preset; r.category = cat;
+                        r.label = it->name; r.globalIndex = it->globalIndex;
+                        rows.add(r);
+                    }
+                }
+            }
+        }
+
         list.updateContent();
         list.repaint();
     }
+
 
     int rowIndexForPreset(int globalIndex) const
     {
