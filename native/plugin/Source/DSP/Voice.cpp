@@ -1,4 +1,6 @@
 #include "Voice.h"
+#include "VoiceCard.h"
+
 
 SynthVoice::SynthVoice()
 {
@@ -217,14 +219,39 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
 
     const int numCh = outputBuffer.getNumChannels();
 
-    auto rateFor = [this](const dida::SampleZone* z) -> double
+    // ---- Voice-card calibration (Juno/Jupiter/Prophet-style) ----
+    const auto& card = dida::VoiceCardBank::instance().get(voiceCardIndex);
+    const float vAmt = vintageAmount;
+    const float cardPitchCents = dida::vintageMix(card.pitchCents,     vAmt);
+    const float cardVcaDb      = dida::vintageMix(card.vcaGainDb,      vAmt)
+                               + dida::vintageMix(card.gainDb,         vAmt);
+    const float cardPan        = dida::vintageMix(card.panOffset,      vAmt);
+    const float cardCutoffHz   = dida::vintageMix(card.cutoffHz,       vAmt);
+    const float vcaGainLin     = std::pow(10.0f, cardVcaDb / 20.0f);
+
+    // Slow analog drift (0.03..0.25 Hz per card). Adds a couple cents of
+    // wobble — the heart of the "alive" character vs static digital pitch.
+    const double driftInc = (double) card.driftHz / sampleRate;
+
+
+    // Capture card pitch + drift in a per-block "extra cents" closure used
+    // by both the sample-rate computation and the synth fallback path.
+    auto extraCentsNow = [&]() {
+        const float driftCents = std::sin((float) driftPhase * juce::MathConstants<float>::twoPi)
+                               * (2.5f * vAmt);   // up to ±2.5c at full vintage
+        return cardPitchCents + driftCents;
+    };
+
+    auto rateFor = [&](const dida::SampleZone* z) -> double
     {
         if (z == nullptr) return 1.0;
-        const double playedHz = midiToHzD(currentMidiNote + (double) pitchOffsetSemis);
+        const double extraRatio = std::pow(2.0, (double) extraCentsNow() / 1200.0);
+        const double playedHz = midiToHzD(currentMidiNote + (double) pitchOffsetSemis) * extraRatio;
         const double rootHz   = midiToHzD((double) z->rootMidi);
         const double srRatio  = z->sourceSampleRate / sampleRate;
         return pitchTracking ? srRatio * (playedHz / rootHz) : srRatio;
     };
+
 
     // Helper: read a zone with crop/loop crossfade respected.
     auto readWithLoop = [this](const dida::SampleZone& z, double& pos, bool& finished,
@@ -304,13 +331,16 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         // the same cheap synth sound.
         if (! hasSampleSource && fallbackSynthesisEnabled)
         {
+            // Card pitch + slow drift add 0..few cents of vintage life.
+            const double totalCents = (double) oscADetuneCents + (double) extraCentsNow();
             const double f = midiToHzD((double) currentMidiNote + (double) pitchOffsetSemis
-                                       + (double) oscADetuneCents / 100.0);
+                                       + totalCents / 100.0);
             sineFallbackPhase += f / sampleRate;
             if (sineFallbackPhase > 1.0) sineFallbackPhase -= 1.0;
             const float v = renderOscShape(oscAWave, (float) sineFallbackPhase, oscAPulseWidth) * 0.5f;
             sampL += v; sampR += v;
         }
+
 
         sampL *= oscALevel;
         sampR *= oscALevel;
@@ -379,10 +409,11 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         l += oscBOut * oscBSideGain;
         r -= oscBOut * oscBSideGain;
 
-        // ---- Filter ----
+        // ---- Filter (with card cutoff offset) ----
         const float fEnv = filterEnv.getNextSample();
         const float keyOffset = (currentMidiNote - 60.0f) * filterKeyTrack * 100.0f;
-        float modCut = baseCutoff * std::pow(2.0f, filterEnvAmount * fEnv * 4.0f) + keyOffset;
+        float modCut = baseCutoff * std::pow(2.0f, filterEnvAmount * fEnv * 4.0f)
+                       + keyOffset + cardCutoffHz;
         modCut = juce::jlimit(20.0f, 20000.0f, modCut);
         filter.setCutoff(modCut);
 
@@ -391,14 +422,28 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         l = 0.5f * (l + filtered);
         r = 0.5f * (r + filtered);
 
-        // ---- Amp envelope ----
+        // ---- Amp envelope + per-voice VCA card offset + pan offset ----
         const float amp = ampEnv.getNextSample();
         const float velCurve = 0.3f + 0.7f * velocity;
-        const float gain = amp * velCurve;
+        const float gain = amp * velCurve * vcaGainLin;
         l *= gain; r *= gain;
+        // Equal-power pan offset using card pan (-0.08..+0.08 at full vintage).
+        // cardPan=0 → both sides ~0.707 (centre). Multiply by sqrt(2) to keep
+        // unity gain in the centre position.
+        const float panAngle = (cardPan + 1.0f) * 0.25f * juce::MathConstants<float>::pi;
+        const float panL = std::cos(panAngle) * 1.41421356f;
+        const float panR = std::sin(panAngle) * 1.41421356f;
+        l *= panL;
+        r *= panR;
+
+
+        // Advance slow analog drift phase.
+        driftPhase += driftInc;
+        if (driftPhase >= 1.0) driftPhase -= 1.0;
 
         if (numCh >= 2) { outputBuffer.addSample(0, s, l); outputBuffer.addSample(1, s, r); }
         else            { outputBuffer.addSample(0, s, 0.5f * (l + r)); }
+
 
         const bool sampleSourceDone = (loZone == nullptr || loFinished)
                                    && (hiZone == nullptr || hiFinished);

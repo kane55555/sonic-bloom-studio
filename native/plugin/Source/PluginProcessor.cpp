@@ -246,6 +246,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createP
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{"directMonitor", 1}, "Direct Monitor", false));
 
+    // Vintage analog amount — scales per-voice card calibration offsets
+    // (pitch, gain, cutoff, pan, drift). 0 = clean/modern, 1 = unstable/vintage.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"vintageAmount", 1}, "Vintage Amount",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.25f));
+
+    // BBD chorus mode: I (slow/deep), II (fast/shallow), I+II (combined wide).
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{"chorusMode", 1}, "Chorus Mode",
+        juce::StringArray{"I", "II", "I+II"}, 0));
+
+
     return { params.begin(), params.end() };
 }
 
@@ -479,9 +491,16 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     const int   unisonVoices = juce::jlimit(1, 8, static_cast<int>(getF("unisonVoices")));
     const float unisonDetune = getF("unisonDetune");
     const float unisonSpread = getF("unisonSpread");
+    const float vintageAmt   = juce::jlimit(0.0f, 1.0f, getF("vintageAmount"));
 
+    int voiceCardCounter = 0;
     synthEngine.forEachSynthVoice([&](SynthVoice& v)
     {
+        // Assign persistent voice card index round-robin so each polyphonic
+        // voice has its own slight analog character (pitch, pan, drift, etc).
+        v.setVoiceCardIndex(voiceCardCounter++);
+        v.setVintageAmount(vintageAmt);
+
         v.setEngineMode(engineMode);
         v.setOscALevel(oscALevel);
         v.setOscBLevel(oscBLevel);
@@ -500,6 +519,9 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         f.setType(filterType);
         f.setResonance(reso);
         f.setDrive(fDrive);
+        // Subtle post-filter saturation scales with the Vintage amount so
+        // resonance peaks stay musical instead of digital/piercing.
+        f.setOutputDrive(0.15f + 0.35f * vintageAmt);
 
         v.getOscA().setWaveform(static_cast<Oscillator::Waveform>(static_cast<int>(getF("oscAWaveform"))));
         v.getOscB().setWaveform(static_cast<Oscillator::Waveform>(static_cast<int>(getF("oscBWaveform"))));
@@ -516,6 +538,7 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         v.getModEnv().setAttack(mA);      v.getModEnv().setDecay(mD);
         v.getModEnv().setSustain(mS);     v.getModEnv().setRelease(mR);
     });
+
 
     // ---- Preset-driven macro mapping (V2 macro targets). When a preset
     // declares macro targets, push macroN values to those APVTS params and
@@ -560,7 +583,9 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     fx.setReverbSize(presetMacrosActive ? clamp01(getF("fxReverbSize"))
                                         : clamp01(getF("fxReverbSize") + m5 * 0.5f));
 
+    fx.setChorusMode(static_cast<int>(getF("chorusMode")));
     fx.setEqLowDb (getF("eqLow"));
+
     fx.setEqMidDb (getF("eqMid"));
     fx.setEqHighDb(getF("eqHigh"));
     fx.setCompEnabled(getF("compEnabled") > 0.5f);
