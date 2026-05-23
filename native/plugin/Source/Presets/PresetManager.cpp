@@ -470,6 +470,8 @@ void PresetManager::applyPendingUserDiapresetAfterSampleLoad()
         { pfx.setReverbInputHighPassHz(280.0f); pfx.setReverbInputLowPassHz(4800.0f); pfx.setReverbDiffusion(0.58f); pfx.setReverbDucking(0.22f, 5.0f, 260.0f); pfx.setReverbLowMonoControl(300.0f, 0.05f); pfx.setReverbWidth(0.72f); }
         else if (c.contains("lead"))
         { pfx.setReverbInputHighPassHz(210.0f); pfx.setReverbInputLowPassHz(8500.0f); pfx.setReverbDiffusion(0.62f); pfx.setReverbDucking(0.23f, 5.0f, 240.0f); pfx.setReverbLowMonoControl(300.0f, 0.06f); pfx.setReverbWidth(0.86f); }
+        else
+        { pfx.setReverbCharacter(ReverbBlock::Character::Studio); }
     }
     logFinalActivePresetParams(processor, pendingUserDiapreset.presetName);
 }
@@ -717,6 +719,8 @@ void PresetManager::loadPreset(int index)
             { setParam(processor, "fxReverbMix", 0.24); setParam(processor, "fxReverbSize", 0.58); pfx.setReverbCharacter(ReverbBlock::Character::Vintage); pfx.setReverbInputHighPassHz(280.0f); pfx.setReverbInputLowPassHz(4800.0f); pfx.setReverbDiffusion(0.58f); pfx.setReverbDucking(0.22f, 5.0f, 260.0f); pfx.setReverbLowMonoControl(300.0f, 0.05f); pfx.setReverbWidth(0.72f); }
             else if (c.contains("lead"))
             { setParam(processor, "fxReverbMix", 0.24); setParam(processor, "fxReverbSize", 0.64); pfx.setReverbCharacter(ReverbBlock::Character::Hall); pfx.setReverbInputHighPassHz(210.0f); pfx.setReverbInputLowPassHz(8500.0f); pfx.setReverbDiffusion(0.62f); pfx.setReverbDucking(0.23f, 5.0f, 240.0f); pfx.setReverbLowMonoControl(300.0f, 0.06f); pfx.setReverbWidth(0.86f); }
+            else
+            { setParam(processor, "fxReverbMix", 0.18); setParam(processor, "fxReverbSize", 0.55); pfx.setReverbCharacter(ReverbBlock::Character::Studio); }
         }
 
         if (onPresetLoaded) onPresetLoaded();
