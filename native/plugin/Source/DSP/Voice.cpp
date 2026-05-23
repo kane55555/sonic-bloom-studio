@@ -406,10 +406,11 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         l += oscBOut * oscBSideGain;
         r -= oscBOut * oscBSideGain;
 
-        // ---- Filter ----
+        // ---- Filter (with card cutoff offset) ----
         const float fEnv = filterEnv.getNextSample();
         const float keyOffset = (currentMidiNote - 60.0f) * filterKeyTrack * 100.0f;
-        float modCut = baseCutoff * std::pow(2.0f, filterEnvAmount * fEnv * 4.0f) + keyOffset;
+        float modCut = baseCutoff * std::pow(2.0f, filterEnvAmount * fEnv * 4.0f)
+                       + keyOffset + cardCutoffHz;
         modCut = juce::jlimit(20.0f, 20000.0f, modCut);
         filter.setCutoff(modCut);
 
@@ -418,14 +419,26 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         l = 0.5f * (l + filtered);
         r = 0.5f * (r + filtered);
 
-        // ---- Amp envelope ----
+        // ---- Amp envelope + per-voice VCA card offset + pan offset ----
         const float amp = ampEnv.getNextSample();
         const float velCurve = 0.3f + 0.7f * velocity;
-        const float gain = amp * velCurve;
+        const float gain = amp * velCurve * vcaGainLin;
         l *= gain; r *= gain;
+        // Equal-power pan offset using card pan (-0.08..+0.08 at full vintage).
+        const float panL = std::cos((cardPan + 1.0f) * 0.25f * juce::MathConstants<float>::pi);
+        const float panR = std::sin((cardPan + 1.0f) * 0.25f * juce::MathConstants<float>::pi);
+        // Normalised so centre (cardPan=0) → ~1.0 both sides.
+        const float panNorm = 1.41421356f;
+        l *= panL * panNorm * 0.5f + 0.5f;
+        r *= panR * panNorm * 0.5f + 0.5f;
+
+        // Advance slow analog drift phase.
+        driftPhase += driftInc;
+        if (driftPhase >= 1.0) driftPhase -= 1.0;
 
         if (numCh >= 2) { outputBuffer.addSample(0, s, l); outputBuffer.addSample(1, s, r); }
         else            { outputBuffer.addSample(0, s, 0.5f * (l + r)); }
+
 
         const bool sampleSourceDone = (loZone == nullptr || loFinished)
                                    && (hiZone == nullptr || hiFinished);
