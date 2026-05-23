@@ -295,17 +295,19 @@ void PresetManager::loadDroppedSamples()
         }
     }
 
-    // Backwards compat: also scan the legacy drop tree at
-    // <Samples>/Presets/User/<Category>/.
+    // Scan every immediate subfolder of <Samples>/Presets/User/ as its own
+    // category, using the folder name exactly as typed by the user. This
+    // covers both the built-in dropCategories() folders and any custom
+    // folder the user creates (e.g. "My Trumpets", "Halloween FX").
     auto legacyRoot = getUserPresetDirectory();
     if (legacyRoot.isDirectory())
     {
-        for (auto& cat : dida::preset::dropCategories())
-        {
-            auto dir = legacyRoot.getChildFile(cat);
-            if (dir.isDirectory())
-                scanCategoryFolder(dir, cat, presets);
-        }
+        auto userDirs = legacyRoot.findChildFiles(juce::File::findDirectories, false);
+        std::sort(userDirs.begin(), userDirs.end(), [](const juce::File& a, const juce::File& b) {
+            return a.getFileName().compareNatural(b.getFileName()) < 0;
+        });
+        for (auto& dir : userDirs)
+            scanCategoryFolder(dir, dir.getFileName(), presets);
     }
 }
 
