@@ -48,4 +48,10 @@ public:
                                       bool layerLoop);
 };
 
+/** Voices the reverb tank (HP/LP, diffusion, ducking, low-mono, width,
+    character) to match a preset category. Used by both V2 (HybridPreset)
+    and V1 (.diapreset) load paths so all presets get the cinematic voicing. */
+void applyReverbCharacterForCategory(juce::AudioProcessor& processor,
+                                     const juce::String& category);
+
 }} // namespace dida::preset
