@@ -22,7 +22,7 @@ static ReverbBlock::Character characterForCategory(const juce::String& categoryI
     return ReverbBlock::Character::Studio;
 }
 
-static void applyReverbCharacter(juce::AudioProcessor& proc, const juce::String& category)
+void applyReverbCharacterForCategory(juce::AudioProcessor& proc, const juce::String& category)
 {
     if (auto* dp = dynamic_cast<DiditagainProcessor*>(&proc))
     {
@@ -60,6 +60,13 @@ static void applyReverbCharacter(juce::AudioProcessor& proc, const juce::String&
             fx.setReverbDiffusion(0.58f); fx.setReverbDucking(0.22f, 5.0f, 260.0f);
             fx.setReverbLowMonoControl(300.0f, 0.05f); fx.setReverbWidth(0.72f);
         }
+        else if (c.contains("piano") || c.contains("keys"))
+        {
+            // Pianos/keys: tight cinematic room, no smear, controlled low-mids.
+            fx.setReverbInputHighPassHz(260.0f); fx.setReverbInputLowPassHz(6400.0f);
+            fx.setReverbDiffusion(0.55f); fx.setReverbDucking(0.20f, 6.0f, 220.0f);
+            fx.setReverbLowMonoControl(280.0f, 0.04f); fx.setReverbWidth(0.68f);
+        }
         else if (c.contains("lead"))
         {
             fx.setReverbInputHighPassHz(210.0f); fx.setReverbInputLowPassHz(8500.0f);
@@ -67,6 +74,11 @@ static void applyReverbCharacter(juce::AudioProcessor& proc, const juce::String&
             fx.setReverbLowMonoControl(300.0f, 0.06f); fx.setReverbWidth(0.86f);
         }
     }
+}
+
+static void applyReverbCharacter(juce::AudioProcessor& proc, const juce::String& category)
+{
+    applyReverbCharacterForCategory(proc, category);
 }
 
 
