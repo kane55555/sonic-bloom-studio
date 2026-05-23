@@ -654,6 +654,38 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     applyLayerBusCharacter(proc, p, fam);
     dida::preset::applyReverbCharacterForCategory(proc, p.category);
 
+    // -- Mod-matrix translation: for the routings the engine natively
+    //    understands, fold the entry's amount into the matching APVTS param
+    //    so existing audio paths apply the modulation. Unknown pairs are
+    //    silently ignored here (still preserved on save).
+    for (auto& e : p.modMatrix)
+    {
+        const auto s = e.source.toLowerCase();
+        const auto d = e.dest.toLowerCase();
+        const float a = juce::jlimit(-1.0f, 1.0f, e.amount);
+
+        // velocity -> amp / cutoff / attack / layer-blend
+        if (s == "velocity")
+        {
+            if      (d == "amp.gain"     || d == "amp.gaindb") setParamById(proc, "velocityToGain",   std::abs(a));
+            else if (d == "filter1cutoff"|| d == "filter.cutoffhz") setParamById(proc, "velocityToCutoff", std::abs(a));
+            else if (d == "amp.attack"   || d == "env1.attack")     setParamById(proc, "velocityToAttack", std::abs(a));
+            else if (d == "layer.blend"  || d == "layer2.gaindb")   setParamById(proc, "velocityToLayer",  std::abs(a));
+        }
+        // env1 -> filter cutoff (signed envelope amount on Voice)
+        else if ((s == "env1" || s == "envelope1") && (d == "filter1cutoff" || d == "filter.cutoffhz"))
+        {
+            setParamById(proc, "filterEnvAmount", juce::jlimit(-1.0f, 1.0f, a));
+        }
+        // lfo1 -> filter cutoff: keep rate, scale depth via filterMovement-style depth knob if present
+        else if ((s == "lfo1") && (d == "filter1cutoff" || d == "filter.cutoffhz"))
+        {
+            // rate already set above; nothing else to do here without a depth param.
+        }
+        // modwheel -> vibrato (mapped through pitch wheel range via existing CC11/CC1 path in Voice::controllerMoved)
+        // aftertouch -> cutoff handled by Voice::controllerMoved; nothing to write here.
+    }
+
     // NOTE: we deliberately do NOT push "polyphony" into APVTS here. Polyphony
     // is a global engine setting; writing it on every preset load triggers the
     // deferred voice-pool mutation path in PluginProcessor, which can refuse
