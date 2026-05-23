@@ -128,7 +128,7 @@ static void configurePainPianos(HybridPresetV2& p, const juce::String& src, int 
     p.layers.push_back(noiseL("layer_3", true, 0.02f, e(0.001f, 0.05f, 0.0f, 0.04f), "Hammer Air"));
     p.layers.push_back(oscL("layer_4","Pad","sine", 12, 0, 0.05f, true, e(0.4f, 1.0f, 0.5f, 2.4f)));
     p.globalFilter = lpf(10500.0f, 0.10f);
-    p.effects.reverbEnabled = true; p.effects.reverbMix = 0.34f; p.effects.reverbSize = 0.72f;
+    p.effects.reverbEnabled = true; p.effects.reverbMix = 0.29f; p.effects.reverbSize = 0.66f;
     p.effects.delayEnabled  = true; p.effects.delayMix  = 0.12f; p.effects.delayFb = 0.24f;
     p.effects.chorusEnabled = true; p.effects.chorusMix = 0.18f;
     p.effects.satEnabled    = true; p.effects.satDrive  = 0.08f; p.effects.satMix = 0.22f;
@@ -168,7 +168,7 @@ static void configurePlucks(HybridPresetV2& p, const juce::String& src, int midi
     p.globalFilter = lpf(11000.0f, 0.10f);
     p.effects.delayEnabled  = true; p.effects.delayMix  = 0.22f; p.effects.delayFb = 0.30f;
     p.effects.chorusEnabled = true; p.effects.chorusMix = 0.20f;
-    p.effects.reverbEnabled = true; p.effects.reverbMix = 0.26f; p.effects.reverbSize = 0.62f;
+    p.effects.reverbEnabled = true; p.effects.reverbMix = 0.22f; p.effects.reverbSize = 0.56f;
     p.effects.widthEnabled  = true; p.effects.widthAmount = 0.65f;
     p.macros.push_back(mk("macro_1","Snap",       0.5f, {{"layers[3].volume", 0.0f, 0.10f}}));
     p.macros.push_back(mk("macro_2","Space",      0.5f, {{"effects.reverb.mix", 0.0f, 0.65f}}));
@@ -264,7 +264,7 @@ static void configureGuitars(HybridPresetV2& p, const juce::String& src, int mid
     p.effects.widthEnabled  = true; p.effects.widthAmount = 0.7f;
     p.macros.push_back(mk("macro_1","Tone",     0.45f,{{"globalFilter.cutoff", 1500.0f, 6500.0f}}));
     p.macros.push_back(mk("macro_2","Drift",    0.5f, {{"effects.chorus.mix", 0.0f, 0.6f}}));
-    p.macros.push_back(mk("macro_3","Space",    0.55f,{{"effects.reverb.mix", 0.0f, 0.7f}, {"effects.delay.mix", 0.0f, 0.45f}}));
+    p.macros.push_back(mk("macro_3","Space",    0.55f,{{"effects.reverb.mix", 0.0f, 0.52f}, {"effects.delay.mix", 0.0f, 0.45f}}));
     p.macros.push_back(mk("macro_4","Warmth",   0.4f, {{"effects.saturation.drive", 0.0f, 0.55f}}));
 }
 
