@@ -583,7 +583,9 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     fx.setReverbSize(presetMacrosActive ? clamp01(getF("fxReverbSize"))
                                         : clamp01(getF("fxReverbSize") + m5 * 0.5f));
 
+    fx.setChorusMode(static_cast<int>(getF("chorusMode")));
     fx.setEqLowDb (getF("eqLow"));
+
     fx.setEqMidDb (getF("eqMid"));
     fx.setEqHighDb(getF("eqHigh"));
     fx.setCompEnabled(getF("compEnabled") > 0.5f);
