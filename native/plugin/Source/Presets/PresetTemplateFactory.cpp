@@ -201,11 +201,11 @@ static void configureFXRisers(HybridPresetV2& p, const juce::String& src, int mi
     p.layers.push_back(noiseL("layer_3", false, 0.0f, e(0.5f, 2.0f, 0.0f, 2.0f)));
     p.layers.push_back(oscL("layer_4","Sweep","saw", 0, 0, 0.0f, false, e(0.5f, 2.0f, 0.0f, 2.0f)));
     p.globalFilter = lpf(14000.0f); p.globalFilter.type = "highpass";
-    p.effects.reverbEnabled = true; p.effects.reverbMix = 0.55f; p.effects.reverbSize = 0.97f;
+    p.effects.reverbEnabled = true; p.effects.reverbMix = 0.44f; p.effects.reverbSize = 0.88f;
     p.effects.widthEnabled  = true; p.effects.widthAmount = 0.85f;
     p.effects.chorusEnabled = true; p.effects.chorusMix = 0.30f;
     p.macros.push_back(mk("macro_1","Sweep", 0.5f, {{"globalFilter.cutoff", 200.0f, 18000.0f}}));
-    p.macros.push_back(mk("macro_2","Space", 0.7f, {{"effects.reverb.mix", 0.0f, 0.9f}}));
+    p.macros.push_back(mk("macro_2","Space", 0.7f, {{"effects.reverb.mix", 0.0f, 0.70f}}));
     p.macros.push_back(mk("macro_3","Drive", 0.2f, {{"effects.saturation.drive", 0.0f, 0.5f}}));
     p.macros.push_back(mk("macro_4","Width", 0.7f, {{"effects.chorus.mix", 0.0f, 0.55f}}));
 }
@@ -240,7 +240,7 @@ static void configureTrapBrass(HybridPresetV2& p, const juce::String& src, int m
     p.effects.satEnabled    = true; p.effects.satDrive  = 0.55f; p.effects.satMix = 0.55f;
     p.effects.chorusEnabled = true; p.effects.chorusMix = 0.18f;
     p.effects.delayEnabled  = true; p.effects.delayMix  = 0.10f; p.effects.delayFb = 0.20f;
-    p.effects.reverbEnabled = true; p.effects.reverbMix = 0.14f; p.effects.reverbSize = 0.55f;
+    p.effects.reverbEnabled = true; p.effects.reverbMix = 0.11f; p.effects.reverbSize = 0.48f;
     p.effects.widthEnabled  = true; p.effects.widthAmount = 0.7f;
     p.macros.push_back(mk("macro_1","Tone",   0.6f, {{"globalFilter.cutoff", 2500.0f, 7500.0f}}));
     p.macros.push_back(mk("macro_2","Drive",  0.55f,{{"effects.saturation.drive", 0.0f, 0.85f}}));
@@ -260,7 +260,7 @@ static void configureGuitars(HybridPresetV2& p, const juce::String& src, int mid
     p.effects.satEnabled    = true; p.effects.satDrive  = 0.20f; p.effects.satMix = 0.40f;
     p.effects.chorusEnabled = true; p.effects.chorusMix = 0.40f;
     p.effects.delayEnabled  = true; p.effects.delayMix  = 0.20f; p.effects.delayFb = 0.22f;
-    p.effects.reverbEnabled = true; p.effects.reverbMix = 0.30f; p.effects.reverbSize = 0.65f;
+    p.effects.reverbEnabled = true; p.effects.reverbMix = 0.24f; p.effects.reverbSize = 0.58f;
     p.effects.widthEnabled  = true; p.effects.widthAmount = 0.7f;
     p.macros.push_back(mk("macro_1","Tone",     0.45f,{{"globalFilter.cutoff", 1500.0f, 6500.0f}}));
     p.macros.push_back(mk("macro_2","Drift",    0.5f, {{"effects.chorus.mix", 0.0f, 0.6f}}));
