@@ -159,6 +159,7 @@ public:
     void setModDepth   (float ms)  noexcept { const float v = juce::jlimit(0.0f, 4.0f, ms); if (std::abs(v - modDepthMs) > 0.0001f) { modDepthMs = v; dirty = true; } }
     void setSaturation (float amt) noexcept { const float v = juce::jlimit(0.0f, 1.0f, amt); if (std::abs(v - satAmount) > 0.0001f) { satAmount = v; dirty = true; } }
     void setInputHighPassHz(float hz) noexcept { const float v = juce::jlimit(20.0f, 800.0f, hz); if (std::abs(v - inputHpHz) > 0.01f) { inputHpHz = v; dirty = true; } }
+    void setInputHighPassFloorHz(float hz) noexcept { const float v = juce::jlimit(20.0f, 800.0f, hz); if (std::abs(v - inputHpFloorHz) > 0.01f) { inputHpFloorHz = v; dirty = true; } }
     void setInputLowPassHz (float hz) noexcept { const float v = juce::jlimit(1000.0f, 18000.0f, hz); if (std::abs(v - inputLpHz) > 0.01f) { inputLpHz = v; dirty = true; } }
     void setDucking(float amount, float attackMs = 6.0f, float releaseMs = 260.0f) noexcept
     {
@@ -345,8 +346,9 @@ private:
         const float modSamples = (modDepthMs * 0.001f) * (float) sampleRate;
         const float inc        = juce::MathConstants<float>::twoPi * modRateHz / (float) sampleRate;
 
-        inputFiltL.set(sampleRate, inputHpHz, inputLpHz);
-        inputFiltR.set(sampleRate, inputHpHz, inputLpHz);
+        const float effectiveInputHp = juce::jmax(inputHpHz, inputHpFloorHz);
+        inputFiltL.set(sampleRate, effectiveInputHp, inputLpHz);
+        inputFiltR.set(sampleRate, effectiveInputHp, inputLpHz);
         sideLow.set(sampleRate, lowMonoHz);
 
         const auto msToCoef = [this](float ms) noexcept
@@ -390,7 +392,7 @@ private:
     float modDepthMs = 0.5f;
     float satAmount = 0.08f;
     float preDelayMs = 18.0f;
-    float inputHpHz = 180.0f, inputLpHz = 8500.0f;
+    float inputHpHz = 180.0f, inputHpFloorHz = 20.0f, inputLpHz = 8500.0f;
     float duckAmount = 0.18f, duckAttackMs = 6.0f, duckReleaseMs = 260.0f;
     float duckAttackCoef = 0.0f, duckReleaseCoef = 0.0f, duckEnv = 0.0f;
     float lowMonoHz = 300.0f, lowStereoWidth = 0.08f;
