@@ -31,6 +31,9 @@
 //==============================================================================
 #include "UserPresetLoader.h"
 #include "../DSP/SampleLibrary.h"
+#include "HybridPresetApplier.h"
+#include "../PluginProcessor.h"
+#include "../DSP/SynthEngine.h"
 #include <algorithm>
 
 namespace dida { namespace userpreset {
