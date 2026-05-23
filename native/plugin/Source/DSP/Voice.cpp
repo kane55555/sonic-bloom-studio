@@ -124,6 +124,23 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
     hiFinished = (hiZone == nullptr);
     oscBPhase = subPhase = fmModPhase = 0.0;
 
+    // ---- Per-layer micro-timing offsets (0.5..8 ms): each note picks new
+    //      small random delays per support layer. Reduces the "stacked WAVs"
+    //      artifact and adds natural ensemble feel. ----
+    std::uniform_real_distribution<float> jitter(0.0005f, 0.008f);
+    oscBStartOffsetSamples   = (int) (jitter(noiseRng) * (float) sampleRate);
+    subStartOffsetSamples    = (int) (jitter(noiseRng) * (float) sampleRate);
+    noiseStartOffsetSamples  = (int) (jitter(noiseRng) * (float) sampleRate * 0.5f);
+    sampleTickCounter = 0;
+
+    // Slight random phase for stereo decorrelation on synth layers.
+    std::uniform_real_distribution<double> phaseJ(0.0, 1.0);
+    oscBPhase = phaseJ(noiseRng);
+    subPhase  = phaseJ(noiseRng) * 0.5;
+
+    noiseHpL.reset(); noiseHpR.reset();
+    subLp.reset(); oscBHp.reset();
+
     ampEnv.noteOn();
     filterEnv.noteOn();
     modEnv.noteOn();
