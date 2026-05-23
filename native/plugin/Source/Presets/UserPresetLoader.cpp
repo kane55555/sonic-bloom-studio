@@ -736,6 +736,40 @@ juce::String toJson(const UserPreset& p)
     adv->setProperty("polyphony", p.advanced.polyphony);
     obj->setProperty("advanced", juce::var(adv));
 
+    // v2 blocks
+    auto mac = new juce::DynamicObject();
+    mac->setProperty("tone",      p.macros.tone);
+    mac->setProperty("movement",  p.macros.movement);
+    mac->setProperty("width",     p.macros.width);
+    mac->setProperty("warmth",    p.macros.warmth);
+    mac->setProperty("attack",    p.macros.attack);
+    mac->setProperty("release",   p.macros.release);
+    mac->setProperty("space",     p.macros.space);
+    mac->setProperty("character", p.macros.character);
+    obj->setProperty("macros", juce::var(mac));
+
+    auto vel = new juce::DynamicObject();
+    vel->setProperty("toGain",       p.velocity.toGain);
+    vel->setProperty("toCutoff",     p.velocity.toCutoff);
+    vel->setProperty("toAttack",     p.velocity.toAttack);
+    vel->setProperty("toLayerBlend", p.velocity.toLayerBlend);
+    obj->setProperty("velocity", juce::var(vel));
+
+    auto leq = new juce::DynamicObject();
+    leq->setProperty("mainBodyHz",   p.layerEq.mainBodyHz);
+    leq->setProperty("mainAirHz",    p.layerEq.mainAirHz);
+    leq->setProperty("layer2BodyHz", p.layerEq.layer2BodyHz);
+    leq->setProperty("layer2AirHz",  p.layerEq.layer2AirHz);
+    obj->setProperty("layerEq", juce::var(leq));
+
+    auto fm = new juce::DynamicObject();
+    fm->setProperty("enabled", p.filterMovement.enabled);
+    fm->setProperty("depth",   p.filterMovement.depth);
+    fm->setProperty("rateHz",  p.filterMovement.rateHz);
+    obj->setProperty("filterMovement", juce::var(fm));
+
+    obj->setProperty("experimental", p.experimental);
+
     return juce::JSON::toString(juce::var(obj));
 }
 
