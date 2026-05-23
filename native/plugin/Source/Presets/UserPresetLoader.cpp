@@ -220,6 +220,24 @@ bool parseFile(const juce::File& file, UserPreset& out, juce::String& errorOut)
 
     out.experimental = getB(json, "experimental", false);
 
+    // Mod-matrix routings (optional). Unknown source/dest names are kept
+    // verbatim so round-trip save preserves user intent.
+    out.modMatrix.clearQuick();
+    auto mm = json.getProperty("modMatrix", juce::var());
+    if (mm.isArray())
+    {
+        for (auto& v : *mm.getArray())
+        {
+            ModMatrixEntry e;
+            e.source  = v.getProperty("source",  "").toString();
+            e.dest    = v.getProperty("dest",    "").toString();
+            e.amount  = (float) (double) v.getProperty("amount",  0.0);
+            e.bipolar = (bool)         v.getProperty("bipolar", true);
+            if (e.source.isNotEmpty() && e.dest.isNotEmpty())
+                out.modMatrix.add(e);
+        }
+    }
+
     return true;
 }
 
@@ -769,6 +787,20 @@ juce::String toJson(const UserPreset& p)
     obj->setProperty("filterMovement", juce::var(fm));
 
     obj->setProperty("experimental", p.experimental);
+
+    // Mod-matrix routings — serialized as an array of small objects so user
+    // hand-edits remain readable.
+    juce::Array<juce::var> mm;
+    for (auto& e : p.modMatrix)
+    {
+        auto* o = new juce::DynamicObject();
+        o->setProperty("source",  e.source);
+        o->setProperty("dest",    e.dest);
+        o->setProperty("amount",  e.amount);
+        o->setProperty("bipolar", e.bipolar);
+        mm.add(juce::var(o));
+    }
+    obj->setProperty("modMatrix", mm);
 
     return juce::JSON::toString(juce::var(obj));
 }
