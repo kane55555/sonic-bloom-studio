@@ -190,6 +190,36 @@ bool parseFile(const juce::File& file, UserPreset& out, juce::String& errorOut)
     out.advanced.humanizeTimingMs   = getF(adv, "humanizeTimingMs",   out.advanced.humanizeTimingMs);
     out.advanced.polyphony          = getI(adv, "polyphony",          out.advanced.polyphony);
 
+    // ---- v2 optional blocks --------------------------------------------------
+    auto mac = json.getProperty("macros", juce::var());
+    out.macros.tone      = getF(mac, "tone",      out.macros.tone);
+    out.macros.movement  = getF(mac, "movement",  out.macros.movement);
+    out.macros.width     = getF(mac, "width",     out.macros.width);
+    out.macros.warmth    = getF(mac, "warmth",    out.macros.warmth);
+    out.macros.attack    = getF(mac, "attack",    out.macros.attack);
+    out.macros.release   = getF(mac, "release",   out.macros.release);
+    out.macros.space     = getF(mac, "space",     out.macros.space);
+    out.macros.character = getF(mac, "character", out.macros.character);
+
+    auto vel = json.getProperty("velocity", juce::var());
+    out.velocity.toGain       = getF(vel, "toGain",       out.velocity.toGain);
+    out.velocity.toCutoff     = getF(vel, "toCutoff",     out.velocity.toCutoff);
+    out.velocity.toAttack     = getF(vel, "toAttack",     out.velocity.toAttack);
+    out.velocity.toLayerBlend = getF(vel, "toLayerBlend", out.velocity.toLayerBlend);
+
+    auto leq = json.getProperty("layerEq", juce::var());
+    out.layerEq.mainBodyHz   = getF(leq, "mainBodyHz",   out.layerEq.mainBodyHz);
+    out.layerEq.mainAirHz    = getF(leq, "mainAirHz",    out.layerEq.mainAirHz);
+    out.layerEq.layer2BodyHz = getF(leq, "layer2BodyHz", out.layerEq.layer2BodyHz);
+    out.layerEq.layer2AirHz  = getF(leq, "layer2AirHz",  out.layerEq.layer2AirHz);
+
+    auto fm = json.getProperty("filterMovement", juce::var());
+    out.filterMovement.enabled = getB(fm, "enabled", out.filterMovement.enabled);
+    out.filterMovement.depth   = getF(fm, "depth",   out.filterMovement.depth);
+    out.filterMovement.rateHz  = getF(fm, "rateHz",  out.filterMovement.rateHz);
+
+    out.experimental = getB(json, "experimental", false);
+
     return true;
 }
 
