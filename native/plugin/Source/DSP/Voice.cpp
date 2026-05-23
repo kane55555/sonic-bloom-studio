@@ -1,4 +1,6 @@
 #include "Voice.h"
+#include "VoiceCard.h"
+
 
 SynthVoice::SynthVoice()
 {
