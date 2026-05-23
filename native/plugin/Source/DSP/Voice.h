@@ -203,5 +203,11 @@ private:
 
     double sampleRate = 44100.0;
 
+    // Vintage / analog voice-card state
+    int   voiceCardIndex = 0;
+    float vintageAmount  = 0.25f;   // mild vintage by default
+    double driftPhase    = 0.0;     // slow analog pitch drift (0..1)
+
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SynthVoice)
 };
