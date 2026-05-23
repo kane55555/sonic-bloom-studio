@@ -236,6 +236,9 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
     setFloat(processor, "fxChorusMix",        p.effects.chorusEnabled ? p.effects.chorusMix : 0.0f);
     setFloat(processor, "fxDistortionAmount", p.effects.satEnabled    ? p.effects.satDrive  : 0.0f);
 
+    // ---- Reverb character voiced per instrument family ----
+    applyReverbCharacter(processor, p.category);
+
     return out;
 }
 
