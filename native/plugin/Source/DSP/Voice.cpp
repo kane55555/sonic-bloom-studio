@@ -219,6 +219,21 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
 
     const int numCh = outputBuffer.getNumChannels();
 
+    // ---- Voice-card calibration (Juno/Jupiter/Prophet-style) ----
+    const auto& card = dida::VoiceCardBank::instance().get(voiceCardIndex);
+    const float vAmt = vintageAmount;
+    const float cardPitchCents = dida::vintageMix(card.pitchCents,     vAmt);
+    const float cardVcaDb      = dida::vintageMix(card.vcaGainDb,      vAmt)
+                               + dida::vintageMix(card.gainDb,         vAmt);
+    const float cardPan        = dida::vintageMix(card.panOffset,      vAmt);
+    const float cardCutoffHz   = dida::vintageMix(card.cutoffHz,       vAmt);
+    const float vcaGainLin     = std::pow(10.0f, cardVcaDb / 20.0f);
+
+    // Slow analog drift (0.03..0.25 Hz per card). Adds a couple cents of
+    // wobble — the heart of the "alive" character vs static digital pitch.
+    const double driftInc = (double) card.driftHz / sampleRate;
+
+
     auto rateFor = [this](const dida::SampleZone* z) -> double
     {
         if (z == nullptr) return 1.0;
