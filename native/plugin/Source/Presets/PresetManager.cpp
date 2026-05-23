@@ -851,17 +851,30 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
             const auto c = cat.toLowerCase();
             using Ch = ReverbBlock::Character;
             Ch ch = Ch::Studio;
-            if      (c.contains("bass") || c.contains("808"))                       ch = Ch::Studio;
-            else if (c.contains("brass") || c.contains("drill") || c.contains("trap")) ch = Ch::Trap;
+            if      (c.contains("bass") || c.contains("808") || c.contains("sub")) ch = Ch::Studio;
+            else if (c.contains("brass") || c.contains("trumpet") || c.contains("horn") || c.contains("drill") || c.contains("trap")) ch = Ch::Trap;
             else if (c.contains("guitar"))                                          ch = Ch::Vintage;
-            else if (c.contains("pad") || c.contains("texture"))                    ch = Ch::Dream;
+            else if (c.contains("pad") || c.contains("string") || c.contains("texture")) ch = Ch::Dream;
             else if (c.contains("choir") || c.contains("vox") || c.contains("vocal")) ch = Ch::Cathedral;
             else if (c.contains("bell") || c.contains("pluck"))                     ch = Ch::Shimmer;
             else if (c.contains("piano") || c.contains("keys"))                     ch = Ch::Hall;
             else if (c.contains("lead"))                                            ch = Ch::Hall;
             else if (c.contains("dark") || c.contains("string"))                    ch = Ch::Dark;
             else if (c.contains("fx") || c.contains("riser"))                       ch = Ch::Cathedral;
-            dp->getSynthEngine().getFx().setReverbCharacter(ch);
+            auto& pfx = dp->getSynthEngine().getFx();
+            pfx.setReverbCharacter(ch);
+            if (c.contains("bass") || c.contains("808") || c.contains("sub"))
+            { pfx.setReverbInputHighPassHz(360.0f); pfx.setReverbInputLowPassHz(4200.0f); pfx.setReverbDiffusion(0.45f); pfx.setReverbDucking(0.10f, 4.0f, 180.0f); pfx.setReverbLowMonoControl(340.0f, 0.0f); pfx.setReverbWidth(0.25f); }
+            else if (c.contains("brass") || c.contains("trumpet") || c.contains("horn") || c.contains("drill") || c.contains("trap"))
+            { pfx.setReverbInputHighPassHz(240.0f); pfx.setReverbInputLowPassHz(5600.0f); pfx.setReverbDiffusion(0.54f); pfx.setReverbDucking(0.28f, 4.0f, 220.0f); pfx.setReverbLowMonoControl(320.0f, 0.03f); pfx.setReverbWidth(0.78f); }
+            else if (c.contains("pad") || c.contains("string") || c.contains("texture"))
+            { pfx.setReverbInputHighPassHz(340.0f); pfx.setReverbInputLowPassHz(7200.0f); pfx.setReverbDiffusion(0.68f); pfx.setReverbDucking(0.27f, 8.0f, 360.0f); pfx.setReverbLowMonoControl(340.0f, 0.04f); pfx.setReverbWidth(0.92f); }
+            else if (c.contains("choir") || c.contains("vox") || c.contains("vocal"))
+            { pfx.setReverbInputHighPassHz(360.0f); pfx.setReverbInputLowPassHz(7600.0f); pfx.setReverbDiffusion(0.70f); pfx.setReverbDucking(0.28f, 9.0f, 390.0f); pfx.setReverbLowMonoControl(350.0f, 0.04f); pfx.setReverbWidth(0.94f); }
+            else if (c.contains("guitar"))
+            { pfx.setReverbInputHighPassHz(280.0f); pfx.setReverbInputLowPassHz(4800.0f); pfx.setReverbDiffusion(0.58f); pfx.setReverbDucking(0.22f, 5.0f, 260.0f); pfx.setReverbLowMonoControl(300.0f, 0.05f); pfx.setReverbWidth(0.72f); }
+            else if (c.contains("lead"))
+            { pfx.setReverbInputHighPassHz(210.0f); pfx.setReverbInputLowPassHz(8500.0f); pfx.setReverbDiffusion(0.62f); pfx.setReverbDucking(0.23f, 5.0f, 240.0f); pfx.setReverbLowMonoControl(300.0f, 0.06f); pfx.setReverbWidth(0.86f); }
         }
     }
 
