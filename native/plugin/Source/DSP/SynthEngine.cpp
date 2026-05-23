@@ -16,6 +16,7 @@ void SynthEngine::prepare(double sampleRate, int samplesPerBlock)
     {
         v.prepare(sampleRate, samplesPerBlock);
     });
+    layerBus.prepare(sampleRate, samplesPerBlock);
     fx.prepare(sampleRate, samplesPerBlock);
 }
 
@@ -25,6 +26,10 @@ void SynthEngine::renderBlockWithFx(juce::AudioBuffer<float>& buffer,
 {
     renderNextBlock(buffer, midi, startSample, numSamples);
     updateHeldNotes(midi);
+    // Shared layer bus glue (saturation + comp + width + drift) BEFORE
+    // the master FX chain — this is what unifies stacked layers into one
+    // cohesive premium-sounding instrument.
+    layerBus.process(buffer);
     fx.process(buffer);
 }
 
@@ -45,6 +50,7 @@ void SynthEngine::resetForPresetChange()
         v.prepare(sampleRate, 0);
     });
     fx.reset();
+    layerBus.reset();
 
     for (int channel = 0; channel < static_cast<int>(heldNotes.size()); ++channel)
         for (int note = 0; note < static_cast<int>(heldNotes[channel].size()); ++note)

@@ -14,6 +14,7 @@
 #include "FilterBlock.h"
 #include "Envelope.h"
 #include "SampleLibrary.h"
+#include "Layers/LayerEQCarver.h"
 
 // Lightweight stand-ins so legacy editor/UI code that took an Oscillator&
 // reference still compiles. They route waveform/detune/pulse-width into the
@@ -162,6 +163,19 @@ private:
     int noiseType = 0; // 0=white, 1=pink
     std::mt19937 noiseRng { 0x1234abcd };
     float pinkB0 = 0.0f, pinkB1 = 0.0f, pinkB2 = 0.0f;
+
+    // ---- Per-layer "carving" filters: keep each layer in its own band
+    //      so they stop fighting and start sounding like one instrument. ----
+    OnePoleCarver noiseHpL, noiseHpR;   // HP ~2 kHz on noise/air
+    OnePoleCarver subLp;                // LP ~250 Hz on sub
+    OnePoleCarver oscBHp;               // gentle HP on Osc B to clear sample low end
+
+    // Micro-timing offsets (samples) per layer — tiny random delays
+    // (0.5-8 ms) reduce the "stacked WAV" feeling and add ensemble realism.
+    int   oscBStartOffsetSamples = 0;
+    int   subStartOffsetSamples  = 0;
+    int   noiseStartOffsetSamples = 0;
+    int   sampleTickCounter = 0;
 
     // ---- Filter modulation ----
     float filterEnvAmount = 0.0f;

@@ -23,6 +23,14 @@ void SynthVoice::prepare(double sr, int)
     ampEnv.prepare(sr);
     filterEnv.prepare(sr);
     modEnv.prepare(sr);
+
+    // Per-layer carving filters — frequency lanes so layers stop clashing.
+    noiseHpL.prepare(sr); noiseHpR.prepare(sr);
+    noiseHpL.setMode(OnePoleCarver::Mode::HighPass); noiseHpL.setCutoff(2200.0f);
+    noiseHpR.setMode(OnePoleCarver::Mode::HighPass); noiseHpR.setCutoff(2200.0f);
+    subLp.prepare(sr);  subLp.setMode (OnePoleCarver::Mode::LowPass);  subLp.setCutoff(260.0f);
+    oscBHp.prepare(sr); oscBHp.setMode(OnePoleCarver::Mode::HighPass); oscBHp.setCutoff(110.0f);
+
     recalcGlideCoeff();
     reset();
 }
@@ -115,6 +123,23 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
     loFinished = (loZone == nullptr);
     hiFinished = (hiZone == nullptr);
     oscBPhase = subPhase = fmModPhase = 0.0;
+
+    // ---- Per-layer micro-timing offsets (0.5..8 ms): each note picks new
+    //      small random delays per support layer. Reduces the "stacked WAVs"
+    //      artifact and adds natural ensemble feel. ----
+    std::uniform_real_distribution<float> jitter(0.0005f, 0.008f);
+    oscBStartOffsetSamples   = (int) (jitter(noiseRng) * (float) sampleRate);
+    subStartOffsetSamples    = (int) (jitter(noiseRng) * (float) sampleRate);
+    noiseStartOffsetSamples  = (int) (jitter(noiseRng) * (float) sampleRate * 0.5f);
+    sampleTickCounter = 0;
+
+    // Slight random phase for stereo decorrelation on synth layers.
+    std::uniform_real_distribution<double> phaseJ(0.0, 1.0);
+    oscBPhase = phaseJ(noiseRng);
+    subPhase  = phaseJ(noiseRng) * 0.5;
+
+    noiseHpL.reset(); noiseHpR.reset();
+    subLp.reset(); oscBHp.reset();
 
     ampEnv.noteOn();
     filterEnv.noteOn();
@@ -291,8 +316,10 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         sampR *= oscALevel;
 
         // ---- Layer 2: Osc B (with optional FM modulation) ----
+        // Gated by micro-timing offset so support layers enter a few ms after
+        // the sample attack — eliminates the "stacked" feel.
         float oscBOut = 0.0f;
-        if (oscBLevel > 0.0001f)
+        if (oscBLevel > 0.0001f && sampleTickCounter >= oscBStartOffsetSamples)
         {
             const double bMidi = (double) currentMidiNote + (double) oscBPitchOffsetSemis
                                + (double) oscBDetuneCents / 100.0;
@@ -311,26 +338,46 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             if (oscBPhase > 1.0) oscBPhase -= 1.0;
             const float ph = (float) oscBPhase + fmOffset;
             oscBOut = renderOscShape(oscBWave, ph - std::floor(ph), oscBPulseWidth) * oscBLevel;
+            // Gentle HP carve so Osc B body does not muddy the sample low end.
+            oscBOut = oscBHp.process(oscBOut);
         }
 
         // ---- Layer 3: Sub (one octave below current note, sine) ----
         float subOut = 0.0f;
-        if (subLevel > 0.0001f)
+        if (subLevel > 0.0001f && sampleTickCounter >= subStartOffsetSamples)
         {
             const double subHz = midiToHzD((double) currentMidiNote - 12.0);
             subPhase += subHz / sampleRate;
             if (subPhase > 1.0) subPhase -= 1.0;
             subOut = std::sin((float) subPhase * juce::MathConstants<float>::twoPi) * subLevel;
+            // Sub stays in its lane (<~260 Hz) — keeps the low end mono-tight.
+            subOut = subLp.process(subOut);
         }
 
-        // ---- Layer 4: Noise ----
-        float noiseOut = 0.0f;
-        if (noiseLevel > 0.0001f)
-            noiseOut = nextNoiseSample() * noiseLevel;
+        // ---- Layer 4: Noise / Air (stereo decorrelated, HP-carved) ----
+        float noiseOutL = 0.0f, noiseOutR = 0.0f;
+        if (noiseLevel > 0.0001f && sampleTickCounter >= noiseStartOffsetSamples)
+        {
+            // Decorrelate L/R so air sits wide; HP at ~2.2k keeps it above
+            // the body of brass / guitars / pianos.
+            noiseOutL = noiseHpL.process(nextNoiseSample()) * noiseLevel;
+            noiseOutR = noiseHpR.process(nextNoiseSample()) * noiseLevel;
+        }
 
-        const float synthSum = oscBOut + subOut + noiseOut;
-        float l = sampL + synthSum;
-        float r = sampR + synthSum;
+        ++sampleTickCounter;
+
+        // ---- Layer-aware stereo placement ----
+        // - Sample (Layer 1): centred (already L/R).
+        // - Osc B (body): mostly mono, tiny stereo bleed (10-25% width).
+        // - Sub: hard mono.
+        // - Noise (air): wide (25-40%).
+        const float oscBSideGain = 0.18f;   // ~18% side
+        const float noiseSideGain = 0.35f;  // ~35% side
+        float l = sampL + subOut + oscBOut + noiseOutL * (1.0f + noiseSideGain);
+        float r = sampR + subOut + oscBOut + noiseOutR * (1.0f - noiseSideGain);
+        // Push a small portion of Osc B opposite-side for body width.
+        l += oscBOut * oscBSideGain;
+        r -= oscBOut * oscBSideGain;
 
         // ---- Filter ----
         const float fEnv = filterEnv.getNextSample();
