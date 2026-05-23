@@ -76,10 +76,10 @@ static void configureDrillBells(HybridPresetV2& p, const juce::String& src, int 
     p.effects.satEnabled = true; p.effects.satDrive = 0.10f; p.effects.satMix = 0.30f;
     p.effects.chorusEnabled = true; p.effects.chorusMix = 0.28f;
     p.effects.delayEnabled  = true; p.effects.delayMix  = 0.14f; p.effects.delayFb = 0.26f;
-    p.effects.reverbEnabled = true; p.effects.reverbMix = 0.34f; p.effects.reverbSize = 0.78f;
+    p.effects.reverbEnabled = true; p.effects.reverbMix = 0.30f; p.effects.reverbSize = 0.70f;
     p.effects.widthEnabled  = true; p.effects.widthAmount = 0.65f;
     p.macros.push_back(mk("macro_1","Darkness", 0.3f, {{"globalFilter.cutoff", 13000.0f, 1800.0f}}));
-    p.macros.push_back(mk("macro_2","Space",    0.55f,{{"effects.reverb.mix", 0.0f, 0.75f}, {"effects.delay.mix", 0.0f, 0.4f}}));
+    p.macros.push_back(mk("macro_2","Space",    0.55f,{{"effects.reverb.mix", 0.0f, 0.62f}, {"effects.delay.mix", 0.0f, 0.4f}}));
     p.macros.push_back(mk("macro_3","Grit",     0.2f, {{"effects.saturation.drive", 0.0f, 0.55f}}));
     p.macros.push_back(mk("macro_4","Width",    0.6f, {{"effects.chorus.mix", 0.0f, 0.65f}}));
 }
@@ -110,12 +110,12 @@ static void configureChoirsVox(HybridPresetV2& p, const juce::String& src, int m
     p.layers.push_back(noiseL("layer_3", true, 0.04f, e(0.4f, 1.5f, 0.45f, 2.5f), "Air"));
     p.layers.push_back(oscL("layer_4","Body Sub","sine", -12, 0, 0.10f, true, e(0.12f, 1.0f, 0.7f, 3.0f)));
     p.globalFilter = lpf(9500.0f, 0.10f);
-    p.effects.reverbEnabled = true; p.effects.reverbMix = 0.55f; p.effects.reverbSize = 0.92f;
+    p.effects.reverbEnabled = true; p.effects.reverbMix = 0.48f; p.effects.reverbSize = 0.84f;
     p.effects.chorusEnabled = true; p.effects.chorusMix = 0.30f;
     p.effects.delayEnabled = true;  p.effects.delayMix = 0.16f; p.effects.delayFb = 0.28f;
     p.effects.widthEnabled = true;  p.effects.widthAmount = 0.8f;
     p.macros.push_back(mk("macro_1","Air",      0.5f, {{"layers[3].volume", 0.0f, 0.15f}}));
-    p.macros.push_back(mk("macro_2","Space",    0.7f, {{"effects.reverb.mix", 0.0f, 0.85f}}));
+    p.macros.push_back(mk("macro_2","Space",    0.7f, {{"effects.reverb.mix", 0.0f, 0.68f}}));
     p.macros.push_back(mk("macro_3","Width",    0.6f, {{"effects.chorus.mix", 0.0f, 0.55f}}));
     p.macros.push_back(mk("macro_4","Darkness", 0.3f, {{"globalFilter.cutoff", 12000.0f, 2000.0f}}));
 }
