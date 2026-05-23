@@ -568,6 +568,7 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     fx.setCompRatio(getF("compRatio"));
     fx.setLimiterCeilingDb(getF("limiterCeiling"));
     fx.setWetHighPassHz(getF("fxWetHighPass"));
+    fx.setReverbInputHighPassFloorHz(getF("fxWetHighPass"));
     fx.setMasterGainDb(getF("masterGain"));
 
     if (! presetMacrosActive)

@@ -109,6 +109,17 @@ public:
     void setReverbModRate(float hz)    { reverb.setModRate(hz); }
     void setReverbModDepth(float ms)   { reverb.setModDepth(ms); }
     void setReverbSaturation(float a)  { reverb.setSaturation(a); }
+    void setReverbInputHighPassHz(float hz) { reverb.setInputHighPassHz(hz); }
+    void setReverbInputHighPassFloorHz(float hz) { reverb.setInputHighPassFloorHz(hz); }
+    void setReverbInputLowPassHz(float hz)  { reverb.setInputLowPassHz(hz); }
+    void setReverbDucking(float amount, float attackMs = 6.0f, float releaseMs = 260.0f)
+    {
+        reverb.setDucking(amount, attackMs, releaseMs);
+    }
+    void setReverbLowMonoControl(float cutoffHz, float lowWidth)
+    {
+        reverb.setLowMonoControl(cutoffHz, lowWidth);
+    }
 
     void setEqLowDb (float db) { eq.setLowDb(db); }
     void setEqMidDb (float db) { eq.setMidDb(db); }

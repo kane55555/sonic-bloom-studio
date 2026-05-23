@@ -10,9 +10,9 @@ static ReverbBlock::Character characterForCategory(const juce::String& categoryI
 {
     const auto c = categoryIn.toLowerCase();
     if (c.contains("808") || c.contains("sub"))                              return ReverbBlock::Character::Studio;
-    if (c.contains("brass") || c.contains("drill") || c.contains("trap"))    return ReverbBlock::Character::Trap;
+    if (c.contains("brass") || c.contains("trumpet") || c.contains("horn") || c.contains("drill") || c.contains("trap")) return ReverbBlock::Character::Trap;
     if (c.contains("guitar"))                                                return ReverbBlock::Character::Vintage;
-    if (c.contains("pad") || c.contains("texture") || c.contains("ambient")) return ReverbBlock::Character::Dream;
+    if (c.contains("pad") || c.contains("string") || c.contains("texture") || c.contains("ambient")) return ReverbBlock::Character::Dream;
     if (c.contains("choir") || c.contains("vox") || c.contains("vocal"))     return ReverbBlock::Character::Cathedral;
     if (c.contains("bell") || c.contains("pluck") || c.contains("crystal"))  return ReverbBlock::Character::Shimmer;
     if (c.contains("piano") || c.contains("keys"))                           return ReverbBlock::Character::Hall;
@@ -25,7 +25,48 @@ static ReverbBlock::Character characterForCategory(const juce::String& categoryI
 static void applyReverbCharacter(juce::AudioProcessor& proc, const juce::String& category)
 {
     if (auto* dp = dynamic_cast<DiditagainProcessor*>(&proc))
-        dp->getSynthEngine().getFx().setReverbCharacter(characterForCategory(category));
+    {
+        auto& fx = dp->getSynthEngine().getFx();
+        const auto c = category.toLowerCase();
+        fx.setReverbCharacter(characterForCategory(category));
+
+        if (c.contains("808") || c.contains("sub"))
+        {
+            fx.setReverbInputHighPassHz(360.0f); fx.setReverbInputLowPassHz(4200.0f);
+            fx.setReverbDiffusion(0.45f); fx.setReverbDucking(0.10f, 4.0f, 180.0f);
+            fx.setReverbLowMonoControl(340.0f, 0.0f); fx.setReverbWidth(0.25f);
+        }
+        else if (c.contains("brass") || c.contains("trumpet") || c.contains("horn") || c.contains("drill") || c.contains("trap"))
+        {
+            fx.setReverbInputHighPassHz(240.0f); fx.setReverbInputLowPassHz(5600.0f);
+            fx.setReverbDiffusion(0.54f); fx.setReverbDucking(0.28f, 4.0f, 220.0f);
+            fx.setReverbLowMonoControl(320.0f, 0.03f); fx.setReverbWidth(0.78f);
+        }
+        else if (c.contains("pad") || c.contains("string") || c.contains("texture") || c.contains("ambient"))
+        {
+            fx.setReverbInputHighPassHz(340.0f); fx.setReverbInputLowPassHz(7200.0f);
+            fx.setReverbDiffusion(0.68f); fx.setReverbDucking(0.27f, 8.0f, 360.0f);
+            fx.setReverbLowMonoControl(340.0f, 0.04f); fx.setReverbWidth(0.92f);
+        }
+        else if (c.contains("choir") || c.contains("vox") || c.contains("vocal"))
+        {
+            fx.setReverbInputHighPassHz(360.0f); fx.setReverbInputLowPassHz(7600.0f);
+            fx.setReverbDiffusion(0.70f); fx.setReverbDucking(0.28f, 9.0f, 390.0f);
+            fx.setReverbLowMonoControl(350.0f, 0.04f); fx.setReverbWidth(0.94f);
+        }
+        else if (c.contains("guitar"))
+        {
+            fx.setReverbInputHighPassHz(280.0f); fx.setReverbInputLowPassHz(4800.0f);
+            fx.setReverbDiffusion(0.58f); fx.setReverbDucking(0.22f, 5.0f, 260.0f);
+            fx.setReverbLowMonoControl(300.0f, 0.05f); fx.setReverbWidth(0.72f);
+        }
+        else if (c.contains("lead"))
+        {
+            fx.setReverbInputHighPassHz(210.0f); fx.setReverbInputLowPassHz(8500.0f);
+            fx.setReverbDiffusion(0.62f); fx.setReverbDucking(0.23f, 5.0f, 240.0f);
+            fx.setReverbLowMonoControl(300.0f, 0.06f); fx.setReverbWidth(0.86f);
+        }
+    }
 }
 
 
