@@ -127,6 +127,22 @@ struct FilterMovementBlock
     float rateHz  = 0.20f;
 };
 
+// ------- Modulation matrix (v2 optional) -------
+// Each entry routes a normalized source value to a destination, scaled by
+// `amount` (-1..1). Recognized sources: "env1","env2","lfo1","lfo2",
+// "velocity","modwheel","aftertouch","keytrack". Recognized destinations:
+// "filter1Cutoff","filter1Reso","amp.gain","amp.pan","osc.pitch",
+// "osc.pulseWidth","fxReverbMix","fxDelayMix","fxChorusMix". Unknown
+// (src,dest) pairs are loaded and serialized round-trip but produce no
+// audible effect.
+struct ModMatrixEntry
+{
+    juce::String source;
+    juce::String dest;
+    float        amount  = 0.0f;
+    bool         bipolar = true;
+};
+
 struct UserPreset
 {
     int          schemaVersion = kSchemaVersion;
@@ -155,6 +171,10 @@ struct UserPreset
     LayerEqCarveBlock   layerEq;
     FilterMovementBlock filterMovement;
     bool                experimental = false;
+
+    // Optional mod-matrix routings. Empty by default; preserved across
+    // load/save even when entries aren't yet wired to engine destinations.
+    juce::Array<ModMatrixEntry> modMatrix;
 };
 
 }} // namespace dida::userpreset
