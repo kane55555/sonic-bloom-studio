@@ -179,6 +179,10 @@ public:
     void setCharacter(Character c) noexcept
     {
         character = c;
+        duckAttackMs = 6.0f;
+        duckReleaseMs = 260.0f;
+        lowMonoHz = 300.0f;
+        lowStereoWidth = 0.08f;
         switch (c)
         {
             case Character::Studio:    preDelayMs=16; diffusion=0.62f; modRateHz=0.08f; modDepthMs=0.25f; satAmount=0.05f; damping=0.50f; inputHpHz=180.0f; inputLpHz=8500.0f; duckAmount=0.18f; break;
