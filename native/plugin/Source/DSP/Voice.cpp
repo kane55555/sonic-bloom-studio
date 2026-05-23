@@ -23,6 +23,14 @@ void SynthVoice::prepare(double sr, int)
     ampEnv.prepare(sr);
     filterEnv.prepare(sr);
     modEnv.prepare(sr);
+
+    // Per-layer carving filters — frequency lanes so layers stop clashing.
+    noiseHpL.prepare(sr); noiseHpR.prepare(sr);
+    noiseHpL.setMode(OnePoleCarver::Mode::HighPass); noiseHpL.setCutoff(2200.0f);
+    noiseHpR.setMode(OnePoleCarver::Mode::HighPass); noiseHpR.setCutoff(2200.0f);
+    subLp.prepare(sr);  subLp.setMode (OnePoleCarver::Mode::LowPass);  subLp.setCutoff(260.0f);
+    oscBHp.prepare(sr); oscBHp.setMode(OnePoleCarver::Mode::HighPass); oscBHp.setCutoff(110.0f);
+
     recalcGlideCoeff();
     reset();
 }
