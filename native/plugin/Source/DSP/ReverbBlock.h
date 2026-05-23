@@ -3,9 +3,9 @@
 //  ReverbBlock.h — Premium algorithmic reverb (Schroeder-Moorer-style FDN).
 //
 //  Signal flow:
-//      in -> pre-delay -> 4 diffusion allpass -> 4 modulated combs (with
-//      damping LPF + tanh saturation in feedback) -> 2 output allpass ->
-//      M/S width -> mix
+//      in -> input HPF/LPF -> pre-delay -> 4 diffusion allpass -> 4 modulated
+//      combs (with damping LPF + tanh saturation in feedback) -> 2 output
+//      allpass -> low-end mono + M/S width -> dry-triggered wet ducking -> mix
 //
 //  Stereo is achieved by running two slightly offset comb sets per channel
 //  and a stereo LFO. All allocations happen in prepare(); process() is
@@ -38,6 +38,10 @@ public:
         preBufL.assign((size_t) preMax, 0.0f);
         preBufR.assign((size_t) preMax, 0.0f);
         preIdxL = preIdxR = 0;
+
+        inputFiltL.reset(); inputFiltR.reset();
+        sideLow.reset();
+        duckEnv = 0.0f;
 
         // Schroeder-classic comb sizes scaled to sample rate, stereo-offset.
         const int combSizesL[4] = { 1116, 1188, 1277, 1356 };
@@ -84,9 +88,22 @@ public:
             const float inL = L[i];
             const float inR = R[i];
 
+            // Dry-triggered wet ducking: fast enough to clear space for new
+            // notes/chords, slow enough to avoid obvious pumping.
+            const float detector = juce::jmin(1.0f, 0.5f * (std::abs(inL) + std::abs(inR)) * 2.2f);
+            const float envCoef = detector > duckEnv ? duckAttackCoef : duckReleaseCoef;
+            duckEnv = detector + envCoef * (duckEnv - detector);
+            const float duckGain = juce::jlimit(0.45f, 1.0f, 1.0f - duckAmount * duckEnv);
+
+            // Reverb input conditioning only affects the tank input, not dry.
+            // This keeps pads/chords wide while preventing low-mid build-up and
+            // metallic top-end smear from accumulating in feedback.
+            float tankInL = inputFiltL.process(inL);
+            float tankInR = inputFiltR.process(inR);
+
             // 1) Pre-delay (independent per channel for subtle stereo).
-            preBufL[(size_t) preIdxL] = inL;
-            preBufR[(size_t) preIdxR] = inR;
+            preBufL[(size_t) preIdxL] = tankInL;
+            preBufR[(size_t) preIdxR] = tankInR;
             const int rL = (preIdxL - preSizeL + (int) preBufL.size()) % (int) preBufL.size();
             const int rR = (preIdxR - preSizeR + (int) preBufR.size()) % (int) preBufR.size();
             float xL = preBufL[(size_t) rL];
@@ -114,14 +131,18 @@ public:
             accR = outApR[0].process(accR);
             accR = outApR[1].process(accR);
 
-            // 5) M/S width on wet only.
+            // 5) M/S width on wet only. Keep low-frequency side mostly mono so
+            // stacked notes don't phase-smear the low end.
             const float m = 0.5f * (accL + accR);
-            const float s = 0.5f * (accL - accR) * (0.5f + w * 1.5f); // 0.5..2x
+            float rawSide = 0.5f * (accL - accR);
+            const float lowSide = sideLow.process(rawSide);
+            const float highSide = rawSide - lowSide;
+            const float s = (highSide * (0.5f + w * 1.5f)) + (lowSide * lowStereoWidth);
             const float wetL = m + s;
             const float wetR = m - s;
 
-            L[i] = inL * dry + wetL * wet;
-            R[i] = inR * dry + wetR * wet;
+            L[i] = inL * dry + wetL * wet * duckGain;
+            R[i] = inR * dry + wetR * wet * duckGain;
         }
     }
 
@@ -137,6 +158,21 @@ public:
     void setModRate    (float hz)  noexcept { modRateHz  = juce::jlimit(0.01f, 1.5f, hz);  dirty = true; }
     void setModDepth   (float ms)  noexcept { modDepthMs = juce::jlimit(0.0f, 4.0f, ms);   dirty = true; }
     void setSaturation (float amt) noexcept { satAmount  = juce::jlimit(0.0f, 1.0f, amt);  dirty = true; }
+    void setInputHighPassHz(float hz) noexcept { inputHpHz = juce::jlimit(20.0f, 800.0f, hz); dirty = true; }
+    void setInputLowPassHz (float hz) noexcept { inputLpHz = juce::jlimit(1000.0f, 18000.0f, hz); dirty = true; }
+    void setDucking(float amount, float attackMs = 6.0f, float releaseMs = 260.0f) noexcept
+    {
+        duckAmount = juce::jlimit(0.0f, 0.55f, amount);
+        duckAttackMs = juce::jlimit(1.0f, 40.0f, attackMs);
+        duckReleaseMs = juce::jlimit(40.0f, 900.0f, releaseMs);
+        dirty = true;
+    }
+    void setLowMonoControl(float cutoffHz, float lowWidth) noexcept
+    {
+        lowMonoHz = juce::jlimit(80.0f, 600.0f, cutoffHz);
+        lowStereoWidth = juce::jlimit(0.0f, 0.5f, lowWidth);
+        dirty = true;
+    }
 
     /** Snap all internal tuning to a named character. Voicing is curated to
         match the spec (Studio/Hall/Dark/Dream/Vintage/Trap/Cathedral/Shimmer). */
@@ -145,14 +181,14 @@ public:
         character = c;
         switch (c)
         {
-            case Character::Studio:    preDelayMs=18; diffusion=0.72f; modRateHz=0.10f; modDepthMs=0.4f; satAmount=0.05f; damping=0.45f; break;
-            case Character::Hall:      preDelayMs=30; diffusion=0.78f; modRateHz=0.09f; modDepthMs=0.5f; satAmount=0.06f; damping=0.40f; break;
-            case Character::Dark:      preDelayMs=25; diffusion=0.75f; modRateHz=0.06f; modDepthMs=0.4f; satAmount=0.10f; damping=0.78f; break;
-            case Character::Dream:     preDelayMs=55; diffusion=0.82f; modRateHz=0.05f; modDepthMs=2.0f; satAmount=0.05f; damping=0.55f; break;
-            case Character::Vintage:   preDelayMs=22; diffusion=0.70f; modRateHz=0.08f; modDepthMs=0.6f; satAmount=0.25f; damping=0.65f; break;
-            case Character::Trap:      preDelayMs=14; diffusion=0.68f; modRateHz=0.10f; modDepthMs=0.3f; satAmount=0.32f; damping=0.70f; break;
-            case Character::Cathedral: preDelayMs=60; diffusion=0.80f; modRateHz=0.04f; modDepthMs=1.0f; satAmount=0.05f; damping=0.35f; break;
-            case Character::Shimmer:   preDelayMs=35; diffusion=0.82f; modRateHz=0.18f; modDepthMs=2.5f; satAmount=0.10f; damping=0.30f; break;
+            case Character::Studio:    preDelayMs=16; diffusion=0.62f; modRateHz=0.08f; modDepthMs=0.25f; satAmount=0.05f; damping=0.50f; inputHpHz=180.0f; inputLpHz=8500.0f; duckAmount=0.18f; break;
+            case Character::Hall:      preDelayMs=28; diffusion=0.68f; modRateHz=0.08f; modDepthMs=0.35f; satAmount=0.06f; damping=0.48f; inputHpHz=220.0f; inputLpHz=8000.0f; duckAmount=0.20f; break;
+            case Character::Dark:      preDelayMs=22; diffusion=0.64f; modRateHz=0.05f; modDepthMs=0.30f; satAmount=0.10f; damping=0.80f; inputHpHz=260.0f; inputLpHz=5200.0f; duckAmount=0.22f; break;
+            case Character::Dream:     preDelayMs=48; diffusion=0.70f; modRateHz=0.045f; modDepthMs=1.25f; satAmount=0.05f; damping=0.60f; inputHpHz=320.0f; inputLpHz=7200.0f; duckAmount=0.24f; break;
+            case Character::Vintage:   preDelayMs=20; diffusion=0.60f; modRateHz=0.07f; modDepthMs=0.40f; satAmount=0.25f; damping=0.72f; inputHpHz=260.0f; inputLpHz=4800.0f; duckAmount=0.22f; break;
+            case Character::Trap:      preDelayMs=12; diffusion=0.56f; modRateHz=0.08f; modDepthMs=0.18f; satAmount=0.32f; damping=0.74f; inputHpHz=240.0f; inputLpHz=5600.0f; duckAmount=0.26f; break;
+            case Character::Cathedral: preDelayMs=56; diffusion=0.72f; modRateHz=0.035f; modDepthMs=0.75f; satAmount=0.05f; damping=0.45f; inputHpHz=340.0f; inputLpHz=7800.0f; duckAmount=0.26f; break;
+            case Character::Shimmer:   preDelayMs=32; diffusion=0.72f; modRateHz=0.14f; modDepthMs=1.60f; satAmount=0.10f; damping=0.38f; inputHpHz=300.0f; inputLpHz=10000.0f; duckAmount=0.22f; break;
         }
         dirty = true;
     }
