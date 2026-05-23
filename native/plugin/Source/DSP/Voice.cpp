@@ -425,12 +425,14 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         const float gain = amp * velCurve * vcaGainLin;
         l *= gain; r *= gain;
         // Equal-power pan offset using card pan (-0.08..+0.08 at full vintage).
-        const float panL = std::cos((cardPan + 1.0f) * 0.25f * juce::MathConstants<float>::pi);
-        const float panR = std::sin((cardPan + 1.0f) * 0.25f * juce::MathConstants<float>::pi);
-        // Normalised so centre (cardPan=0) → ~1.0 both sides.
-        const float panNorm = 1.41421356f;
-        l *= panL * panNorm * 0.5f + 0.5f;
-        r *= panR * panNorm * 0.5f + 0.5f;
+        // cardPan=0 → both sides ~0.707 (centre). Multiply by sqrt(2) to keep
+        // unity gain in the centre position.
+        const float panAngle = (cardPan + 1.0f) * 0.25f * juce::MathConstants<float>::pi;
+        const float panL = std::cos(panAngle) * 1.41421356f;
+        const float panR = std::sin(panAngle) * 1.41421356f;
+        l *= panL;
+        r *= panR;
+
 
         // Advance slow analog drift phase.
         driftPhase += driftInc;
