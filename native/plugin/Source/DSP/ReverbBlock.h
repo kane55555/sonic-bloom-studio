@@ -204,9 +204,45 @@ public:
         for (auto& a : outApR) a.reset();
         for (auto& c : combL)  c.reset();
         for (auto& c : combR)  c.reset();
+        inputFiltL.reset(); inputFiltR.reset();
+        sideLow.reset();
+        duckEnv = 0.0f;
     }
 
 private:
+    struct OnePoleTone
+    {
+        float hpCoef = 0.0f, lpCoef = 1.0f;
+        float hpState = 0.0f, lpState = 0.0f;
+
+        void set(double sr, float hpHz, float lpHz) noexcept
+        {
+            const float fs = (float) (sr > 1.0 ? sr : 44100.0);
+            hpCoef = std::exp(-juce::MathConstants<float>::twoPi * juce::jlimit(20.0f, 800.0f, hpHz) / fs);
+            lpCoef = std::exp(-juce::MathConstants<float>::twoPi * juce::jlimit(1000.0f, 18000.0f, lpHz) / fs);
+        }
+        void reset() noexcept { hpState = 0.0f; lpState = 0.0f; }
+        float process(float x) noexcept
+        {
+            hpState = (1.0f - hpCoef) * x + hpCoef * hpState;
+            const float hp = x - hpState;
+            lpState = (1.0f - lpCoef) * hp + lpCoef * lpState;
+            return lpState;
+        }
+    };
+
+    struct OnePoleLowpass
+    {
+        float coef = 0.0f, state = 0.0f;
+        void set(double sr, float hz) noexcept
+        {
+            const float fs = (float) (sr > 1.0 ? sr : 44100.0);
+            coef = std::exp(-juce::MathConstants<float>::twoPi * juce::jlimit(80.0f, 600.0f, hz) / fs);
+        }
+        void reset() noexcept { state = 0.0f; }
+        float process(float x) noexcept { state = (1.0f - coef) * x + coef * state; return state; }
+    };
+
     struct Allpass
     {
         std::vector<float> buf;
@@ -304,6 +340,17 @@ private:
         const float modSamples = (modDepthMs * 0.001f) * (float) sampleRate;
         const float inc        = juce::MathConstants<float>::twoPi * modRateHz / (float) sampleRate;
 
+        inputFiltL.set(sampleRate, inputHpHz, inputLpHz);
+        inputFiltR.set(sampleRate, inputHpHz, inputLpHz);
+        sideLow.set(sampleRate, lowMonoHz);
+
+        const auto msToCoef = [this](float ms) noexcept
+        {
+            return std::exp(-1.0f / juce::jmax(1.0f, ms * 0.001f * (float) sampleRate));
+        };
+        duckAttackCoef = msToCoef(duckAttackMs);
+        duckReleaseCoef = msToCoef(duckReleaseMs);
+
         for (int i = 0; i < 4; ++i)
         {
             combL[i].feedback = fb;
@@ -329,6 +376,8 @@ private:
     Allpass apL[4], apR[4];
     Allpass outApL[2], outApR[2];
     ModComb combL[4], combR[4];
+    OnePoleTone inputFiltL, inputFiltR;
+    OnePoleLowpass sideLow;
 
     float mix = 0.0f, size = 0.6f, damping = 0.5f, width = 1.0f;
     float diffusion = 0.72f;
@@ -336,6 +385,10 @@ private:
     float modDepthMs = 0.5f;
     float satAmount = 0.08f;
     float preDelayMs = 18.0f;
+    float inputHpHz = 180.0f, inputLpHz = 8500.0f;
+    float duckAmount = 0.18f, duckAttackMs = 6.0f, duckReleaseMs = 260.0f;
+    float duckAttackCoef = 0.0f, duckReleaseCoef = 0.0f, duckEnv = 0.0f;
+    float lowMonoHz = 300.0f, lowStereoWidth = 0.08f;
     Character character = Character::Studio;
     bool dirty = true;
 };
