@@ -1,6 +1,33 @@
 #include "HybridPresetApplier.h"
+#include "../PluginProcessor.h"
+#include "../DSP/SynthEngine.h"
 
 namespace dida { namespace preset {
+
+// Map preset category to a reverb character voicing. Categories are matched
+// loosely (case-insensitive, substring) so V1/V2/imported names all hit.
+static ReverbBlock::Character characterForCategory(const juce::String& categoryIn) noexcept
+{
+    const auto c = categoryIn.toLowerCase();
+    if (c.contains("808") || c.contains("sub"))                              return ReverbBlock::Character::Studio;
+    if (c.contains("brass") || c.contains("drill") || c.contains("trap"))    return ReverbBlock::Character::Trap;
+    if (c.contains("guitar"))                                                return ReverbBlock::Character::Vintage;
+    if (c.contains("pad") || c.contains("texture") || c.contains("ambient")) return ReverbBlock::Character::Dream;
+    if (c.contains("choir") || c.contains("vox") || c.contains("vocal"))     return ReverbBlock::Character::Cathedral;
+    if (c.contains("bell") || c.contains("pluck") || c.contains("crystal"))  return ReverbBlock::Character::Shimmer;
+    if (c.contains("piano") || c.contains("keys"))                           return ReverbBlock::Character::Hall;
+    if (c.contains("lead"))                                                  return ReverbBlock::Character::Hall;
+    if (c.contains("dark"))                                                  return ReverbBlock::Character::Dark;
+    if (c.contains("fx") || c.contains("riser"))                             return ReverbBlock::Character::Cathedral;
+    return ReverbBlock::Character::Studio;
+}
+
+static void applyReverbCharacter(juce::AudioProcessor& proc, const juce::String& category)
+{
+    if (auto* dp = dynamic_cast<DiditagainProcessor*>(&proc))
+        dp->getSynthEngine().getFx().setReverbCharacter(characterForCategory(category));
+}
+
 
 // ---- shared helpers (mirror of PresetManager.cpp ones; kept local to avoid linkage churn) ----
 
