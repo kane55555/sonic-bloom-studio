@@ -11,6 +11,7 @@
 #include "Voice.h"
 #include "FxChain.h"
 #include "SampleLibrary.h"
+#include "Layers/LayerBusProcessor.h"
 
 class DiditagainSynthSound : public juce::SynthesiserSound
 {
@@ -41,7 +42,8 @@ public:
     bool setMaxPolyphony(int n);
     bool setMonoMode(bool mono);
 
-    FxChain&  getFx()   noexcept { return fx; }
+    FxChain&  getFx()       noexcept { return fx; }
+    LayerBusProcessor& getLayerBus() noexcept { return layerBus; }
 
     // Set the active multisample instrument by folder name (under Documents/
     // DIDITAGAIN STUDIO/Samples). Empty name = silence. Returns true on success.
@@ -93,6 +95,7 @@ private:
     void updateHeldNotes(const juce::MidiBuffer& midi);
 
     FxChain fx;
+    LayerBusProcessor layerBus;
     std::array<std::array<HeldNote, 128>, 16> heldNotes {};
     bool    monoMode = false;
     bool    fallbackSynthesisEnabled = true;
