@@ -148,18 +148,18 @@ public:
 
     // ---- Back-compat setters --------------------------------------------------
     void setMix    (float m) noexcept { mix     = juce::jlimit(0.0f, 1.0f, m); }
-    void setSize   (float s) noexcept { size    = juce::jlimit(0.0f, 1.0f, s); dirty = true; }
-    void setDamping(float d) noexcept { damping = juce::jlimit(0.0f, 1.0f, d); dirty = true; }
+    void setSize   (float s) noexcept { const float v = juce::jlimit(0.0f, 1.0f, s); if (std::abs(v - size) > 0.0001f) { size = v; dirty = true; } }
+    void setDamping(float d) noexcept { const float v = juce::jlimit(0.0f, 1.0f, d); if (std::abs(v - damping) > 0.0001f) { damping = v; dirty = true; } }
     void setWidth  (float w) noexcept { width   = juce::jlimit(0.0f, 1.0f, w); }
 
     // ---- Premium controls -----------------------------------------------------
-    void setPreDelayMs (float ms)  noexcept { preDelayMs = juce::jlimit(0.0f, 200.0f, ms); dirty = true; }
-    void setDiffusion  (float d)   noexcept { diffusion  = juce::jlimit(0.0f, 0.92f, d);   dirty = true; }
-    void setModRate    (float hz)  noexcept { modRateHz  = juce::jlimit(0.01f, 1.5f, hz);  dirty = true; }
-    void setModDepth   (float ms)  noexcept { modDepthMs = juce::jlimit(0.0f, 4.0f, ms);   dirty = true; }
-    void setSaturation (float amt) noexcept { satAmount  = juce::jlimit(0.0f, 1.0f, amt);  dirty = true; }
-    void setInputHighPassHz(float hz) noexcept { inputHpHz = juce::jlimit(20.0f, 800.0f, hz); dirty = true; }
-    void setInputLowPassHz (float hz) noexcept { inputLpHz = juce::jlimit(1000.0f, 18000.0f, hz); dirty = true; }
+    void setPreDelayMs (float ms)  noexcept { const float v = juce::jlimit(0.0f, 200.0f, ms); if (std::abs(v - preDelayMs) > 0.001f) { preDelayMs = v; dirty = true; } }
+    void setDiffusion  (float d)   noexcept { const float v = juce::jlimit(0.0f, 0.92f, d); if (std::abs(v - diffusion) > 0.0001f) { diffusion = v; dirty = true; } }
+    void setModRate    (float hz)  noexcept { const float v = juce::jlimit(0.01f, 1.5f, hz); if (std::abs(v - modRateHz) > 0.0001f) { modRateHz = v; dirty = true; } }
+    void setModDepth   (float ms)  noexcept { const float v = juce::jlimit(0.0f, 4.0f, ms); if (std::abs(v - modDepthMs) > 0.0001f) { modDepthMs = v; dirty = true; } }
+    void setSaturation (float amt) noexcept { const float v = juce::jlimit(0.0f, 1.0f, amt); if (std::abs(v - satAmount) > 0.0001f) { satAmount = v; dirty = true; } }
+    void setInputHighPassHz(float hz) noexcept { const float v = juce::jlimit(20.0f, 800.0f, hz); if (std::abs(v - inputHpHz) > 0.01f) { inputHpHz = v; dirty = true; } }
+    void setInputLowPassHz (float hz) noexcept { const float v = juce::jlimit(1000.0f, 18000.0f, hz); if (std::abs(v - inputLpHz) > 0.01f) { inputLpHz = v; dirty = true; } }
     void setDucking(float amount, float attackMs = 6.0f, float releaseMs = 260.0f) noexcept
     {
         duckAmount = juce::jlimit(0.0f, 0.55f, amount);
