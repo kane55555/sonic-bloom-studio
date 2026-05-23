@@ -102,6 +102,13 @@ public:
     void setReverbMix(float m) { reverb.setMix(m); reverbActive = m > 0.001f; }
     void setReverbSize(float s) { reverb.setSize(s); }
     void setReverbDamping(float d) { reverb.setDamping(d); }
+    void setReverbWidth(float w) { reverb.setWidth(w); }
+    void setReverbCharacter(ReverbBlock::Character c) { reverb.setCharacter(c); }
+    void setReverbPreDelayMs(float ms) { reverb.setPreDelayMs(ms); }
+    void setReverbDiffusion(float d)   { reverb.setDiffusion(d); }
+    void setReverbModRate(float hz)    { reverb.setModRate(hz); }
+    void setReverbModDepth(float ms)   { reverb.setModDepth(ms); }
+    void setReverbSaturation(float a)  { reverb.setSaturation(a); }
 
     void setEqLowDb (float db) { eq.setLowDb(db); }
     void setEqMidDb (float db) { eq.setMidDb(db); }

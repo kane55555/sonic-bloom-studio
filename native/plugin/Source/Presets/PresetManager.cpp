@@ -8,6 +8,8 @@
 #include "UserPresetFormat.h"
 #include "GuitarPresetBank.h"
 #include "../DSP/SampleLibrary.h"
+#include "../PluginProcessor.h"
+#include "../DSP/SynthEngine.h"
 #include <limits>
 #include <cmath>
 
@@ -837,6 +839,28 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
         setParam(processor, "fxReverbMix",        fx.getProperty("reverbMix", 0.0));
         setParam(processor, "fxReverbSize",       fx.getProperty("reverbSize", 0.5));
         setParam(processor, "fxDistortionAmount", fx.getProperty("distortionAmount", 0.0));
+    }
+
+    // Voice the premium reverb per category (V1 path).
+    {
+        const juce::String cat = json.getProperty(key::category, juce::String()).toString();
+        if (auto* dp = dynamic_cast<DiditagainProcessor*>(&processor))
+        {
+            const auto c = cat.toLowerCase();
+            using Ch = ReverbBlock::Character;
+            Ch ch = Ch::Studio;
+            if      (c.contains("bass") || c.contains("808"))                       ch = Ch::Studio;
+            else if (c.contains("brass") || c.contains("drill") || c.contains("trap")) ch = Ch::Trap;
+            else if (c.contains("guitar"))                                          ch = Ch::Vintage;
+            else if (c.contains("pad") || c.contains("texture"))                    ch = Ch::Dream;
+            else if (c.contains("choir") || c.contains("vox") || c.contains("vocal")) ch = Ch::Cathedral;
+            else if (c.contains("bell") || c.contains("pluck"))                     ch = Ch::Shimmer;
+            else if (c.contains("piano") || c.contains("keys"))                     ch = Ch::Hall;
+            else if (c.contains("lead"))                                            ch = Ch::Hall;
+            else if (c.contains("dark") || c.contains("string"))                    ch = Ch::Dark;
+            else if (c.contains("fx") || c.contains("riser"))                       ch = Ch::Cathedral;
+            dp->getSynthEngine().getFx().setReverbCharacter(ch);
+        }
     }
 
     if (onPresetLoaded)
