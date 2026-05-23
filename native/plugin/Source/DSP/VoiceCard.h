@@ -14,6 +14,11 @@
 
 namespace dida {
 
+inline float vc_min(float a, float b) noexcept { return a < b ? a : b; }
+inline float vc_max(float a, float b) noexcept { return a > b ? a : b; }
+inline float vc_clamp01(float v) noexcept { return vc_min(vc_max(v, 0.0f), 1.0f); }
+
+
 struct VoiceCard
 {
     float pitchCents      = 0.0f;  // ±0.5..±4 cents
