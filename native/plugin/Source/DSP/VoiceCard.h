@@ -97,19 +97,14 @@ private:
 // scale fields) and the card's full vintage offset by `amount` in 0..1.
 inline float vintageMix(float fullOffset, float amount) noexcept
 {
-    if (amount <= 0.0f) return 0.0f;
-    if (amount >= 1.0f) return fullOffset;
-    return fullOffset * amount;
+    return fullOffset * vc_clamp01(amount);
 }
 
 inline float vintageScale(float fullScale, float amount) noexcept
 {
-    // fullScale is e.g. 1.08; at amount=0 we want 1.0, at amount=1 we want fullScale.
-    return 1.0f + (fullScale - 1.0f) * juce_min(juce_max(amount, 0.0f), 1.0f);
+    // fullScale e.g. 1.08; at amount=0 returns 1.0, at amount=1 returns fullScale.
+    return 1.0f + (fullScale - 1.0f) * vc_clamp01(amount);
 }
 
-// Avoid pulling in JUCE just for jmin/jmax in this header.
-inline float juce_min(float a, float b) noexcept { return a < b ? a : b; }
-inline float juce_max(float a, float b) noexcept { return a > b ? a : b; }
-
 } // namespace dida
+
