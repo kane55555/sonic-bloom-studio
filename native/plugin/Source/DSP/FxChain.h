@@ -110,6 +110,7 @@ public:
     void setReverbModDepth(float ms)   { reverb.setModDepth(ms); }
     void setReverbSaturation(float a)  { reverb.setSaturation(a); }
     void setReverbInputHighPassHz(float hz) { reverb.setInputHighPassHz(hz); }
+    void setReverbInputHighPassFloorHz(float hz) { reverb.setInputHighPassFloorHz(hz); }
     void setReverbInputLowPassHz(float hz)  { reverb.setInputLowPassHz(hz); }
     void setReverbDucking(float amount, float attackMs = 6.0f, float releaseMs = 260.0f)
     {
