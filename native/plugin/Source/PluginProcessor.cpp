@@ -246,6 +246,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createP
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{"directMonitor", 1}, "Direct Monitor", false));
 
+    // Vintage analog amount — scales per-voice card calibration offsets
+    // (pitch, gain, cutoff, pan, drift). 0 = clean/modern, 1 = unstable/vintage.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"vintageAmount", 1}, "Vintage Amount",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.25f));
+
+    // BBD chorus mode: I (slow/deep), II (fast/shallow), I+II (combined wide).
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{"chorusMode", 1}, "Chorus Mode",
+        juce::StringArray{"I", "II", "I+II"}, 0));
+
+
     return { params.begin(), params.end() };
 }
 
