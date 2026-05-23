@@ -56,6 +56,12 @@ public:
     void setFallbackSynthesisEnabled(bool enabled) noexcept { fallbackSynthesisEnabled = enabled; }
     void setSampleLooping(bool shouldLoop) noexcept { sampleLooping = shouldLoop; }
 
+    // ---- Vintage / voice-card calibration ----
+    void setVoiceCardIndex(int idx) noexcept { voiceCardIndex = idx; }
+    void setVintageAmount(float a) noexcept  { vintageAmount = juce::jlimit(0.0f, 1.0f, a); }
+    int  getVoiceCardIndex() const noexcept  { return voiceCardIndex; }
+
+
     // --- Crop / loop metadata (fractions of the buffer length, 0..1) ---
     void setCropRange(float start01, float end01) noexcept {
         cropStartFrac = juce::jlimit(0.0f, 1.0f, start01);
