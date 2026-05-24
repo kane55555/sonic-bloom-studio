@@ -35,10 +35,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createP
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    // Master
+    // Master — default -6 dB for safe headroom on chords/layered presets.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"masterGain", 1}, "Master Gain",
-        juce::NormalisableRange<float>(-60.0f, 12.0f, 0.1f), 0.0f));
+        juce::NormalisableRange<float>(-60.0f, 12.0f, 0.1f), -6.0f));
 
     // Engine
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
