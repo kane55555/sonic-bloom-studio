@@ -18,9 +18,10 @@ SynthVoice::SynthVoice()
 
 bool SynthVoice::canPlaySound(juce::SynthesiserSound*) { return true; }
 
-void SynthVoice::prepare(double sr, int)
+void SynthVoice::prepare(double sr, int blockSize)
 {
     sampleRate = sr;
+    preparedBlockSize = juce::jmax(16, blockSize);
     filter.prepare(sr);
     ampEnv.prepare(sr);
     filterEnv.prepare(sr);
@@ -38,9 +39,42 @@ void SynthVoice::prepare(double sr, int)
     exciter.prepare(sr);
     spreader.prepare(sr);
 
+    partialScratch.setSize(2, preparedBlockSize, false, false, true);
+    for (auto& slot : partials_)
+        if (slot.engine) slot.engine->prepare(sampleRate, preparedBlockSize);
+
     recalcGlideCoeff();
     reset();
 }
+
+void SynthVoice::clearPartials() noexcept
+{
+    for (auto& slot : partials_) { slot.engine.reset(); slot.enabled = false; }
+}
+
+void SynthVoice::setPartial(int idx,
+                            std::unique_ptr<dida::engines::IEngineSource> engine,
+                            bool enabled, float level, float pan,
+                            int pitchSemis, float fineCents) noexcept
+{
+    if (idx < 0 || idx >= kMaxPartials) return;
+    auto& slot = partials_[(size_t) idx];
+    slot.engine     = std::move(engine);
+    slot.enabled    = enabled && slot.engine != nullptr;
+    slot.level      = juce::jlimit(0.0f, 4.0f, level);
+    slot.pan        = juce::jlimit(-1.0f, 1.0f, pan);
+    slot.pitchSemis = pitchSemis;
+    slot.fineCents  = fineCents;
+    if (slot.engine) slot.engine->prepare(sampleRate, preparedBlockSize);
+}
+
+bool SynthVoice::hasActivePartials() const noexcept
+{
+    for (auto& slot : partials_)
+        if (slot.enabled && slot.engine) return true;
+    return false;
+}
+
 
 void SynthVoice::recalcGlideCoeff() noexcept
 {
