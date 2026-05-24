@@ -76,6 +76,43 @@ public:
         const int nc = buffer.getNumChannels();
         if (n <= 0 || nc <= 0) return;
 
+        // ---- Silence watchdog --------------------------------------------
+        // Track input RMS. If the input has been below -70 dBFS for more than
+        // ~2 seconds (host paused, no notes), exponentially decay the tank
+        // state so the wet tail can't ring forever. A full reset is forced
+        // after ~10s of continuous silence as a hard safety stop.
+        float blockSumSq = 0.0f;
+        {
+            const auto* L0 = buffer.getReadPointer(0);
+            const auto* R0 = nc > 1 ? buffer.getReadPointer(1) : L0;
+            for (int i = 0; i < n; ++i)
+                blockSumSq += L0[i]*L0[i] + R0[i]*R0[i];
+        }
+        const float blockRms = std::sqrt(blockSumSq / (float) juce::jmax(1, n * 2));
+        constexpr float kSilenceThresh = 0.000316f; // -70 dBFS
+        if (blockRms < kSilenceThresh)
+            silenceSamples += n;
+        else
+            silenceSamples = 0;
+
+        const int silenceDecayStart = (int) (sampleRate * 2.0); // 2 s
+        const int silenceHardReset  = (int) (sampleRate * 10.0); // 10 s
+
+        if (silenceSamples > silenceHardReset)
+        {
+            reset();
+            silenceSamples = 0;
+            return; // nothing to render; buffer is already (near-)silent
+        }
+
+        // Per-block decay factor applied to comb feedback when watchdog active.
+        // 0.97 per block @ 512 samples ≈ -1.3 dB; tail falls below -60 dB in ~2 s.
+        float tailDecay = 1.0f;
+        if (silenceSamples > silenceDecayStart)
+            tailDecay = 0.96f;
+
+
+
         auto* L = buffer.getWritePointer(0);
         auto* R = nc > 1 ? buffer.getWritePointer(1) : L;
 
