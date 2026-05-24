@@ -343,6 +343,8 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
 
     // ---- Reverb character voiced per instrument family ----
     applyReverbCharacter(processor, p.category);
+    // Per-category hybrid-synth tuning (unison / spread / exciter / drift).
+    applyCategoryDsp(processor, p.category);
 
     return out;
 }
