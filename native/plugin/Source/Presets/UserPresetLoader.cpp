@@ -525,6 +525,10 @@ FxLimits fxLimitsFor(Family f)
         case Family::Pluck:     return { 0.30f, 0.35f, 0.35f, 0.18f };
         case Family::Bass808:   return { 0.12f, 0.18f, 0.18f, 0.35f };
         case Family::FxRiser:   return { 0.60f, 0.70f, 0.70f, 0.60f };
+        // Vintage synth strict caps (chorus/delay/reverb/sat) — matches the
+        // "remove static, keep warm" spec. Saturation drive is also capped
+        // hard at 0.16 to stop layer-bus tanh from overdriving the chain.
+        case Family::Synth:     return { 0.18f, 0.10f, 0.18f, 0.16f };
         default:                return { 0.50f, 0.50f, 0.50f, 0.40f };
     }
 }
