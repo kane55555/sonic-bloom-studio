@@ -503,6 +503,8 @@ EnvRange envRangeFor(Family f)
         case Family::Pluck:     return { 0.0f,   0.005f, 0.10f, 0.40f, 0.00f, 0.25f, 0.20f, 0.80f };
         case Family::Bass808:   return { 0.0f,   0.005f, 0.10f, 0.40f, 0.85f, 1.00f, 0.10f, 0.60f };
         case Family::FxRiser:   return { 0.0f,   1.00f, 0.05f, 4.00f, 0.00f, 1.00f, 0.05f, 4.00f };
+        // Vintage synth presets: warm, soft, never clicky and never too long.
+        case Family::Synth:     return { 0.008f, 0.040f, 0.10f, 1.50f, 0.50f, 0.95f, 0.40f, 1.40f };
         default:                return { 0.0f,   2.00f, 0.01f, 4.00f, 0.00f, 1.00f, 0.01f, 6.00f };
     }
 }
