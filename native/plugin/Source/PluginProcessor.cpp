@@ -633,8 +633,39 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     }
    #endif
 
+    // ---- Transport-stop watchdog: when the host stops playback, flush the
+    // FX tails (reverb/delay) after a short grace period so a long preset
+    // doesn't ring forever while the user has hit "pause". We do NOT reset
+    // if any voices are still releasing — that would clip a held note.
+    if (auto* ph = getPlayHead())
+    {
+        if (auto pos = ph->getPosition())
+        {
+            const bool isPlaying = pos->getIsPlaying();
+            if (! isPlaying)
+            {
+                stoppedBlocks++;
+                const double sr = getSampleRate() > 0 ? getSampleRate() : 44100.0;
+                const int blockSamples = juce::jmax(1, buffer.getNumSamples());
+                const int blocksFor500ms = (int) (0.5 * sr / blockSamples);
+                if (stoppedBlocks == blocksFor500ms
+                    && ! synthEngine.hasActiveVoices()
+                    && ! synthEngine.hasHeldNotes())
+                {
+                    synthEngine.getFx().reset();
+                    didaAudioLog("transport stopped — flushed FX tails");
+                }
+            }
+            else
+            {
+                stoppedBlocks = 0;
+            }
+        }
+    }
+
     // ---- Render voices + FX (master gain + limiter applied inside FX chain) ----
     synthEngine.renderBlockWithFx(buffer, midiMessages, 0, buffer.getNumSamples());
+
 
     // ---- Output clipping meter: warn if the master bus exceeds -1 dBFS
     //      (~0.891). Throttled to once every ~1s to avoid log spam. ----
