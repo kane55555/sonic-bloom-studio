@@ -1110,6 +1110,10 @@ juce::String toJson(const UserPreset& p)
             po->setProperty("pan",        pb.pan);
             po->setProperty("pitchSemis", pb.pitchSemis);
             po->setProperty("fineCents",  pb.fineCents);
+            if (pb.blendMode.isNotEmpty()) po->setProperty("blendMode", pb.blendMode);
+            if (pb.eqRole.isNotEmpty())    po->setProperty("eqRole",    pb.eqRole);
+            po->setProperty("followMainEnvelope", pb.followMainEnvelope);
+            if (pb.maxGainDb != 0.0f)      po->setProperty("maxGainDb", pb.maxGainDb);
             if (! pb.engineParams.isVoid())
                 po->setProperty("engineParams", pb.engineParams);
 
