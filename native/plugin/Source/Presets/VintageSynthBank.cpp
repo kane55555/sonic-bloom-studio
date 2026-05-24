@@ -1,11 +1,30 @@
 #include "VintageSynthBank.h"
 
+// ============================================================================
+// VintageSynthBank.cpp
+//
+// 20 vintage-inspired synth presets, retuned for SAFE gain staging.
+// Hard rules (matches the Family::Synth clamps in UserPresetLoader.cpp):
+//   gainDb       : -6 .. -3 dB
+//   attack       :  8 .. 40 ms (slow pads use macro.attack instead)
+//   release      : 400 .. 1400 ms (longer pads still allowed, clamped upstream)
+//   filter cutoff: 3000 .. 8000 Hz
+//   resonance    : 0.08 .. 0.18
+//   saturation   : drive 0.08-0.16, mix 0.06-0.14 (clean vintage)
+//   layer2 gain  : -24 .. -18 dB (just a whisper of detune, no octave stacking)
+//   chorus mix   : 0.08 .. 0.18
+//   delay mix    : 0.04 .. 0.10
+//   reverb mix   : 0.08 .. 0.18
+//
+// One "intentionally dirty" preset (Horror Lead) opts into experimental=true,
+// which lets it bend the FX-cap rules a bit (still bounded by Family::Synth's
+// hard caps in the loader). The output is also protected by a brickwall
+// limiter at -0.3 dB plus a clip-warning log in FxChain.
+// ============================================================================
+
 namespace dida { namespace userpreset {
 
 // Sensible neutral starting point — every preset overrides what it needs.
-// The category "Synth" routes through HybridPresetApplier's synth voicing,
-// and the macro/velocity/filterMovement blocks (v2 schema) drive the
-// vintage-modeling layer-bus and per-voice analog drift.
 static UserPreset makeBase (const juce::String& name, const juce::String& src)
 {
     UserPreset p;
@@ -17,27 +36,30 @@ static UserPreset makeBase (const juce::String& name, const juce::String& src)
     p.source.mappingMode     = "nearest";
     p.source.rootNotePattern = { "C", "D#", "F#", "A" };
 
-    p.amp    = { 0.0f, 0.0f, 8.0f, 350.0f, 0.85f, 500.0f };
-    p.filter = { true, "lowpass", 8000.0f, 0.15f, 0.10f, 0.20f };
+    // amp: master at -4 dB headroom, modest envelope.
+    p.amp    = { -4.0f, 0.0f, 12.0f, 320.0f, 0.80f, 700.0f };
+    p.filter = { true, "lowpass", 5500.0f, 0.12f, 0.05f, 0.18f };
+
     p.main   = { true,   0.0f, 0.0f, 0, 0,  0.0f };
-    p.layer2 = { true,  -6.0f, 0.0f, 0, 0, +7.0f };   // detuned twin osc
+    // Layer 2 = quiet detuned twin, never octave-stacked by default.
+    p.layer2 = { true,  -20.0f, 0.0f, 0, 0, +4.0f };
 
-    p.chorus     = { true,  0.40f, 0.30f, 0.35f };    // BBD-style by default
-    p.delay      = { false, 320.0f, 0.30f, 0.0f };
-    p.reverb     = { true,  0.55f, 0.45f, 0.22f };
-    p.saturation = { true,  0.12f, 0.20f };
+    p.chorus     = { true,  0.30f, 0.25f, 0.14f };   // gentle BBD-style
+    p.delay      = { false, 320.0f, 0.25f, 0.06f };  // disabled by default
+    p.reverb     = { true,  0.45f, 0.45f, 0.14f };   // light room
+    p.saturation = { true,  0.10f, 0.10f };          // subtle tape glue only
 
-    p.lfo1 = { true,  "filter.cutoffHz", "sine",     0.18f, 0.10f };
-    p.lfo2 = { true,  "amp.pan",         "triangle", 0.09f, 0.08f };
+    p.lfo1 = { true,  "filter.cutoffHz", "sine",     0.18f, 0.08f };
+    p.lfo2 = { true,  "amp.pan",         "triangle", 0.09f, 0.05f };
 
-    p.advanced = { 0.0f, 0.0f, 0.30f, 0.25f, 4.0f, 1.5f, 8 };
+    p.advanced = { 0.0f, 0.0f, 0.30f, 0.20f, 3.0f, 1.2f, 8 };
 
-    // v2 — vintage-leaning defaults
-    p.macros   = { /*tone*/0.55f, /*move*/0.35f, /*width*/0.65f, /*warmth*/0.50f,
-                   /*atk*/0.30f,  /*rel*/0.55f,  /*space*/0.40f, /*char*/0.45f };
-    p.velocity = { 0.40f, 0.30f, 0.15f, 0.35f };
+    // v2 — warm, conservative defaults.
+    p.macros   = { /*tone*/0.50f, /*move*/0.25f, /*width*/0.60f, /*warmth*/0.45f,
+                   /*atk*/0.30f,  /*rel*/0.50f,  /*space*/0.35f, /*char*/0.45f };
+    p.velocity = { 0.40f, 0.25f, 0.15f, 0.30f };
     p.layerEq  = { 0.0f, 0.0f, 260.0f, 0.0f };
-    p.filterMovement = { true, 0.18f, 0.18f };
+    p.filterMovement = { true, 0.14f, 0.18f };
     p.experimental = false;
     return p;
 }
@@ -47,178 +69,181 @@ juce::Array<UserPreset> buildVintageSynthBank (const juce::String& src)
     juce::Array<UserPreset> out;
     auto add = [&](UserPreset p) { out.add (std::move (p)); };
 
-    // 1. Juno-60 Warm Pad — wide chorus, gentle filter, slow attack
+    // 1. Juno-60 Warm Pad
     { auto p = makeBase ("Juno-60 Warm Pad", src);
-      p.amp = { 0.0f, 0.0f, 600.0f, 800.0f, 0.85f, 1800.0f };
-      p.filter.cutoffHz = 3400.0f; p.filter.resonance = 0.18f;
-      p.chorus = { true, 0.55f, 0.45f, 0.55f };
-      p.macros.width = 0.85f; p.macros.warmth = 0.55f; p.macros.space = 0.55f;
+      p.amp = { -5.0f, 0.0f, 40.0f, 700.0f, 0.85f, 1400.0f };
+      p.filter.cutoffHz = 3400.0f; p.filter.resonance = 0.14f;
+      p.chorus = { true, 0.45f, 0.35f, 0.18f };
+      p.reverb = { true, 0.55f, 0.45f, 0.18f };
+      p.macros.width = 0.80f; p.macros.warmth = 0.55f; p.macros.space = 0.55f;
       add (p); }
 
-    // 2. Jupiter-8 Brass — punchy attack, env-modulated filter, stereo wash
+    // 2. Jupiter-8 Brass
     { auto p = makeBase ("Jupiter-8 Brass", src);
-      p.amp = { 0.0f, 0.0f, 18.0f, 420.0f, 0.75f, 480.0f };
-      p.filter.cutoffHz = 5200.0f; p.filter.resonance = 0.25f; p.filter.drive = 0.22f;
-      p.layer2.detuneCents = +9.0f;
-      p.macros.tone = 0.65f; p.macros.warmth = 0.60f;
-      p.velocity.toCutoff = 0.45f; p.velocity.toGain = 0.50f;
+      p.amp = { -4.0f, 0.0f, 18.0f, 380.0f, 0.75f, 480.0f };
+      p.filter.cutoffHz = 5200.0f; p.filter.resonance = 0.18f; p.filter.drive = 0.08f;
+      p.layer2.detuneCents = +5.0f; p.layer2.gainDb = -20.0f;
+      p.macros.tone = 0.60f; p.macros.warmth = 0.55f;
+      p.velocity.toCutoff = 0.40f; p.velocity.toGain = 0.45f;
       add (p); }
 
-    // 3. Prophet-5 Soft Keys — short release, light chorus, focused mids
+    // 3. Prophet-5 Soft Keys
     { auto p = makeBase ("Prophet-5 Soft Keys", src);
-      p.amp = { 0.0f, 0.0f, 6.0f, 280.0f, 0.55f, 380.0f };
-      p.filter.cutoffHz = 4600.0f; p.filter.resonance = 0.12f;
-      p.chorus = { true, 0.35f, 0.22f, 0.30f };
-      p.macros.tone = 0.55f; p.macros.movement = 0.20f; p.macros.space = 0.30f;
+      p.amp = { -4.0f, 0.0f, 10.0f, 260.0f, 0.55f, 420.0f };
+      p.filter.cutoffHz = 4600.0f; p.filter.resonance = 0.10f;
+      p.chorus = { true, 0.35f, 0.22f, 0.12f };
+      p.macros.tone = 0.55f; p.macros.movement = 0.18f; p.macros.space = 0.30f;
       add (p); }
 
-    // 4. CS-80 Cinematic Pad — dual filter character, expressive aftertouch
+    // 4. CS-80 Cinematic Pad
     { auto p = makeBase ("CS-80 Cinematic Pad", src);
-      p.amp = { 0.0f, 0.0f, 900.0f, 1400.0f, 0.90f, 2600.0f };
-      p.filter.cutoffHz = 2800.0f; p.filter.resonance = 0.22f;
-      p.reverb = { true, 0.75f, 0.45f, 0.45f };
-      p.macros.movement = 0.55f; p.macros.width = 0.90f; p.macros.space = 0.65f;
-      p.filterMovement = { true, 0.30f, 0.12f };
+      p.amp = { -5.0f, 0.0f, 40.0f, 1100.0f, 0.88f, 1400.0f };
+      p.filter.cutoffHz = 3200.0f; p.filter.resonance = 0.16f;
+      p.reverb = { true, 0.65f, 0.45f, 0.18f };
+      p.macros.movement = 0.45f; p.macros.width = 0.85f; p.macros.space = 0.60f;
+      p.filterMovement = { true, 0.22f, 0.12f };
       add (p); }
 
-    // 5. Analog Bass Mono — tight, mono, saturated low end
+    // 5. Analog Bass Mono
     { auto p = makeBase ("Analog Bass Mono", src);
-      p.amp = { 0.0f, 0.0f, 3.0f, 220.0f, 0.65f, 240.0f };
-      p.filter.cutoffHz = 900.0f; p.filter.resonance = 0.35f; p.filter.drive = 0.30f;
+      p.amp = { -3.0f, 0.0f, 8.0f, 220.0f, 0.65f, 400.0f };
+      p.filter.cutoffHz = 3000.0f; p.filter.resonance = 0.18f; p.filter.drive = 0.12f;
       p.layer2.enabled = false;
-      p.chorus.enabled = false; p.reverb.mix = 0.05f;
-      p.macros.width = 0.10f; p.macros.warmth = 0.65f; p.macros.space = 0.10f;
+      p.chorus.enabled = false;
+      p.reverb.mix = 0.08f;
+      p.saturation = { true, 0.14f, 0.12f };
+      p.macros.width = 0.15f; p.macros.warmth = 0.65f; p.macros.space = 0.10f;
       p.advanced.polyphony = 1;
       add (p); }
 
-    // 6. Mono Lead Classic — singing lead, mild glide, juicy chorus
+    // 6. Mono Lead Classic
     { auto p = makeBase ("Mono Lead Classic", src);
-      p.amp = { 0.0f, 0.0f, 8.0f, 240.0f, 0.80f, 320.0f };
-      p.filter.cutoffHz = 5800.0f; p.filter.resonance = 0.30f;
-      p.chorus = { true, 0.45f, 0.40f, 0.40f };
-      p.macros.tone = 0.65f; p.macros.movement = 0.25f;
+      p.amp = { -4.0f, 0.0f, 10.0f, 240.0f, 0.80f, 420.0f };
+      p.filter.cutoffHz = 5800.0f; p.filter.resonance = 0.18f;
+      p.chorus = { true, 0.35f, 0.30f, 0.16f };
+      p.macros.tone = 0.60f; p.macros.movement = 0.22f;
       p.advanced.polyphony = 1;
       add (p); }
 
-    // 7. PWM Pad — pulse-width-modulated breathing pad
+    // 7. PWM Pad
     { auto p = makeBase ("PWM Pad", src);
-      p.amp = { 0.0f, 0.0f, 700.0f, 1200.0f, 0.85f, 2200.0f };
+      p.amp = { -5.0f, 0.0f, 35.0f, 900.0f, 0.85f, 1400.0f };
       p.filter.cutoffHz = 3200.0f;
-      p.lfo1 = { true, "osc.pulseWidth", "sine", 0.22f, 0.45f };
-      p.macros.movement = 0.65f; p.macros.width = 0.80f;
+      p.lfo1 = { true, "osc.pulseWidth", "sine", 0.22f, 0.30f };
+      p.macros.movement = 0.55f; p.macros.width = 0.75f;
       add (p); }
 
-    // 8. String Machine — Solina-style ensemble strings
+    // 8. String Machine
     { auto p = makeBase ("String Machine", src);
-      p.amp = { 0.0f, 0.0f, 420.0f, 900.0f, 0.85f, 1400.0f };
+      p.amp = { -5.0f, 0.0f, 35.0f, 700.0f, 0.85f, 1400.0f };
       p.filter.cutoffHz = 5200.0f; p.filter.resonance = 0.10f;
-      p.chorus = { true, 0.60f, 0.55f, 0.65f };
-      p.reverb = { true, 0.65f, 0.45f, 0.30f };
-      p.macros.width = 0.90f; p.macros.warmth = 0.45f;
+      p.chorus = { true, 0.55f, 0.45f, 0.18f };
+      p.reverb = { true, 0.55f, 0.45f, 0.18f };
+      p.macros.width = 0.85f; p.macros.warmth = 0.45f;
       add (p); }
 
-    // 9. Vintage Pluck — short, percussive, slightly detuned
+    // 9. Vintage Pluck
     { auto p = makeBase ("Vintage Pluck", src);
-      p.amp = { 0.0f, 0.0f, 2.0f, 180.0f, 0.00f, 300.0f };
-      p.filter.cutoffHz = 4200.0f; p.filter.resonance = 0.18f;
-      p.delay = { true, 280.0f, 0.32f, 0.18f };
-      p.macros.tone = 0.60f; p.macros.movement = 0.10f;
+      p.amp = { -4.0f, 0.0f, 8.0f, 180.0f, 0.00f, 400.0f };
+      p.filter.cutoffHz = 4200.0f; p.filter.resonance = 0.14f;
+      p.delay = { true, 280.0f, 0.25f, 0.08f };
+      p.macros.tone = 0.55f; p.macros.movement = 0.10f;
       add (p); }
 
-    // 10. Analog Bell — clean transient, long decay, sparkly air
+    // 10. Analog Bell
     { auto p = makeBase ("Analog Bell", src);
-      p.amp = { 0.0f, 0.0f, 1.0f, 900.0f, 0.20f, 1600.0f };
-      p.filter.cutoffHz = 7800.0f; p.filter.resonance = 0.15f;
+      p.amp = { -4.0f, 0.0f, 8.0f, 800.0f, 0.20f, 1400.0f };
+      p.filter.cutoffHz = 7800.0f; p.filter.resonance = 0.12f;
       p.layerEq.layer2BodyHz = 480.0f;
-      p.macros.tone = 0.75f; p.macros.space = 0.55f; p.macros.character = 0.70f;
+      p.macros.tone = 0.70f; p.macros.space = 0.55f; p.macros.character = 0.65f;
       add (p); }
 
-    // 11. Dark Choir — slow attack, dark voicing, dense reverb
+    // 11. Dark Choir
     { auto p = makeBase ("Dark Choir", src);
-      p.amp = { 0.0f, 0.0f, 1100.0f, 1800.0f, 0.85f, 3000.0f };
-      p.filter.cutoffHz = 2200.0f; p.filter.resonance = 0.10f;
-      p.reverb = { true, 0.80f, 0.55f, 0.45f };
-      p.macros.tone = 0.30f; p.macros.space = 0.70f;
+      p.amp = { -5.0f, 0.0f, 40.0f, 1200.0f, 0.85f, 1400.0f };
+      p.filter.cutoffHz = 3000.0f; p.filter.resonance = 0.10f;
+      p.reverb = { true, 0.70f, 0.55f, 0.18f };
+      p.macros.tone = 0.35f; p.macros.space = 0.65f;
       add (p); }
 
-    // 12. Reese Bass — thick detuned saws, mono low end
+    // 12. Reese Bass
     { auto p = makeBase ("Reese Bass", src);
-      p.amp = { 0.0f, 0.0f, 4.0f, 260.0f, 0.80f, 320.0f };
-      p.filter.cutoffHz = 1400.0f; p.filter.resonance = 0.32f; p.filter.drive = 0.30f;
-      p.layer2.detuneCents = +12.0f; p.layer2.gainDb = -3.0f;
-      p.macros.width = 0.30f; p.macros.warmth = 0.70f;
+      p.amp = { -3.0f, 0.0f, 12.0f, 260.0f, 0.80f, 420.0f };
+      p.filter.cutoffHz = 3000.0f; p.filter.resonance = 0.18f; p.filter.drive = 0.14f;
+      p.layer2.detuneCents = +7.0f; p.layer2.gainDb = -18.0f;
+      p.saturation = { true, 0.14f, 0.12f };
+      p.macros.width = 0.30f; p.macros.warmth = 0.65f;
       p.advanced.polyphony = 2;
       add (p); }
 
-    // 13. Soft Poly Keys — gentle bell-like keys, light air
+    // 13. Soft Poly Keys
     { auto p = makeBase ("Soft Poly Keys", src);
-      p.amp = { 0.0f, 0.0f, 5.0f, 320.0f, 0.55f, 480.0f };
-      p.filter.cutoffHz = 5400.0f; p.filter.resonance = 0.12f;
-      p.chorus = { true, 0.30f, 0.20f, 0.28f };
+      p.amp = { -4.0f, 0.0f, 10.0f, 320.0f, 0.55f, 480.0f };
+      p.filter.cutoffHz = 5400.0f; p.filter.resonance = 0.10f;
+      p.chorus = { true, 0.30f, 0.20f, 0.12f };
       p.macros.tone = 0.55f; p.macros.warmth = 0.45f;
       add (p); }
 
-    // 14. Horror Lead — detuned, slow filter sweep, aggressive saturation
+    // 14. Horror Lead — intentionally dirty (experimental).
     { auto p = makeBase ("Horror Lead", src);
-      p.amp = { 0.0f, 0.0f, 30.0f, 600.0f, 0.85f, 900.0f };
-      p.filter.cutoffHz = 1800.0f; p.filter.resonance = 0.55f; p.filter.drive = 0.45f;
-      p.layer2.detuneCents = +18.0f;
-      p.saturation = { true, 0.30f, 0.35f };
-      p.filterMovement = { true, 0.45f, 0.08f };
-      p.macros.tone = 0.35f; p.macros.movement = 0.65f;
+      p.amp = { -4.0f, 0.0f, 30.0f, 600.0f, 0.85f, 900.0f };
+      p.filter.cutoffHz = 3000.0f; p.filter.resonance = 0.18f; p.filter.drive = 0.16f;
+      p.layer2.detuneCents = +10.0f; p.layer2.gainDb = -18.0f;
+      p.saturation = { true, 0.16f, 0.14f };
+      p.filterMovement = { true, 0.30f, 0.10f };
+      p.macros.tone = 0.40f; p.macros.movement = 0.55f;
       p.experimental = true;
       add (p); }
 
-    // 15. Tape Pad — lo-fi wow/flutter pad with darker air
+    // 15. Tape Pad
     { auto p = makeBase ("Tape Pad", src);
-      p.amp = { 0.0f, 0.0f, 800.0f, 1400.0f, 0.85f, 2400.0f };
+      p.amp = { -5.0f, 0.0f, 40.0f, 1100.0f, 0.85f, 1400.0f };
       p.filter.cutoffHz = 3000.0f;
-      p.saturation = { true, 0.25f, 0.30f };
-      p.advanced.humanizePitchCents = 9.0f; p.advanced.humanizeTimingMs = 6.0f;
-      p.macros.warmth = 0.75f; p.macros.character = 0.30f;
+      p.saturation = { true, 0.14f, 0.12f };
+      p.advanced.humanizePitchCents = 5.0f; p.advanced.humanizeTimingMs = 4.0f;
+      p.macros.warmth = 0.70f; p.macros.character = 0.35f;
       add (p); }
 
-    // 16. Analog Init — clean starting point, mild vintage
+    // 16. Analog Init
     { auto p = makeBase ("Analog Init", src);
-      // keep defaults except disable layer 2 for a single-osc init
       p.layer2.enabled = false;
-      p.chorus.mix = 0.20f; p.reverb.mix = 0.15f;
-      p.macros.movement = 0.20f; p.macros.width = 0.50f;
+      p.chorus.mix = 0.12f; p.reverb.mix = 0.10f;
+      p.macros.movement = 0.18f; p.macros.width = 0.50f;
       add (p); }
 
-    // 17. Brass Stack — layered brass, wide stereo, BBD chorus II
+    // 17. Brass Stack
     { auto p = makeBase ("Brass Stack", src);
-      p.amp = { 0.0f, 0.0f, 20.0f, 380.0f, 0.80f, 520.0f };
-      p.filter.cutoffHz = 4800.0f; p.filter.resonance = 0.20f; p.filter.drive = 0.20f;
-      p.chorus = { true, 0.55f, 0.50f, 0.50f };
-      p.macros.width = 0.85f; p.macros.warmth = 0.55f;
-      p.velocity.toCutoff = 0.40f;
+      p.amp = { -4.0f, 0.0f, 20.0f, 380.0f, 0.80f, 520.0f };
+      p.filter.cutoffHz = 4800.0f; p.filter.resonance = 0.16f; p.filter.drive = 0.10f;
+      p.chorus = { true, 0.45f, 0.40f, 0.18f };
+      p.macros.width = 0.80f; p.macros.warmth = 0.55f;
+      p.velocity.toCutoff = 0.35f;
       add (p); }
 
-    // 18. Glass Pad — sparkly air, shimmer reverb feel
+    // 18. Glass Pad
     { auto p = makeBase ("Glass Pad", src);
-      p.amp = { 0.0f, 0.0f, 600.0f, 1100.0f, 0.80f, 2000.0f };
+      p.amp = { -5.0f, 0.0f, 35.0f, 900.0f, 0.80f, 1400.0f };
       p.filter.cutoffHz = 6500.0f;
-      p.reverb = { true, 0.70f, 0.30f, 0.40f };
-      p.macros.tone = 0.75f; p.macros.character = 0.80f; p.macros.space = 0.70f;
+      p.reverb = { true, 0.60f, 0.30f, 0.18f };
+      p.macros.tone = 0.70f; p.macros.character = 0.70f; p.macros.space = 0.65f;
       add (p); }
 
-    // 19. Sequencer Pulse — short gate, syncopation-friendly, mono-ish
+    // 19. Sequencer Pulse
     { auto p = makeBase ("Sequencer Pulse", src);
-      p.amp = { 0.0f, 0.0f, 2.0f, 140.0f, 0.10f, 220.0f };
-      p.filter.cutoffHz = 3000.0f; p.filter.resonance = 0.40f;
-      p.lfo1 = { true, "filter.cutoffHz", "sine", 4.5f, 0.35f };
-      p.delay = { true, 250.0f, 0.40f, 0.20f };
-      p.macros.movement = 0.55f; p.macros.width = 0.55f;
+      p.amp = { -4.0f, 0.0f, 8.0f, 140.0f, 0.10f, 400.0f };
+      p.filter.cutoffHz = 3200.0f; p.filter.resonance = 0.18f;
+      p.lfo1 = { true, "filter.cutoffHz", "sine", 4.5f, 0.30f };
+      p.delay = { true, 250.0f, 0.30f, 0.10f };
+      p.macros.movement = 0.50f; p.macros.width = 0.55f;
       add (p); }
 
-    // 20. Ambient Drone — long evolving drone, deep movement
+    // 20. Ambient Drone
     { auto p = makeBase ("Ambient Drone", src);
-      p.amp = { 0.0f, 0.0f, 1400.0f, 2200.0f, 0.95f, 4500.0f };
-      p.filter.cutoffHz = 2400.0f; p.filter.resonance = 0.20f;
-      p.reverb = { true, 0.85f, 0.55f, 0.55f };
-      p.filterMovement = { true, 0.45f, 0.06f };
-      p.macros.movement = 0.75f; p.macros.width = 0.95f; p.macros.space = 0.80f;
+      p.amp = { -5.0f, 0.0f, 40.0f, 1400.0f, 0.92f, 1400.0f };
+      p.filter.cutoffHz = 3000.0f; p.filter.resonance = 0.16f;
+      p.reverb = { true, 0.75f, 0.55f, 0.18f };
+      p.filterMovement = { true, 0.30f, 0.06f };
+      p.macros.movement = 0.65f; p.macros.width = 0.90f; p.macros.space = 0.75f;
       add (p); }
 
     return out;
