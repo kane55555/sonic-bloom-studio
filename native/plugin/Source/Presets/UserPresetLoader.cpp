@@ -83,6 +83,10 @@ static LayerBlock parseLayer(const juce::var& v, const LayerBlock& def)
     l.octave      = getI(v, "octave",      def.octave);
     l.semitone    = getI(v, "semitone",    def.semitone);
     l.detuneCents = getF(v, "detuneCents", def.detuneCents);
+    l.blendMode          = getS(v, "blendMode",          def.blendMode);
+    l.eqRole             = getS(v, "eqRole",             def.eqRole);
+    l.followMainEnvelope = getB(v, "followMainEnvelope", def.followMainEnvelope);
+    l.maxGainDb          = getF(v, "maxGainDb",          def.maxGainDb);
     return l;
 }
 
