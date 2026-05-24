@@ -843,6 +843,44 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     setParamById(proc, "oscBSemi",   static_cast<float>(p.layer2.semitone));
     setParamById(proc, "oscBDetune", p.layer2.detuneCents);
 
+    // ---- eqRole wiring: per-layer carver cutoffs ----
+    //
+    // Resolve an effective eqRole for layer 2 from the explicit field, falling
+    // back to the blend mode that the policy block above picked. This lets a
+    // preset say `blendMode: "addAir"` and automatically inherit `eqRole:
+    // "air"` (oscBHp opened up to 2.5 kHz) without authoring both fields.
+    {
+        juce::String role2 = p.layer2.eqRole.trim().toLowerCase();
+        if (role2.isEmpty())
+        {
+            const auto mode = (p.layer2.blendMode.trim().toLowerCase().isNotEmpty()
+                                  ? p.layer2.blendMode.trim().toLowerCase()
+                                  : juce::String());
+            if      (mode == "addair")        role2 = "air";
+            else if (mode == "addwarmth")     role2 = "warmth";
+            else if (mode == "reinforcebody") role2 = "body";
+            else if (mode == "hiddentexture") role2 = "texture";
+            else if (mode == "subsupport")    role2 = "sub";
+        }
+
+        if (auto* dp = dynamic_cast<DiditagainProcessor*>(&proc))
+        {
+            const juce::String r2 = role2;
+            dp->getSynthEngine().forEachSynthVoice([&r2](SynthVoice& v)
+            {
+                v.setLayer2EqRole(r2);
+                // Layers 3/4 inherit complementary roles so the noise/sub
+                // carvers also park in their own bands. We don't have a
+                // dedicated LayerBlock for them yet — use sensible siblings.
+                v.setLayer3EqRole(r2 == "air" || r2 == "texture" ? r2 : juce::String());
+                v.setLayer4EqRole(r2 == "sub" ? juce::String("sub")
+                                  : r2 == "warmth" ? juce::String("warmth")
+                                                   : juce::String());
+            });
+        }
+    }
+
+
     // Sample is the only sound source — make sure Osc A pass-through is on,
     // sub/noise silenced. (Same convention as PresetManager sample-drop path.)
     setParamById(proc, "oscALevel",    1.0f);

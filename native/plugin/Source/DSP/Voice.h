@@ -134,6 +134,58 @@ public:
     }
     void setNoiseType(int t)              noexcept { noiseType = (t == 1 ? 1 : 0); }
 
+    // ---- Per-layer EQ role wiring (v2.1 blendMode contract) ----
+    //
+    // Maps a preset's textual `eqRole` for layer 2 (Osc B) to the oscBHp
+    // carving filter cutoff so each role parks the layer in its own band:
+    //   body    -> 60 Hz   (let body through; minimal carve)
+    //   warmth  -> 150 Hz  (gentle low cut, mids intact)
+    //   air     -> 2500 Hz (only highs pass; layer becomes pure shimmer)
+    //   texture -> 450 Hz  (mids+highs)
+    //   sub     -> 40 Hz   (oscB barely touched; sub really lives on subOsc)
+    //   ""/auto -> 110 Hz  (default)
+    void setLayer2EqRole(const juce::String& role) noexcept
+    {
+        const auto r = role.trim().toLowerCase();
+        float hz = 110.0f;
+        if      (r == "body")    hz = 60.0f;
+        else if (r == "warmth")  hz = 150.0f;
+        else if (r == "air")     hz = 2500.0f;
+        else if (r == "texture") hz = 450.0f;
+        else if (r == "sub")     hz = 40.0f;
+        oscBHp.setCutoff(hz);
+    }
+
+    // Layer 3 (Noise/Air): HP cutoff for the noise carvers.
+    //   air     -> 4000 Hz (sparkle only)
+    //   texture -> 1500 Hz (broadband-ish noise body)
+    //   warmth  -> 600 Hz  (low rumble allowed)
+    //   ""/auto -> 2200 Hz (default)
+    void setLayer3EqRole(const juce::String& role) noexcept
+    {
+        const auto r = role.trim().toLowerCase();
+        float hz = 2200.0f;
+        if      (r == "air")     hz = 4000.0f;
+        else if (r == "texture") hz = 1500.0f;
+        else if (r == "warmth")  hz = 600.0f;
+        noiseHpL.setCutoff(hz);
+        noiseHpR.setCutoff(hz);
+    }
+
+    // Layer 4 (Sub): LP cutoff for the sub carver.
+    //   sub     -> 120 Hz  (true sub)
+    //   body    -> 260 Hz  (default; round low end)
+    //   warmth  -> 400 Hz  (low-mids warmth)
+    void setLayer4EqRole(const juce::String& role) noexcept
+    {
+        const auto r = role.trim().toLowerCase();
+        float hz = 260.0f;
+        if      (r == "sub")    hz = 120.0f;
+        else if (r == "warmth") hz = 400.0f;
+        else if (r == "body")   hz = 260.0f;
+        subLp.setCutoff(hz);
+    }
+
     LegacyOscillatorStub& getOscA()      noexcept { return oscAStub; }
     LegacyOscillatorStub& getOscB()      noexcept { return oscBStub; }
     LegacyOscillatorStub& getSubOsc()    noexcept { return subStub;  }
