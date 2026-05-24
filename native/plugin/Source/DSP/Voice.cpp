@@ -460,6 +460,12 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         r *= panR;
 
 
+        // Premium tone stages: harmonic exciter + Haas/M-S stereo spread.
+        // Both are no-ops at amount 0, so CPU cost stays near zero for
+        // categories that don't request them (e.g. pianos, 808s).
+        exciter.process(l, r);
+        spreader.process(l, r);
+
         // Advance slow analog drift phase.
         driftPhase += driftInc;
         if (driftPhase >= 1.0) driftPhase -= 1.0;
