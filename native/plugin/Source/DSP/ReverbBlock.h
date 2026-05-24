@@ -76,12 +76,59 @@ public:
         const int nc = buffer.getNumChannels();
         if (n <= 0 || nc <= 0) return;
 
+        // ---- Silence watchdog --------------------------------------------
+        // Track input RMS. If the input has been below -70 dBFS for more than
+        // ~2 seconds (host paused, no notes), exponentially decay the tank
+        // state so the wet tail can't ring forever. A full reset is forced
+        // after ~10s of continuous silence as a hard safety stop.
+        float blockSumSq = 0.0f;
+        {
+            const auto* L0 = buffer.getReadPointer(0);
+            const auto* R0 = nc > 1 ? buffer.getReadPointer(1) : L0;
+            for (int i = 0; i < n; ++i)
+                blockSumSq += L0[i]*L0[i] + R0[i]*R0[i];
+        }
+        const float blockRms = std::sqrt(blockSumSq / (float) juce::jmax(1, n * 2));
+        constexpr float kSilenceThresh = 0.000316f; // -70 dBFS
+        if (blockRms < kSilenceThresh)
+            silenceSamples += n;
+        else
+            silenceSamples = 0;
+
+        const int silenceDecayStart = (int) (sampleRate * 2.0); // 2 s
+        const int silenceHardReset  = (int) (sampleRate * 10.0); // 10 s
+
+        if (silenceSamples > silenceHardReset)
+        {
+            reset();
+            silenceSamples = 0;
+            return; // nothing to render; buffer is already (near-)silent
+        }
+
+        // Per-block decay factor applied to comb feedback when watchdog active.
+        // 0.97 per block @ 512 samples ≈ -1.3 dB; tail falls below -60 dB in ~2 s.
+        float tailDecay = 1.0f;
+        if (silenceSamples > silenceDecayStart)
+            tailDecay = 0.96f;
+
+
+
         auto* L = buffer.getWritePointer(0);
         auto* R = nc > 1 ? buffer.getWritePointer(1) : L;
 
         const float dry = 1.0f - mix;
         const float wet = mix;
         const float w   = juce::jlimit(0.0f, 1.0f, width);
+
+        // Apply silence-watchdog decay: temporarily scale each comb's
+        // feedback for this block. recompute() restores the nominal value.
+        if (tailDecay < 0.999f)
+        {
+            for (auto& c : combL) c.feedback *= tailDecay;
+            for (auto& c : combR) c.feedback *= tailDecay;
+        }
+
+
 
         for (int i = 0; i < n; ++i)
         {
@@ -212,7 +259,9 @@ public:
         inputFiltL.reset(); inputFiltR.reset();
         sideLow.reset();
         duckEnv = 0.0f;
+        silenceSamples = 0;
     }
+
 
 private:
     struct OnePoleTone
@@ -337,9 +386,11 @@ private:
         for (auto& a : outApL) a.g = outG;
         for (auto& a : outApR) a.g = outG;
 
-        // size 0..1 -> RT60-ish feedback 0.50..0.88. Keeping the ceiling below
-        // runaway cathedral territory prevents chord tails from piling into mud.
-        const float fb = juce::jlimit(0.0f, 0.88f, 0.50f + size * 0.36f);
+        // size 0..1 -> RT60-ish feedback 0.50..0.82. Lowered ceiling from 0.88
+        // so reverb tails always decay to silence in finite time even when the
+        // host is paused but still calling processBlock with zero input.
+        const float fb = juce::jlimit(0.0f, 0.82f, 0.50f + size * 0.32f);
+
         // damping 0..1 maps to 1-pole coef toward 1 (more dark)
         const float dampCoef = juce::jlimit(0.0f, 0.93f, damping * 0.93f);
 
@@ -398,4 +449,6 @@ private:
     float lowMonoHz = 300.0f, lowStereoWidth = 0.08f;
     Character character = Character::Studio;
     bool dirty = true;
+    int silenceSamples = 0; // input-silence counter for tail watchdog
 };
+
