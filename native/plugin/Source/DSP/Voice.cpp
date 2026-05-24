@@ -554,10 +554,11 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
                          * fmAmount * 0.1f;
             }
 
+            const float bDt = (float) (bHz / sampleRate);
             oscBPhase += bHz / sampleRate;
             if (oscBPhase > 1.0) oscBPhase -= 1.0;
             const float ph = (float) oscBPhase + fmOffset;
-            oscBOut = renderOscShape(oscBWave, ph - std::floor(ph), oscBPulseWidth) * oscBLevel;
+            oscBOut = renderOscShapeAA(oscBWave, ph - std::floor(ph), oscBPulseWidth, bDt) * oscBLevel;
             // Gentle HP carve so Osc B body does not muddy the sample low end.
             oscBOut = oscBHp.process(oscBOut);
         }
