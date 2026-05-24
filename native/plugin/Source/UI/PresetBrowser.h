@@ -192,45 +192,16 @@ private:
         return k;
     }
 
-    /** Map a preset to one of the broad categories. The folder hint wins
-        whenever it matches a known bucket — that way dropping a file into
-        Samples/Presets/User/Pads always lands in "Pads" regardless of its filename. */
+    /** Map a preset to a category. The folder hint always wins so the browser
+        mirrors the user's folder structure under Samples/Presets/User/ exactly
+        as named — no consolidation of similar-sounding folders. */
     static juce::String classify(const juce::String& nameIn, const juce::String& hintCat)
     {
-        // 1) Folder hint takes priority — known bucket match.
-        for (auto& c : categoryOrder())
-            if (c.equalsIgnoreCase(hintCat)) return c;
+        // Folder hint wins verbatim — preserves the user's exact folder name
+        // so "Guitars" and "Electric Guitars" stay as separate tabs.
+        if (hintCat.trim().isNotEmpty()) return hintCat.trim();
 
-        // 1b) Folder hints like "Trap Brass" or "Sad Piano" are descriptive
-        //     child folders, not new browser sections. Keep them in the broad
-        //     instrument bucket the user expects.
-        const auto h = hintCat.toLowerCase();
-        auto hintAny = [&](std::initializer_list<const char*> kws) {
-            for (auto* k : kws) if (h.contains(k)) return true;
-            return false;
-        };
-        if (hintAny({"piano", "grand", "upright", "rhodes", "wurli"}))      return "Pianos";
-        if (hintAny({"guitar", "nylon", "strat", "tele", "acoustic"}))      return "Guitars";
-        if (hintAny({"choir", "vocal", "vox", "ahh", "ooh", "voice"}))      return "Choirs";
-        if (hintAny({"violin", "viola", "cello", "orchestra", "string"}))   return "Strings";
-        if (hintAny({"brass", "trumpet", "trombone", "horn", "tuba", "sax"})) return "Brass";
-        if (hintAny({"flute", "clarinet", "oboe", "bassoon", "wind"}))      return "Winds";
-        if (hintAny({"bell", "mallet", "music box", "chime", "glock"}))     return "Bells";
-        if (hintAny({"pluck"}))                                              return "Plucks";
-        if (hintAny({"pad", "ambient", "atmosphere", "drone"}))             return "Pads";
-        if (hintAny({"lead", "solo"}))                                       return "Leads";
-        if (hintAny({"bass", "808", "sub"}))                                return "Bass";
-        if (hintAny({"drum", "kick", "snare", "clap", "hat", "perc", "tom", "cymbal"})) return "Drums";
-        if (hintAny({"fx", "texture", "noise", "sweep", "riser", "impact", "hit"})) return "FX";
-        if (hintAny({"key", "ep", "organ", "clav"}))                        return "Keys";
-        if (hintAny({"synth"}))                                              return "Synths";
-
-        // 1c) Unknown but non-empty folder hint: preserve the user's exact
-        //     folder name so custom folders under Samples/Presets/User/
-        //     appear as their own category tab labelled as typed.
-        if (hintCat.trim().isNotEmpty()) return hintCat;
-
-        // 2) Otherwise infer from the preset name.
+        // No folder hint: infer a bucket from the preset name as a fallback.
         const auto n = nameIn.toLowerCase();
         auto any = [&](std::initializer_list<const char*> kws) {
             for (auto* k : kws) if (n.contains(k)) return true;
