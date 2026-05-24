@@ -523,9 +523,10 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             }
             else
             {
+                const float dt = (float) (f / sampleRate);
                 sineFallbackPhase += f / sampleRate;
                 if (sineFallbackPhase > 1.0) sineFallbackPhase -= 1.0;
-                const float v = renderOscShape(oscAWave, (float) sineFallbackPhase, oscAPulseWidth) * 0.5f;
+                const float v = renderOscShapeAA(oscAWave, (float) sineFallbackPhase, oscAPulseWidth, dt) * 0.5f;
                 sampL += v; sampR += v;
             }
         }
