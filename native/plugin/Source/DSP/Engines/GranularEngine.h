@@ -88,7 +88,7 @@ private:
         float  gainL = 0.7f, gainR = 0.7f;
     };
 
-    template<class Rng, class Dist>
+    template<class Dist>
     void spawnGrain(int sizeSamples, float pitchHz, Dist& u, Dist& p01_) {
         juce::ignoreUnused(pitchHz);
         for (auto& g : grains)
