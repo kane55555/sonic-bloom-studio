@@ -651,9 +651,7 @@ void PresetManager::loadPreset(int index)
         if (! resolved.isDirectory())
         {
             resolved = dida::userpreset::resolveSourcePath(up.source.path);
-            if (resolved.isDirectory()
-                && ! pathLivesInCategory(resolved, effectiveCategory)
-                && ! pathLivesInCategory(resolved, up.category))
+            if (resolved.isDirectory() && ! pathLivesInCategory(resolved, effectiveCategory))
             {
                 didaPresetManagerLog("diapreset source outside folder category ignored path="
                     + resolved.getFullPathName() + " category=" + effectiveCategory);
