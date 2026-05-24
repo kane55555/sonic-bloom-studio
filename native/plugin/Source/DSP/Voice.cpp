@@ -509,27 +509,95 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             const double totalCents = (double) oscADetuneCents + (double) extraCentsNow();
             const double f = midiToHzD((double) currentMidiNote + (double) pitchOffsetSemis
                                        + totalCents / 100.0);
-            if (unisonRenderVoices > 1)
-            {
-                // True unison stack — supersaw-style. Uses Osc A waveform when saw/square/triangle.
-                auto shape = dida::UnisonEngine::Shape::Saw;
-                if (oscAWave == Oscillator::Waveform::Square || oscAWave == Oscillator::Waveform::Pulse)
-                    shape = dida::UnisonEngine::Shape::Square;
-                else if (oscAWave == Oscillator::Waveform::Triangle)
-                    shape = dida::UnisonEngine::Shape::Triangle;
-                float ul = 0.0f, ur = 0.0f;
-                unison.renderSample((float) f, shape, ul, ur);
-                sampL += ul * 0.5f; sampR += ur * 0.5f;
-            }
-            else
-            {
-                const float dt = (float) (f / sampleRate);
+            const float dt = (float) (f / sampleRate);
+            float synL = 0.0f, synR = 0.0f;
+
+            auto renderSubtractive = [&]() {
+                if (unisonRenderVoices > 1)
+                {
+                    auto shape = dida::UnisonEngine::Shape::Saw;
+                    if (oscAWave == Oscillator::Waveform::Square || oscAWave == Oscillator::Waveform::Pulse)
+                        shape = dida::UnisonEngine::Shape::Square;
+                    else if (oscAWave == Oscillator::Waveform::Triangle)
+                        shape = dida::UnisonEngine::Shape::Triangle;
+                    unison.renderSample((float) f, shape, synL, synR);
+                    synL *= 0.5f; synR *= 0.5f;
+                }
+                else
+                {
+                    sineFallbackPhase += f / sampleRate;
+                    if (sineFallbackPhase > 1.0) sineFallbackPhase -= 1.0;
+                    const float v = renderOscShapeAA(oscAWave, (float) sineFallbackPhase, oscAPulseWidth, dt) * 0.5f;
+                    synL = synR = v;
+                }
+            };
+
+            // 2-op FM: op1 modulates op2 (sine carrier). fmAmount = modulation
+            // index (0..12 in voice units → 0..~1.2 here); fmRatio = mod/carrier.
+            auto renderFM = [&](int ops) {
+                const float idx = juce::jlimit(0.0f, 1.5f, fmAmount * 0.1f);
+                fmModPhase += (f * fmRatio) / sampleRate;
+                if (fmModPhase >= 1.0) fmModPhase -= 1.0;
+                const float mod1 = std::sin((float) fmModPhase * juce::MathConstants<float>::twoPi);
+                float modSum = mod1 * idx;
+                if (ops >= 4)
+                {
+                    // 2 additional modulators at 2x and 0.5x ratio, chained.
+                    oscBPhase += (f * fmRatio * 2.0f) / sampleRate;
+                    if (oscBPhase >= 1.0) oscBPhase -= 1.0;
+                    const float mod2 = std::sin((float) oscBPhase * juce::MathConstants<float>::twoPi + mod1 * idx * 0.5f);
+                    subPhase += (f * fmRatio * 0.5f) / sampleRate;
+                    if (subPhase >= 1.0) subPhase -= 1.0;
+                    const float mod3 = std::sin((float) subPhase * juce::MathConstants<float>::twoPi);
+                    modSum = (mod1 + mod2 * 0.7f + mod3 * 0.5f) * idx;
+                }
                 sineFallbackPhase += f / sampleRate;
                 if (sineFallbackPhase > 1.0) sineFallbackPhase -= 1.0;
-                const float v = renderOscShapeAA(oscAWave, (float) sineFallbackPhase, oscAPulseWidth, dt) * 0.5f;
-                sampL += v; sampR += v;
+                const float carrier = std::sin((float) sineFallbackPhase
+                    * juce::MathConstants<float>::twoPi + modSum);
+                synL = synR = carrier * 0.5f;
+            };
+
+            // Wavetable: morph sine → triangle → saw → square by macro position
+            // (use oscAPulseWidth as morph 0..1 if no dedicated parameter).
+            auto renderWavetable = [&]() {
+                sineFallbackPhase += f / sampleRate;
+                if (sineFallbackPhase > 1.0) sineFallbackPhase -= 1.0;
+                const float ph = (float) sineFallbackPhase;
+                const float morph = juce::jlimit(0.0f, 1.0f, oscAPulseWidth);
+                const float s1 = std::sin(ph * juce::MathConstants<float>::twoPi);
+                const float s2 = 4.0f * std::abs(ph - std::floor(ph + 0.5f)) - 1.0f;
+                const float s3 = 2.0f * ph - 1.0f - polyBLEP(ph, dt);
+                const float s4 = (ph < 0.5f ? 1.0f : -1.0f) + polyBLEP(ph, dt)
+                               - polyBLEP(ph + 0.5f - std::floor(ph + 0.5f), dt);
+                const float seg = morph * 3.0f;
+                const int   i0  = juce::jlimit(0, 2, (int) seg);
+                const float f0  = seg - (float) i0;
+                const float frames[4] = { s1, s2, s3, s4 };
+                synL = synR = (frames[i0] * (1.0f - f0) + frames[i0 + 1] * f0) * 0.5f;
+            };
+
+            // Layered: subtractive + sine sub-octave + soft triangle on top.
+            auto renderLayered = [&]() {
+                renderSubtractive();
+                subPhase += (f * 0.5) / sampleRate;
+                if (subPhase >= 1.0) subPhase -= 1.0;
+                const float subS = std::sin((float) subPhase * juce::MathConstants<float>::twoPi) * 0.25f;
+                synL += subS; synR += subS;
+            };
+
+            switch (engineMode)
+            {
+                case EngineMode::FM2:      renderFM(2);       break;
+                case EngineMode::FM4:      renderFM(4);       break;
+                case EngineMode::Wavetable:renderWavetable(); break;
+                case EngineMode::Layered:  renderLayered();   break;
+                case EngineMode::Subtractive:
+                default:                   renderSubtractive(); break;
             }
+            sampL += synL; sampR += synR;
         }
+
 
 
         sampL *= oscALevel;
