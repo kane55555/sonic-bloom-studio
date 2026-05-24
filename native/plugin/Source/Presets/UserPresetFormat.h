@@ -175,6 +175,37 @@ struct UserPreset
     // Optional mod-matrix routings. Empty by default; preserved across
     // load/save even when entries aren't yet wired to engine destinations.
     juce::Array<ModMatrixEntry> modMatrix;
+
+    // ------- Multi-engine partials (v2 additive) -------
+    // Optional. If omitted, the plugin uses the legacy PCM/multisample path
+    // exactly as before (full backwards-compat for every existing preset).
+    //
+    // Each partial can pick its own engine ("pcm" | "analog" | "supersaw"
+    // | "fm" | "wavetable" | "granular") and gets its own filter, amp env,
+    // LFO, mod-matrix slots and pan/level. Up to 4 partials per tone.
+    //
+    // The default top-level `engineType` provides a hint for tools/UI when
+    // no partials are defined; absent => "pcm".
+    struct PartialBlock
+    {
+        bool          enabled    = false;
+        juce::String  engineType = "pcm";
+        float         level      = 1.0f;
+        float         pan        = 0.0f;
+        int           pitchSemis = 0;
+        float         fineCents  = 0.0f;
+        // Per-engine parameter bag — kept as raw juce::var so we can extend
+        // each engine without bumping the schema. Engines fall back to
+        // defaults for any missing keys.
+        juce::var     engineParams;
+        FilterBlockData filter;
+        AmpBlock        amp;
+        LfoBlock        lfo;
+        juce::Array<ModMatrixEntry> mods;
+    };
+
+    juce::String              engineType;   // optional; default "" => pcm
+    juce::Array<PartialBlock> partials;     // optional; up to 4
 };
 
 }} // namespace dida::userpreset
