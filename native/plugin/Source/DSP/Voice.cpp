@@ -713,6 +713,33 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         constexpr float kVoiceTrim = 0.5f;
         l *= kVoiceTrim; r *= kVoiceTrim;
 
+        // ---- Per-layer peak metering (cheap abs/max). Throttled log at end. ----
+        const float absSamp  = juce::jmax(std::fabs(sampL),  std::fabs(sampR));
+        const float absOscB  = std::fabs(oscBOut);
+        const float absSub   = std::fabs(subOut);
+        const float absNoise = juce::jmax(std::fabs(noiseOutL), std::fabs(noiseOutR));
+        const float absOut   = juce::jmax(std::fabs(l), std::fabs(r));
+        if (absSamp  > peakSamp)  peakSamp  = absSamp;
+        if (absOscB  > peakOscB)  peakOscB  = absOscB;
+        if (absSub   > peakSub)   peakSub   = absSub;
+        if (absNoise > peakNoise) peakNoise = absNoise;
+        if (absOut   > peakOut)   peakOut   = absOut;
+        if (++meterFrameCounter >= (int) sampleRate)
+        {
+            auto db = [](float v) { return 20.0f * std::log10(juce::jmax(1.0e-9f, v)); };
+            if (peakOut > 0.001f) // skip idle voices
+            {
+                juce::Logger::writeToLog(juce::String("[DIDITAGAIN voice peaks] samp=")
+                    + juce::String(db(peakSamp), 1)
+                    + " oscB=" + juce::String(db(peakOscB), 1)
+                    + " sub="  + juce::String(db(peakSub), 1)
+                    + " noise="+ juce::String(db(peakNoise), 1)
+                    + " out="  + juce::String(db(peakOut), 1) + " dBFS");
+            }
+            peakSamp = peakOscB = peakSub = peakNoise = peakOut = 0.0f;
+            meterFrameCounter = 0;
+        }
+
         if (numCh >= 2) { outputBuffer.addSample(0, s, l); outputBuffer.addSample(1, s, r); }
         else            { outputBuffer.addSample(0, s, 0.5f * (l + r)); }
 
