@@ -638,6 +638,13 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         driftPhase += driftInc;
         if (driftPhase >= 1.0) driftPhase -= 1.0;
 
+        // Per-voice output trim (-6 dB). This is the single biggest contributor
+        // to clean chord/poly playback: each voice contributes half the gain
+        // so 4-8 simultaneous notes stay well below 0 dBFS before the FX
+        // chain's master gain + limiter.
+        constexpr float kVoiceTrim = 0.5f;
+        l *= kVoiceTrim; r *= kVoiceTrim;
+
         if (numCh >= 2) { outputBuffer.addSample(0, s, l); outputBuffer.addSample(1, s, r); }
         else            { outputBuffer.addSample(0, s, 0.5f * (l + r)); }
 
