@@ -271,6 +271,10 @@ bool parseFile(const juce::File& file, UserPreset& out, juce::String& errorOut)
             pb.pan        = getF(v, "pan",        pb.pan);
             pb.pitchSemis = getI(v, "pitchSemis", pb.pitchSemis);
             pb.fineCents  = getF(v, "fineCents",  pb.fineCents);
+            pb.blendMode          = getS(v, "blendMode",          pb.blendMode);
+            pb.eqRole             = getS(v, "eqRole",             pb.eqRole);
+            pb.followMainEnvelope = getB(v, "followMainEnvelope", pb.followMainEnvelope);
+            pb.maxGainDb          = getF(v, "maxGainDb",          pb.maxGainDb);
             pb.engineParams = v.getProperty("engineParams", juce::var());
 
             auto pAmp = v.getProperty("amp", juce::var());
