@@ -50,32 +50,82 @@ static juce::String midiToNoteName(int midi)
     return juce::String(names[midi % 12]) + juce::String((midi / 12) - 1);
 }
 
-// Parse "Brass_C3" or "Brass_F#3_v90" out of a filename stem.
-// Returns true on success and fills root + hiVel (hiVel = 127 if not present).
+// Try to extract a root-note MIDI from an arbitrary token. Accepts the token
+// itself ("C3", "F#4", "Bb2") OR a trailing note suffix inside a larger token
+// ("xc2" -> "C2", "rr2c#3" -> "C#3", "saxaphoneA4" -> "A4"). Returns -1 if no
+// valid note is found.
+static int extractNoteFromToken(const juce::String& token)
+{
+    if (token.isEmpty()) return -1;
+
+    // Fast path: whole token parses.
+    int direct = noteNameToMidi(token);
+    if (direct >= 0) return direct;
+
+    // Find longest valid note suffix. Walk from each position to end and try.
+    // A note is [A-Ga-g][#b]?-?\d+, so scan from right looking for a digit run,
+    // then back up over optional '-', then accidental, then letter.
+    const int n = token.length();
+    int end = n;
+    // Trim trailing non-digits (e.g. "_v90" already split off; but be safe).
+    while (end > 0 && ! juce::CharacterFunctions::isDigit(token[end - 1])) --end;
+    if (end == 0) return -1;
+
+    int digitStart = end;
+    while (digitStart > 0 && juce::CharacterFunctions::isDigit(token[digitStart - 1])) --digitStart;
+    if (digitStart == end) return -1;
+
+    int letterPos = digitStart;
+    if (letterPos > 0 && token[letterPos - 1] == '-') --letterPos; // negative octave sign
+    // optional accidental
+    int accPos = letterPos;
+    if (accPos > 0)
+    {
+        const auto c = token[accPos - 1];
+        if (c == '#' || c == 'b') --accPos;
+    }
+    if (accPos == 0) return -1;
+    const auto letter = juce::CharacterFunctions::toUpperCase(token[accPos - 1]);
+    if (letter < 'A' || letter > 'G') return -1;
+
+    // Make sure the char before the letter is not itself a letter (avoid
+    // pulling "C" out of "MIC2" -> would give C2 which is actually desired
+    // by the user, e.g. "saxaphone xc2"). So we DO allow letters before.
+    return noteNameToMidi(token.substring(accPos - 1, end));
+}
+
+// Parse a sample filename stem and extract the root-note MIDI plus an optional
+// velocity tag. Very permissive: "Brass_C3", "Brass_F#3_v90", "rr2 c2 234",
+// "piano_c2", "saxaphone xc2", "MyKit-C#4-RR1" all resolve correctly.
 static bool parseSampleName(const juce::String& stem, int& rootMidi, int& hiVel)
 {
     rootMidi = -1;
     hiVel = 127;
 
     auto tokens = juce::StringArray::fromTokens(stem, "_-. ", "");
+    tokens.removeEmptyStrings();
     if (tokens.isEmpty()) return false;
 
-    // Walk tokens right-to-left; first try to read an optional vNN, then the note.
-    int idx = tokens.size() - 1;
-
-    // Optional velocity token
-    auto& last = tokens.getReference(idx);
-    if (last.length() >= 2 && (last[0] == 'v' || last[0] == 'V')
-        && last.substring(1).containsOnly("0123456789"))
+    // Optional velocity token anywhere in the name (typically last).
+    for (int i = tokens.size() - 1; i >= 0; --i)
     {
-        hiVel = juce::jlimit(1, 127, last.substring(1).getIntValue());
-        --idx;
-        if (idx < 0) return false;
+        const auto& t = tokens.getReference(i);
+        if (t.length() >= 2 && (t[0] == 'v' || t[0] == 'V')
+            && t.substring(1).containsOnly("0123456789"))
+        {
+            hiVel = juce::jlimit(1, 127, t.substring(1).getIntValue());
+            tokens.remove(i);
+            break;
+        }
     }
 
-    // Note token
-    rootMidi = noteNameToMidi(tokens[idx]);
-    return rootMidi >= 0;
+    // Scan tokens right-to-left for the first one containing a parseable note.
+    for (int i = tokens.size() - 1; i >= 0; --i)
+    {
+        const int midi = extractNoteFromToken(tokens[i]);
+        if (midi >= 0) { rootMidi = midi; return true; }
+    }
+    return false;
 }
 
 //==============================================================================
