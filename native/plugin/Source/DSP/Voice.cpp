@@ -91,7 +91,10 @@ void SynthVoice::reset() noexcept
     oscBPhase = subPhase = fmModPhase = sineFallbackPhase = 0.0;
     pinkB0 = pinkB1 = pinkB2 = 0.0f;
     filter.reset();
+    for (auto& slot : partials_)
+        if (slot.engine) slot.engine->reset();
 }
+
 
 static double midiToHzD(double m) { return 440.0 * std::pow(2.0, (m - 69.0) / 12.0); }
 
