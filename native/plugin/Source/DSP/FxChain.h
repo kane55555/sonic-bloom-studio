@@ -83,6 +83,11 @@ public:
         // 8) Master gain trim
         masterGain.process(buffer);
 
+        // 8.5) Clip-warning instrumentation — log if any sample crosses the
+        //      brick-wall ceiling BEFORE the limiter saves us. Rate-limited
+        //      to 1 message per ~500ms so a runaway preset can't flood logs.
+        detectAndLogClipping(buffer);
+
         // 9) Final brick-wall safety limiter
         limiter.process(buffer);
     }
@@ -153,6 +158,34 @@ public:
     }
 
 private:
+    // Scan the post-master buffer for samples exceeding ~ -1 dB (0.891).
+    // Logs at most ~twice per second per chain instance.
+    void detectAndLogClipping(juce::AudioBuffer<float>& buffer) noexcept
+    {
+        constexpr float kClipThresh = 0.891251f; // -1 dBFS
+        float peak = 0.0f;
+        const int n = buffer.getNumSamples();
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        {
+            const auto* d = buffer.getReadPointer(ch);
+            for (int i = 0; i < n; ++i)
+            {
+                const float a = std::abs(d[i]);
+                if (a > peak) peak = a;
+            }
+        }
+        clipFramesSinceLog += n;
+        if (peak > kClipThresh && clipFramesSinceLog > 22050) // ~0.5s @ 44.1k
+        {
+            juce::Logger::writeToLog("[DIDITAGAIN clip] master peak="
+                + juce::String(juce::Decibels::gainToDecibels(peak), 2)
+                + " dBFS — limiter engaging");
+            clipFramesSinceLog = 0;
+        }
+    }
+
+    int clipFramesSinceLog = 100000;
+
     Saturation       sat;
     ChorusBlock      chorus;
     DelayBlock       delay;

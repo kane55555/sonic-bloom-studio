@@ -427,7 +427,9 @@ static int lfoShapeIndex(const juce::String& s)
 namespace {
 
 enum class Family {
-    PianoKeys, Lead, Pad, ChoirVox, Brass, Guitar, Bell, Pluck, Bass808, FxRiser, Other
+    PianoKeys, Lead, Pad, ChoirVox, Brass, Guitar, Bell, Pluck, Bass808, FxRiser,
+    Synth,   // vintage analog modeling presets — strict safety caps
+    Other
 };
 
 Family familyOf(const juce::String& categoryIn)
@@ -443,6 +445,7 @@ Family familyOf(const juce::String& categoryIn)
     if (c.contains("pluck"))                                             return Family::Pluck;
     if (c.contains("808")   || c.contains("bass") || c.contains("sub")) return Family::Bass808;
     if (c.contains("fx")    || c.contains("riser"))                     return Family::FxRiser;
+    if (c == "synth" || c.contains("vintage"))                          return Family::Synth;
     return Family::Other;
 }
 
@@ -461,6 +464,7 @@ juce::StringArray expectedParentsFor(Family f)
         case Family::Pluck:     return { "Plucks", "Synths" };
         case Family::Bass808:   return { "808", "Bass", "Subs" };
         case Family::FxRiser:   return { "FX", "Risers" };
+        case Family::Synth:     return { "Synths", "Synth", "Leads", "Pads" };
         default:                return {};
     }
 }
@@ -499,6 +503,8 @@ EnvRange envRangeFor(Family f)
         case Family::Pluck:     return { 0.0f,   0.005f, 0.10f, 0.40f, 0.00f, 0.25f, 0.20f, 0.80f };
         case Family::Bass808:   return { 0.0f,   0.005f, 0.10f, 0.40f, 0.85f, 1.00f, 0.10f, 0.60f };
         case Family::FxRiser:   return { 0.0f,   1.00f, 0.05f, 4.00f, 0.00f, 1.00f, 0.05f, 4.00f };
+        // Vintage synth presets: warm, soft, never clicky and never too long.
+        case Family::Synth:     return { 0.008f, 0.040f, 0.10f, 1.50f, 0.50f, 0.95f, 0.40f, 1.40f };
         default:                return { 0.0f,   2.00f, 0.01f, 4.00f, 0.00f, 1.00f, 0.01f, 6.00f };
     }
 }
@@ -519,6 +525,10 @@ FxLimits fxLimitsFor(Family f)
         case Family::Pluck:     return { 0.30f, 0.35f, 0.35f, 0.18f };
         case Family::Bass808:   return { 0.12f, 0.18f, 0.18f, 0.35f };
         case Family::FxRiser:   return { 0.60f, 0.70f, 0.70f, 0.60f };
+        // Vintage synth strict caps (chorus/delay/reverb/sat) — matches the
+        // "remove static, keep warm" spec. Saturation drive is also capped
+        // hard at 0.16 to stop layer-bus tanh from overdriving the chain.
+        case Family::Synth:     return { 0.18f, 0.10f, 0.18f, 0.16f };
         default:                return { 0.50f, 0.50f, 0.50f, 0.40f };
     }
 }
@@ -535,8 +545,15 @@ void applyLayerBusCharacter(juce::AudioProcessor& proc, const UserPreset& p, Fam
     const float movement = juce::jlimit(0.0f, 1.0f, p.macros.movement);
 
     bus.setEnabled(true);
-    bus.setSaturationDrive(0.08f + warmth * 0.30f);   // subtle analog glue
-    bus.setSaturationMix  (0.10f + warmth * 0.35f);
+    // Synth family gets much gentler glue so the shared tanh doesn't pile on
+    // top of per-voice saturation. Other families keep their original curve.
+    const bool synthFam = (fam == Family::Synth);
+    const float satDriveMax = synthFam ? 0.16f : 0.38f;
+    const float satMixMax   = synthFam ? 0.14f : 0.45f;
+    const float satDriveBase = synthFam ? 0.04f : 0.08f;
+    const float satMixBase   = synthFam ? 0.06f : 0.10f;
+    bus.setSaturationDrive(juce::jmin(satDriveMax, satDriveBase + warmth * (satDriveMax - satDriveBase)));
+    bus.setSaturationMix  (juce::jmin(satMixMax,   satMixBase   + warmth * (satMixMax   - satMixBase)));
 
     // Per-family width baseline (then macro nudges it).
     float baseWidth = 0.85f;
@@ -548,6 +565,7 @@ void applyLayerBusCharacter(juce::AudioProcessor& proc, const UserPreset& p, Fam
         case Family::Brass:     baseWidth = 0.80f; break;
         case Family::Guitar:    baseWidth = 0.78f; break;
         case Family::Bass808:   baseWidth = 0.35f; break; // narrow low end
+        case Family::Synth:     baseWidth = 0.80f; break;
         default: break;
     }
     bus.setWidth(juce::jlimit(0.0f, 1.4f, baseWidth * (0.6f + width * 0.8f)));
