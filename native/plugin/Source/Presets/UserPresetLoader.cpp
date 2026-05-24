@@ -789,6 +789,25 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
         + " chorusMix=" + juce::String(juce::jmin(p.chorus.mix, fxL.chorusMax), 2)
         + " macros.warmth=" + juce::String(p.macros.warmth, 2)
         + " macros.space="  + juce::String(p.macros.space, 2));
+
+    // Engine summary log — makes the active engine list visible in the host
+    // console so users can confirm which engine(s) a preset is exercising.
+    if (! p.partials.isEmpty() || p.engineType.isNotEmpty())
+    {
+        juce::StringArray engines;
+        if (! p.partials.isEmpty())
+        {
+            for (auto& pb : p.partials)
+                if (pb.enabled) engines.add(pb.engineType.isNotEmpty() ? pb.engineType : juce::String("pcm"));
+        }
+        else
+        {
+            engines.add(p.engineType);
+        }
+        didaUserPresetLog("engines name=" + p.presetName
+            + " active=[" + engines.joinIntoString(",") + "]"
+            + " partials=" + juce::String(p.partials.size()));
+    }
 }
 
 juce::String toJson(const UserPreset& p)
