@@ -9,6 +9,7 @@
 //==============================================================================
 #include <JuceHeader.h>
 #include <memory>
+#include <array>
 #include <random>
 #include "Oscillator.h"
 #include "FilterBlock.h"
@@ -18,6 +19,8 @@
 #include "Synthesis/HarmonicExciter.h"
 #include "Synthesis/StereoSpread.h"
 #include "Layers/LayerEQCarver.h"
+#include "Engines/IEngineSource.h"
+
 
 // Lightweight stand-ins so legacy editor/UI code that took an Oscillator&
 // reference still compiles. They route waveform/detune/pulse-width into the
@@ -76,6 +79,24 @@ public:
     void setExciterAmount(float a) noexcept       { exciter.setAmount(a); }
     void setStereoSpreadAmount(float a) noexcept  { spreader.setAmount(a); }
 
+    // ---- Multi-engine partials (additive, mixed before the filter) ----
+    struct PartialSlot
+    {
+        std::unique_ptr<dida::engines::IEngineSource> engine;
+        bool  enabled    = false;
+        float level      = 1.0f;
+        float pan        = 0.0f;
+        int   pitchSemis = 0;
+        float fineCents  = 0.0f;
+    };
+    static constexpr int kMaxPartials = 4;
+
+    void clearPartials() noexcept;
+    void setPartial(int idx,
+                    std::unique_ptr<dida::engines::IEngineSource> engine,
+                    bool enabled, float level, float pan,
+                    int pitchSemis, float fineCents) noexcept;
+    bool hasActivePartials() const noexcept;
 
     // --- Crop / loop metadata (fractions of the buffer length, 0..1) ---
     void setCropRange(float start01, float end01) noexcept {
@@ -89,6 +110,7 @@ public:
     void setLoopCrossfadeMs(float ms)    noexcept { loopCrossfadeMs = juce::jlimit(0.0f, 200.0f, ms); }
     void setOneShotMode(bool b)          noexcept { oneShotMode = b; }
     void setPitchTracking(bool b)        noexcept { pitchTracking = b; }
+
 
     // ---- Per-voice configuration ----
     void setEngineMode(EngineMode m)      noexcept { engineMode = m; }
@@ -230,8 +252,11 @@ private:
     int   unisonRenderVoices = 1;
     float unisonRenderDetune = 0.0f, unisonRenderSpread = 0.0f, unisonRenderDrift = 0.0f;
 
-
-
+    // Multi-engine partials and their scratch buffer (sized in prepare()).
+    std::array<PartialSlot, kMaxPartials> partials_;
+    juce::AudioBuffer<float> partialScratch;
+    int preparedBlockSize = 512;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SynthVoice)
+
 };

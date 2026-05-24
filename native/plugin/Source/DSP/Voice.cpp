@@ -18,9 +18,10 @@ SynthVoice::SynthVoice()
 
 bool SynthVoice::canPlaySound(juce::SynthesiserSound*) { return true; }
 
-void SynthVoice::prepare(double sr, int)
+void SynthVoice::prepare(double sr, int blockSize)
 {
     sampleRate = sr;
+    preparedBlockSize = juce::jmax(16, blockSize);
     filter.prepare(sr);
     ampEnv.prepare(sr);
     filterEnv.prepare(sr);
@@ -38,9 +39,42 @@ void SynthVoice::prepare(double sr, int)
     exciter.prepare(sr);
     spreader.prepare(sr);
 
+    partialScratch.setSize(2, preparedBlockSize, false, false, true);
+    for (auto& slot : partials_)
+        if (slot.engine) slot.engine->prepare(sampleRate, preparedBlockSize);
+
     recalcGlideCoeff();
     reset();
 }
+
+void SynthVoice::clearPartials() noexcept
+{
+    for (auto& slot : partials_) { slot.engine.reset(); slot.enabled = false; }
+}
+
+void SynthVoice::setPartial(int idx,
+                            std::unique_ptr<dida::engines::IEngineSource> engine,
+                            bool enabled, float level, float pan,
+                            int pitchSemis, float fineCents) noexcept
+{
+    if (idx < 0 || idx >= kMaxPartials) return;
+    auto& slot = partials_[(size_t) idx];
+    slot.engine     = std::move(engine);
+    slot.enabled    = enabled && slot.engine != nullptr;
+    slot.level      = juce::jlimit(0.0f, 4.0f, level);
+    slot.pan        = juce::jlimit(-1.0f, 1.0f, pan);
+    slot.pitchSemis = pitchSemis;
+    slot.fineCents  = fineCents;
+    if (slot.engine) slot.engine->prepare(sampleRate, preparedBlockSize);
+}
+
+bool SynthVoice::hasActivePartials() const noexcept
+{
+    for (auto& slot : partials_)
+        if (slot.enabled && slot.engine) return true;
+    return false;
+}
+
 
 void SynthVoice::recalcGlideCoeff() noexcept
 {
@@ -57,7 +91,10 @@ void SynthVoice::reset() noexcept
     oscBPhase = subPhase = fmModPhase = sineFallbackPhase = 0.0;
     pinkB0 = pinkB1 = pinkB2 = 0.0f;
     filter.reset();
+    for (auto& slot : partials_)
+        if (slot.engine) slot.engine->reset();
 }
+
 
 static double midiToHzD(double m) { return 440.0 * std::pow(2.0, (m - 69.0) / 12.0); }
 
@@ -154,6 +191,10 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
     ampEnv.noteOn();
     filterEnv.noteOn();
     modEnv.noteOn();
+
+    for (auto& slot : partials_)
+        if (slot.enabled && slot.engine)
+            slot.engine->noteOn(static_cast<int>(targetMidiNote), velocity);
 }
 
 void SynthVoice::stopNote(float, bool allowTailOff)
@@ -161,8 +202,11 @@ void SynthVoice::stopNote(float, bool allowTailOff)
     ampEnv.noteOff();
     filterEnv.noteOff();
     modEnv.noteOff();
+    for (auto& slot : partials_)
+        if (slot.enabled && slot.engine) slot.engine->noteOff();
     if (! allowTailOff) { clearCurrentNote(); reset(); }
 }
+
 
 void SynthVoice::pitchWheelMoved(int) {}
 void SynthVoice::controllerMoved(int, int) {}
@@ -289,8 +333,53 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         }
     };
 
+    // ---- Multi-engine partials: render block-rate into scratch, then mix
+    //      into the per-sample sample bus before the filter. PCM partials
+    //      render nothing (handled by the legacy sample path above).
+    const bool partialsActive = hasActivePartials();
+    if (partialsActive)
+    {
+        if (partialScratch.getNumSamples() < numSamples)
+            partialScratch.setSize(2, juce::jmax(numSamples, preparedBlockSize), false, false, true);
+        partialScratch.clear(0, numSamples);
+        auto* pL = partialScratch.getWritePointer(0);
+        auto* pR = partialScratch.getWritePointer(1);
+        dida::engines::ModSnapshot mod;
+        mod.velocity = velocity;
+        for (auto& slot : partials_)
+        {
+            if (! (slot.enabled && slot.engine)) continue;
+            if (slot.engine->type() == dida::engines::EngineType::Pcm) continue;
+            const double midi = (double) currentMidiNote + (double) slot.pitchSemis
+                              + (double) slot.fineCents / 100.0;
+            const float pitchHz = (float) midiToHzD(midi);
+            // Render additively into a private temp range so we can apply
+            // per-partial level/pan before summing into the shared scratch.
+            std::array<float, 2048> tL{}, tR{};
+            const int chunk = juce::jmin((int) tL.size(), numSamples);
+            int done = 0;
+            while (done < numSamples)
+            {
+                const int n = juce::jmin(chunk, numSamples - done);
+                std::fill_n(tL.data(), n, 0.0f);
+                std::fill_n(tR.data(), n, 0.0f);
+                slot.engine->renderAdd(tL.data(), tR.data(), n, pitchHz, mod);
+                const float panAng = (slot.pan + 1.0f) * 0.25f * juce::MathConstants<float>::pi;
+                const float gL = std::cos(panAng) * 1.41421356f * slot.level;
+                const float gR = std::sin(panAng) * 1.41421356f * slot.level;
+                for (int i = 0; i < n; ++i)
+                {
+                    pL[done + i] += tL[i] * gL;
+                    pR[done + i] += tR[i] * gR;
+                }
+                done += n;
+            }
+        }
+    }
+
     for (int s = startSample; s < startSample + numSamples; ++s)
     {
+
         if (glideCoeff > 0.0f)
             currentMidiNote = targetMidiNote + (currentMidiNote - targetMidiNote) * glideCoeff;
         else
@@ -333,6 +422,15 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             hiReadPos += hiStep;
             advanceLoop(*hiZone, hiReadPos, hiFinished);
         }
+
+        if (partialsActive)
+        {
+            const int idx = s - startSample;
+            sampL += partialScratch.getSample(0, idx);
+            sampR += partialScratch.getSample(1, idx);
+        }
+
+
 
         // Legacy synth fallback only for factory/pure-synth presets. Imported
         // hybrid presets disable this so a missing sample cannot masquerade as
@@ -478,7 +576,8 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
                                    && (hiZone == nullptr || hiFinished);
         // End the voice only when amp env is idle. If a sample finishes but
         // synth layers are still active, keep rendering until release.
-        const bool synthLayersSilent = (oscBLevel + subLevel + noiseLevel) < 0.0001f;
+        const bool synthLayersSilent = (oscBLevel + subLevel + noiseLevel) < 0.0001f
+                                     && ! partialsActive;
         if (! ampEnv.isActive()
             || (sampleSourceDone && multisample && hasSampleSource && synthLayersSilent))
         {
