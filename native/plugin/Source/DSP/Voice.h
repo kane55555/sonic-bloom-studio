@@ -79,16 +79,26 @@ public:
     void setExciterAmount(float a) noexcept       { exciter.setAmount(a); }
     void setStereoSpreadAmount(float a) noexcept  { spreader.setAmount(a); }
 
+    // ---- Multi-engine partials (additive, mixed before the filter) ----
+    struct PartialSlot
+    {
+        std::unique_ptr<dida::engines::IEngineSource> engine;
+        bool  enabled    = false;
+        float level      = 1.0f;
+        float pan        = 0.0f;
+        int   pitchSemis = 0;
+        float fineCents  = 0.0f;
+    };
+    static constexpr int kMaxPartials = 4;
 
-    // --- Crop / loop metadata (fractions of the buffer length, 0..1) ---
-    void setCropRange(float start01, float end01) noexcept {
-        cropStartFrac = juce::jlimit(0.0f, 1.0f, start01);
-        cropEndFrac   = juce::jlimit(cropStartFrac, 1.0f, end01);
-    }
-    void setLoopRange(float lstart01, float lend01) noexcept {
-        loopStartFrac = juce::jlimit(0.0f, 1.0f, lstart01);
-        loopEndFrac   = juce::jlimit(loopStartFrac, 1.0f, lend01);
-    }
+    void clearPartials() noexcept;
+    void setPartial(int idx,
+                    std::unique_ptr<dida::engines::IEngineSource> engine,
+                    bool enabled, float level, float pan,
+                    int pitchSemis, float fineCents) noexcept;
+    bool hasActivePartials() const noexcept;
+
+
     void setLoopCrossfadeMs(float ms)    noexcept { loopCrossfadeMs = juce::jlimit(0.0f, 200.0f, ms); }
     void setOneShotMode(bool b)          noexcept { oneShotMode = b; }
     void setPitchTracking(bool b)        noexcept { pitchTracking = b; }
