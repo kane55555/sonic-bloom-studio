@@ -33,6 +33,11 @@ void SynthVoice::prepare(double sr, int)
     subLp.prepare(sr);  subLp.setMode (OnePoleCarver::Mode::LowPass);  subLp.setCutoff(260.0f);
     oscBHp.prepare(sr); oscBHp.setMode(OnePoleCarver::Mode::HighPass); oscBHp.setCutoff(110.0f);
 
+    unison.prepare(sr);
+    unison.setConfig(unisonRenderVoices, unisonRenderDetune, unisonRenderSpread, unisonRenderDrift);
+    exciter.prepare(sr);
+    spreader.prepare(sr);
+
     recalcGlideCoeff();
     reset();
 }
@@ -142,6 +147,9 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
 
     noiseHpL.reset(); noiseHpR.reset();
     subLp.reset(); oscBHp.reset();
+    // Per-note phase scramble for the unison stack — anti-machine-gun.
+    unison.randomizePhasesAndDrift();
+
 
     ampEnv.noteOn();
     filterEnv.noteOn();
@@ -335,10 +343,25 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             const double totalCents = (double) oscADetuneCents + (double) extraCentsNow();
             const double f = midiToHzD((double) currentMidiNote + (double) pitchOffsetSemis
                                        + totalCents / 100.0);
-            sineFallbackPhase += f / sampleRate;
-            if (sineFallbackPhase > 1.0) sineFallbackPhase -= 1.0;
-            const float v = renderOscShape(oscAWave, (float) sineFallbackPhase, oscAPulseWidth) * 0.5f;
-            sampL += v; sampR += v;
+            if (unisonRenderVoices > 1)
+            {
+                // True unison stack — supersaw-style. Uses Osc A waveform when saw/square/triangle.
+                auto shape = dida::UnisonEngine::Shape::Saw;
+                if (oscAWave == Oscillator::Waveform::Square || oscAWave == Oscillator::Waveform::Pulse)
+                    shape = dida::UnisonEngine::Shape::Square;
+                else if (oscAWave == Oscillator::Waveform::Triangle)
+                    shape = dida::UnisonEngine::Shape::Triangle;
+                float ul = 0.0f, ur = 0.0f;
+                unison.renderSample((float) f, shape, ul, ur);
+                sampL += ul * 0.5f; sampR += ur * 0.5f;
+            }
+            else
+            {
+                sineFallbackPhase += f / sampleRate;
+                if (sineFallbackPhase > 1.0) sineFallbackPhase -= 1.0;
+                const float v = renderOscShape(oscAWave, (float) sineFallbackPhase, oscAPulseWidth) * 0.5f;
+                sampL += v; sampR += v;
+            }
         }
 
 
@@ -436,6 +459,12 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         l *= panL;
         r *= panR;
 
+
+        // Premium tone stages: harmonic exciter + Haas/M-S stereo spread.
+        // Both are no-ops at amount 0, so CPU cost stays near zero for
+        // categories that don't request them (e.g. pianos, 808s).
+        exciter.process(l, r);
+        spreader.process(l, r);
 
         // Advance slow analog drift phase.
         driftPhase += driftInc;
