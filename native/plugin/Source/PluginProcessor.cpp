@@ -585,11 +585,13 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     fx.setDelayTime(getF("fxDelayTime"));
     fx.setDelayFeedback(getF("fxDelayFeedback"));
 
-    fx.setReverbMix (directMonitor ? 0.0f
-                                   : (presetMacrosActive ? clamp01(getF("fxReverbMix"))
-                                                         : clamp01(getF("fxReverbMix")  + m7 * 0.6f)));
-    fx.setReverbSize(presetMacrosActive ? clamp01(getF("fxReverbSize"))
-                                        : clamp01(getF("fxReverbSize") + m5 * 0.5f));
+    const float reverbMix = directMonitor ? 0.0f
+        : (presetMacrosActive ? clamp01(getF("fxReverbMix"))
+                              : clamp01(getF("fxReverbMix") + m7 * 0.25f));
+    const float reverbSize = presetMacrosActive ? clamp01(getF("fxReverbSize"))
+                                                : clamp01(getF("fxReverbSize") + m5 * 0.20f);
+    fx.setReverbMix (juce::jlimit(0.0f, 0.45f, reverbMix));
+    fx.setReverbSize(juce::jlimit(0.0f, 0.78f, reverbSize));
 
     fx.setChorusMode(static_cast<int>(getF("chorusMode")));
     fx.setEqLowDb (getF("eqLow"));
@@ -647,18 +649,25 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                 stoppedBlocks++;
                 const double sr = getSampleRate() > 0 ? getSampleRate() : 44100.0;
                 const int blockSamples = juce::jmax(1, buffer.getNumSamples());
-                const int blocksFor500ms = (int) (0.5 * sr / blockSamples);
-                if (stoppedBlocks == blocksFor500ms
-                    && ! synthEngine.hasActiveVoices()
-                    && ! synthEngine.hasHeldNotes())
+                const int blocksFor120ms = juce::jmax(1, (int) (0.12 * sr / blockSamples));
+                const int blocksFor700ms = juce::jmax(blocksFor120ms + 1, (int) (0.70 * sr / blockSamples));
+
+                if (stoppedBlocks >= blocksFor120ms)
+                    synthEngine.getFx().notifyTransportStopped(blockSamples);
+
+                if (stoppedBlocks == blocksFor700ms)
                 {
+                    synthEngine.allNotesOff(0, false);
+                    synthEngine.clearHeldNotes();
+                    synthEngine.forEachSynthVoice([](SynthVoice& v) { v.resetNote(); });
                     synthEngine.getFx().reset();
-                    didaAudioLog("transport stopped — flushed FX tails");
+                    didaAudioLog("transport stopped — killed voices and flushed FX tails");
                 }
             }
             else
             {
                 stoppedBlocks = 0;
+                synthEngine.getFx().notifyTransportPlaying();
             }
         }
     }

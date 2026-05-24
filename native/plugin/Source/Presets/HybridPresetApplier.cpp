@@ -298,7 +298,7 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
 
     // ---- Layer 3 noise / air ----
     if (airLayer != nullptr && airLayer->enabled)
-        setFloat(processor, "noiseLevel", airLayer->volume);
+        setFloat(processor, "noiseLevel", juce::jlimit(0.0f, 0.18f, airLayer->volume * 0.45f));
     else
         setFloat(processor, "noiseLevel", 0.0f);
 
@@ -334,8 +334,8 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
     setFloat (processor, "filter1Drive",     p.globalFilter.drive);
 
     // ---- Effects ----
-    setFloat(processor, "fxReverbMix",        p.effects.reverbEnabled ? p.effects.reverbMix : 0.0f);
-    setFloat(processor, "fxReverbSize",       p.effects.reverbSize);
+    setFloat(processor, "fxReverbMix",        p.effects.reverbEnabled ? juce::jlimit(0.0f, 0.38f, p.effects.reverbMix) : 0.0f);
+    setFloat(processor, "fxReverbSize",       juce::jlimit(0.0f, 0.72f, p.effects.reverbSize));
     setFloat(processor, "fxDelayMix",         p.effects.delayEnabled  ? p.effects.delayMix  : 0.0f);
     setFloat(processor, "fxDelayFeedback",    p.effects.delayFb);
     setFloat(processor, "fxChorusMix",        p.effects.chorusEnabled ? p.effects.chorusMix : 0.0f);

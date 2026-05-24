@@ -661,7 +661,10 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         // - Sub: hard mono.
         // - Noise (air): wide (25-40%).
         const float oscBSideGain = 0.18f;   // ~18% side
-        const float noiseSideGain = 0.35f;  // ~35% side
+        const float noiseSideGain = 0.22f;  // air stays present, not splashy
+        constexpr float kAirLayerTrim = 0.38f;
+        noiseOutL *= kAirLayerTrim;
+        noiseOutR *= kAirLayerTrim;
         float l = sampL + subOut + oscBOut + noiseOutL * (1.0f + noiseSideGain);
         float r = sampR + subOut + oscBOut + noiseOutR * (1.0f - noiseSideGain);
         // Push a small portion of Osc B opposite-side for body width.

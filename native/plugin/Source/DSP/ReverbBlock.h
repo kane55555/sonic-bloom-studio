@@ -69,7 +69,11 @@ public:
 
     void process(juce::AudioBuffer<float>& buffer) noexcept
     {
-        if (mix <= 0.0001f) return;
+        if (mix <= 0.0001f)
+        {
+            reset();
+            return;
+        }
         if (dirty) recompute();
 
         const int n = buffer.getNumSamples();
@@ -77,10 +81,9 @@ public:
         if (n <= 0 || nc <= 0) return;
 
         // ---- Silence watchdog --------------------------------------------
-        // Track input RMS. If the input has been below -70 dBFS for more than
-        // ~2 seconds (host paused, no notes), exponentially decay the tank
-        // state so the wet tail can't ring forever. A full reset is forced
-        // after ~10s of continuous silence as a hard safety stop.
+        // Track input RMS. If the input has been below roughly -62 dBFS for a
+        // short time (host paused, no notes), aggressively drain the tank.
+        // A hard reset after ~2s prevents "endless cathedral" tails.
         float blockSumSq = 0.0f;
         {
             const auto* L0 = buffer.getReadPointer(0);
@@ -89,14 +92,21 @@ public:
                 blockSumSq += L0[i]*L0[i] + R0[i]*R0[i];
         }
         const float blockRms = std::sqrt(blockSumSq / (float) juce::jmax(1, n * 2));
-        constexpr float kSilenceThresh = 0.000316f; // -70 dBFS
+        constexpr float kSilenceThresh = 0.0008f; // about -62 dBFS
         if (blockRms < kSilenceThresh)
             silenceSamples += n;
         else
+        {
+            if (silenceSamples > 0)
+            {
+                dirty = true;
+                recompute();
+            }
             silenceSamples = 0;
+        }
 
-        const int silenceDecayStart = (int) (sampleRate * 2.0); // 2 s
-        const int silenceHardReset  = (int) (sampleRate * 10.0); // 10 s
+        const int silenceDecayStart = (int) (sampleRate * 0.25); // 250 ms
+        const int silenceHardReset  = (int) (sampleRate * 2.0);  // 2 s
 
         if (silenceSamples > silenceHardReset)
         {
@@ -106,10 +116,10 @@ public:
         }
 
         // Per-block decay factor applied to comb feedback when watchdog active.
-        // 0.97 per block @ 512 samples ≈ -1.3 dB; tail falls below -60 dB in ~2 s.
+        // Strong enough to audibly stop frozen tails without clicking.
         float tailDecay = 1.0f;
         if (silenceSamples > silenceDecayStart)
-            tailDecay = 0.96f;
+            tailDecay = 0.82f;
 
 
 
@@ -262,6 +272,29 @@ public:
         silenceSamples = 0;
     }
 
+    /** Called by the host when transport is stopped. It keeps a little tail
+        for musical stops, then rapidly drains and finally clears the tank. */
+    void notifyTransportStopped(int numSamples) noexcept
+    {
+        const int n = juce::jmax(1, numSamples);
+        silenceSamples += n;
+        if (silenceSamples > (int) (sampleRate * 1.0))
+        {
+            reset();
+            return;
+        }
+
+        const float decay = silenceSamples > (int) (sampleRate * 0.10) ? 0.72f : 0.88f;
+        for (auto& c : combL) c.decayState(decay);
+        for (auto& c : combR) c.decayState(decay);
+        for (auto& a : apL) a.decayState(decay);
+        for (auto& a : apR) a.decayState(decay);
+        for (auto& a : outApL) a.decayState(decay);
+        for (auto& a : outApR) a.decayState(decay);
+    }
+
+    void notifyTransportPlaying() noexcept { silenceSamples = 0; dirty = true; }
+
 
 private:
     struct OnePoleTone
@@ -305,6 +338,7 @@ private:
 
         void prepare(int sz) { size = std::max(1, sz); buf.assign((size_t) size, 0.0f); idx = 0; }
         void reset()         { std::fill(buf.begin(), buf.end(), 0.0f); idx = 0; }
+        void decayState(float g) noexcept { for (auto& x : buf) x *= g; }
         float process(float x) noexcept
         {
             const float bufOut = buf[(size_t) idx];
@@ -339,6 +373,11 @@ private:
             lfoPhase = 0.0f;
         }
         void reset() { std::fill(buf.begin(), buf.end(), 0.0f); writeIdx = 0; dampState = 0.0f; }
+        void decayState(float g) noexcept
+        {
+            for (auto& x : buf) x *= g;
+            dampState *= g;
+        }
 
         float process(float in) noexcept
         {
