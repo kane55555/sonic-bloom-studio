@@ -90,6 +90,13 @@ int SynthEngine::getActiveVoiceCount() const noexcept
     return count;
 }
 
+void SynthEngine::clearHeldNotes() noexcept
+{
+    for (auto& channel : heldNotes)
+        for (auto& note : channel)
+            note = {};
+}
+
 bool SynthEngine::canSafelyResetVoices() const noexcept
 {
     return ! hasHeldNotes() && ! hasActiveVoices();
