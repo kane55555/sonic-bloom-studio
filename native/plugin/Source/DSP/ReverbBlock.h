@@ -386,9 +386,11 @@ private:
         for (auto& a : outApL) a.g = outG;
         for (auto& a : outApR) a.g = outG;
 
-        // size 0..1 -> RT60-ish feedback 0.50..0.88. Keeping the ceiling below
-        // runaway cathedral territory prevents chord tails from piling into mud.
-        const float fb = juce::jlimit(0.0f, 0.88f, 0.50f + size * 0.36f);
+        // size 0..1 -> RT60-ish feedback 0.50..0.82. Lowered ceiling from 0.88
+        // so reverb tails always decay to silence in finite time even when the
+        // host is paused but still calling processBlock with zero input.
+        const float fb = juce::jlimit(0.0f, 0.82f, 0.50f + size * 0.32f);
+
         // damping 0..1 maps to 1-pole coef toward 1 (more dark)
         const float dampCoef = juce::jlimit(0.0f, 0.93f, damping * 0.93f);
 
