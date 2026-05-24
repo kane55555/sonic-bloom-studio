@@ -53,6 +53,15 @@ struct FilterBlockData
     float keytrack   = 0.0f;
 };
 
+// --- Blend mode (v2.1 additive) ---
+// Describes HOW a synth/oscillator layer is intended to sit relative to the
+// main PCM source. Drives sensible defaults for max gain, EQ carving and
+// envelope coupling so a "reinforcement" layer never escapes as a beep on
+// top of a sampled instrument.
+//
+// Recognised values (case-insensitive):
+//   "reinforceBody" "addWarmth" "addAir" "subSupport"
+//   "hiddenTexture" "leadLayer" ""(empty => engine picks per-category)
 struct LayerBlock
 {
     bool  enabled    = true;
@@ -61,6 +70,12 @@ struct LayerBlock
     int   octave     = 0;
     int   semitone   = 0;
     float detuneCents = 0.0f;
+
+    // v2.1 blend-mode contract (all optional; engine fills in defaults).
+    juce::String blendMode;          // "" => category default
+    juce::String eqRole;             // "body" | "warmth" | "air" | "sub" | "texture" | "" (auto)
+    bool         followMainEnvelope = true;
+    float        maxGainDb = 0.0f;   // 0 = use category default cap
 };
 
 struct FxChorusBlock   { bool enabled=false; float rateHz=0.4f; float depth=0.25f; float mix=0.0f; };
@@ -194,14 +209,17 @@ struct UserPreset
         float         pan        = 0.0f;
         int           pitchSemis = 0;
         float         fineCents  = 0.0f;
-        // Per-engine parameter bag — kept as raw juce::var so we can extend
-        // each engine without bumping the schema. Engines fall back to
-        // defaults for any missing keys.
         juce::var     engineParams;
         FilterBlockData filter;
         AmpBlock        amp;
         LfoBlock        lfo;
         juce::Array<ModMatrixEntry> mods;
+
+        // v2.1 blend-mode contract — see LayerBlock above for the value list.
+        juce::String blendMode;
+        juce::String eqRole;
+        bool         followMainEnvelope = true;
+        float        maxGainDb = 0.0f;
     };
 
     juce::String              engineType;   // optional; default "" => pcm
