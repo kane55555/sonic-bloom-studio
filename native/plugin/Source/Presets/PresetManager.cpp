@@ -67,6 +67,7 @@ void PresetManager::scanPresetDirectory()
     loadFactoryPresets();
     loadUserPresets();
     loadDiapresetFiles();
+    autoIndexUserInstrumentFolders();
 
     // Browser source of truth: only .diapreset files inside
     // <Samples>/Presets/User/<Category>/ should appear in the user-facing
