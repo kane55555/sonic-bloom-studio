@@ -449,4 +449,6 @@ private:
     float lowMonoHz = 300.0f, lowStereoWidth = 0.08f;
     Character character = Character::Studio;
     bool dirty = true;
+    int silenceSamples = 0; // input-silence counter for tail watchdog
 };
+
