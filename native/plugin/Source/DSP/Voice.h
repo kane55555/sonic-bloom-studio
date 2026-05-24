@@ -9,6 +9,7 @@
 //==============================================================================
 #include <JuceHeader.h>
 #include <memory>
+#include <array>
 #include <random>
 #include "Oscillator.h"
 #include "FilterBlock.h"
@@ -18,6 +19,8 @@
 #include "Synthesis/HarmonicExciter.h"
 #include "Synthesis/StereoSpread.h"
 #include "Layers/LayerEQCarver.h"
+#include "Engines/IEngineSource.h"
+
 
 // Lightweight stand-ins so legacy editor/UI code that took an Oscillator&
 // reference still compiles. They route waveform/detune/pulse-width into the
