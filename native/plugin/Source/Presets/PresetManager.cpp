@@ -205,8 +205,7 @@ static juce::File findCategorySourceFolder(const juce::File& userPresetRoot,
     if (! catDir.isDirectory()) return {};
 
     for (auto cursor = presetFile.getParentDirectory();
-         cursor.isDirectory() && cursor != catDir.getParentDirectory();
-         cursor = cursor.getParentDirectory())
+         cursor.isDirectory() && cursor != catDir.getParentDirectory();)
     {
         if (cursor == catDir)
         {
@@ -214,6 +213,10 @@ static juce::File findCategorySourceFolder(const juce::File& userPresetRoot,
             break;
         }
         if (folderHasMappedAudio(cursor, true)) return cursor;
+
+        const auto parent = cursor.getParentDirectory();
+        if (parent == cursor) break;
+        cursor = parent;
     }
 
     auto subdirs = catDir.findChildFiles(juce::File::findDirectories, true);
