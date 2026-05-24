@@ -1,8 +1,60 @@
 #include "HybridPresetApplier.h"
 #include "../PluginProcessor.h"
 #include "../DSP/SynthEngine.h"
+#include "../DSP/Voice.h"
 
 namespace dida { namespace preset {
+
+// Category tuning profile for the new hybrid-synth DSP. These four numbers
+// (unison voices, detune, stereo spread, harmonic exciter) decide whether a
+// preset sounds wide and supersaw-y (leads), slow and lush (pads), tight and
+// mono (808s), or warm and natural (pianos). They are applied per voice so
+// every preset in a category gets the right baseline character without
+// having to author per-preset DSP.
+struct CategoryDsp
+{
+    int   unisonVoices = 1;
+    float unisonDetune = 0.0f;
+    float stereoSpread = 0.0f;
+    float exciter      = 0.0f;
+    float drift        = 0.25f;
+};
+
+static CategoryDsp dspForCategory(const juce::String& categoryIn) noexcept
+{
+    const auto c = categoryIn.toLowerCase();
+    CategoryDsp d;
+    if (c.contains("lead") || c.contains("alien"))     { d = { 7, 0.55f, 0.85f, 0.45f, 0.30f }; }
+    else if (c.contains("pad") || c.contains("texture") || c.contains("ambient"))
+                                                       { d = { 5, 0.35f, 0.90f, 0.25f, 0.55f }; }
+    else if (c.contains("choir") || c.contains("vox")) { d = { 4, 0.20f, 0.75f, 0.20f, 0.40f }; }
+    else if (c.contains("brass") || c.contains("horn")|| c.contains("trumpet"))
+                                                       { d = { 3, 0.18f, 0.55f, 0.40f, 0.20f }; }
+    else if (c.contains("piano") || c.contains("keys")){ d = { 1, 0.00f, 0.10f, 0.18f, 0.15f }; }
+    else if (c.contains("guitar"))                     { d = { 2, 0.12f, 0.40f, 0.30f, 0.20f }; }
+    else if (c.contains("bell") || c.contains("pluck")|| c.contains("crystal"))
+                                                       { d = { 2, 0.10f, 0.30f, 0.22f, 0.20f }; }
+    else if (c.contains("808") || c.contains("sub") || c.contains("bass"))
+                                                       { d = { 1, 0.00f, 0.00f, 0.15f, 0.10f }; }
+    else                                               { d = { 2, 0.20f, 0.40f, 0.20f, 0.25f }; }
+    return d;
+}
+
+static void applyCategoryDsp(juce::AudioProcessor& proc, const juce::String& category)
+{
+    if (auto* dp = dynamic_cast<DiditagainProcessor*>(&proc))
+    {
+        const auto d = dspForCategory(category);
+        dp->getSynthEngine().forEachSynthVoice([d](SynthVoice& v)
+        {
+            v.setUnisonRender(d.unisonVoices, d.unisonDetune, d.stereoSpread, d.drift);
+            v.setExciterAmount(d.exciter);
+            v.setStereoSpreadAmount(d.stereoSpread);
+        });
+    }
+}
+
+
 
 // Map preset category to a reverb character voicing. Categories are matched
 // loosely (case-insensitive, substring) so V1/V2/imported names all hit.
