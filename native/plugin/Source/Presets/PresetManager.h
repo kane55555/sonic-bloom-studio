@@ -127,6 +127,10 @@ private:
     bool requestedPresetIsUserDiapreset = false;
     bool pendingUserDiapresetApply = false;
     dida::userpreset::UserPreset pendingUserDiapreset;
+    // Developer/debug-only: when true, raw sample folders under the Samples
+    // root and the Presets/User category folders also appear as presets in
+    // the browser. Default OFF — only .diapreset files are user-facing.
+    bool showSampleFoldersInBrowser = false;
 
     void loadFactoryPresets();
     void loadUserPresets();

@@ -730,9 +730,37 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     setParamById(proc, "filter1Drive",     p.filter.drive);
     setParamById(proc, "filter1KeyTrack",  p.filter.keytrack);
 
-    // -- Layer 2 (octave/detune routed onto Osc B controls)
+    // -- Layer 2 (octave/detune routed onto Osc B controls).
+    //
+    // Reinforcement-layer safety: for PCM/sample-based categories the
+    // oscillator layer is meant to thicken the sample, NOT sit on top as a
+    // pure sine beep. We hard-clamp the layer gain to -15 dB unless the
+    // preset is explicitly experimental or a true synth-lead/synth-only
+    // family (Synth/Lead/Bass808/FxRiser) where loud oscillator layers are
+    // legitimate.
+    const bool isPcmFamily =
+           fam == Family::PianoKeys || fam == Family::Pad
+        || fam == Family::ChoirVox  || fam == Family::Brass
+        || fam == Family::Guitar    || fam == Family::Bell
+        || fam == Family::Pluck     || fam == Family::Other;
+
+    float layer2GainDb = p.layer2.gainDb;
+    if (p.layer2.enabled && isPcmFamily && ! p.experimental)
+    {
+        const float kReinforcementMaxDb = -15.0f;
+        if (layer2GainDb > kReinforcementMaxDb)
+        {
+            juce::Logger::writeToLog(juce::String("[DIDITAGAIN layer-safety] preset=")
+                + p.presetName + " layer=layer2 reason=sine reinforcement too loud"
+                + " oldGain=" + juce::String(layer2GainDb, 1)
+                + " newGain=" + juce::String(kReinforcementMaxDb, 1)
+                + " category=" + p.category);
+            layer2GainDb = kReinforcementMaxDb;
+        }
+    }
+
     setParamById(proc, "oscBLevel",  p.layer2.enabled
-        ? juce::Decibels::decibelsToGain(p.layer2.gainDb) : 0.0f);
+        ? juce::Decibels::decibelsToGain(layer2GainDb) : 0.0f);
     setParamById(proc, "oscBOctave", static_cast<float>(p.layer2.octave));
     setParamById(proc, "oscBSemi",   static_cast<float>(p.layer2.semitone));
     setParamById(proc, "oscBDetune", p.layer2.detuneCents);

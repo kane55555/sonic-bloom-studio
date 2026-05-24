@@ -67,7 +67,26 @@ void PresetManager::scanPresetDirectory()
     loadFactoryPresets();
     loadUserPresets();
     loadDiapresetFiles();
-    loadDroppedSamples();
+
+    // Browser source of truth: only .diapreset files inside
+    // <Samples>/Presets/User/<Category>/ should appear in the user-facing
+    // browser. Raw sample folders under <Samples>/<Category>/<Folder>/ are
+    // hidden base instruments and must NOT show as presets. The legacy
+    // dropped-sample scan is preserved for developer/debug builds only.
+    if (showSampleFoldersInBrowser)
+        loadDroppedSamples();
+
+    int diapresetCount = 0;
+    juce::StringArray seenCats;
+    for (auto& p : presets)
+    {
+        if (p.isUserPreset) ++diapresetCount;
+        if (! seenCats.contains(p.category)) seenCats.add(p.category);
+    }
+    juce::Logger::writeToLog(juce::String("[DIDITAGAIN browser] visiblePresets=")
+        + juce::String(diapresetCount)
+        + " categories=" + juce::String(seenCats.size())
+        + " sampleFoldersExposed=" + juce::String(showSampleFoldersInBrowser ? 1 : 0));
 }
 
 // Parse a trailing note token like "C3", "F#4", "Gb2", "Fs4" from a filename
