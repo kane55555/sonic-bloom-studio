@@ -257,6 +257,10 @@ private:
     juce::AudioBuffer<float> partialScratch;
     int preparedBlockSize = 512;
 
+    // Per-layer peak metering — logged ~once per second per voice.
+    float peakSamp = 0.0f, peakOscB = 0.0f, peakSub = 0.0f, peakNoise = 0.0f, peakOut = 0.0f;
+    int   meterFrameCounter = 0;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SynthVoice)
 
 };
