@@ -259,7 +259,9 @@ public:
         inputFiltL.reset(); inputFiltR.reset();
         sideLow.reset();
         duckEnv = 0.0f;
+        silenceSamples = 0;
     }
+
 
 private:
     struct OnePoleTone
