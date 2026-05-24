@@ -252,8 +252,11 @@ private:
     int   unisonRenderVoices = 1;
     float unisonRenderDetune = 0.0f, unisonRenderSpread = 0.0f, unisonRenderDrift = 0.0f;
 
-
-
+    // Multi-engine partials and their scratch buffer (sized in prepare()).
+    std::array<PartialSlot, kMaxPartials> partials_;
+    juce::AudioBuffer<float> partialScratch;
+    int preparedBlockSize = 512;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SynthVoice)
+
 };
