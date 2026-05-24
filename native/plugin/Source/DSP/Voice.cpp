@@ -33,6 +33,11 @@ void SynthVoice::prepare(double sr, int)
     subLp.prepare(sr);  subLp.setMode (OnePoleCarver::Mode::LowPass);  subLp.setCutoff(260.0f);
     oscBHp.prepare(sr); oscBHp.setMode(OnePoleCarver::Mode::HighPass); oscBHp.setCutoff(110.0f);
 
+    unison.prepare(sr);
+    unison.setConfig(unisonRenderVoices, unisonRenderDetune, unisonRenderSpread, unisonRenderDrift);
+    exciter.prepare(sr);
+    spreader.prepare(sr);
+
     recalcGlideCoeff();
     reset();
 }
@@ -142,6 +147,9 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
 
     noiseHpL.reset(); noiseHpR.reset();
     subLp.reset(); oscBHp.reset();
+    // Per-note phase scramble for the unison stack — anti-machine-gun.
+    unison.randomizePhasesAndDrift();
+
 
     ampEnv.noteOn();
     filterEnv.noteOn();
