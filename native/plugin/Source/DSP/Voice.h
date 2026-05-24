@@ -194,6 +194,12 @@ private:
     double oscBPhase = 0.0;
     double subPhase  = 0.0;
     double fmModPhase = 0.0;
+    // Extra per-operator phases for FM4 serial algorithm (op4 -> op3 -> op2 -> carrier).
+    double fmOp3Phase = 0.0;
+    double fmOp4Phase = 0.0;
+    // Last-sample feedback memory for op1 (gives FM2/FM4 the metallic edge
+    // and prevents the carrier from collapsing back to a pure sine).
+    float  fmFeedbackZ = 0.0f;
     float fmAmount = 0.0f;
     float fmRatio  = 1.0f;
 

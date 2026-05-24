@@ -89,6 +89,8 @@ void SynthVoice::reset() noexcept
     loFinished = hiFinished = true;
     isActive = false;
     oscBPhase = subPhase = fmModPhase = sineFallbackPhase = 0.0;
+    fmOp3Phase = fmOp4Phase = 0.0;
+    fmFeedbackZ = 0.0f;
     pinkB0 = pinkB1 = pinkB2 = 0.0f;
     filter.reset();
     for (auto& slot : partials_)
@@ -167,6 +169,8 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
     loFinished = (loZone == nullptr);
     hiFinished = (hiZone == nullptr);
     oscBPhase = subPhase = fmModPhase = 0.0;
+    fmOp3Phase = fmOp4Phase = 0.0;
+    fmFeedbackZ = 0.0f;
 
     // ---- Per-layer micro-timing offsets (0.5..8 ms): each note picks new
     //      small random delays per support layer. Reduces the "stacked WAVs"
@@ -532,30 +536,60 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
                 }
             };
 
-            // 2-op FM: op1 modulates op2 (sine carrier). fmAmount = modulation
-            // index (0..12 in voice units → 0..~1.2 here); fmRatio = mod/carrier.
+            // ---- FM engine (DX-style) ----
+            //   ops=2  →  op2 (mod, with feedback) → op1 (sine carrier)
+            //   ops=4  →  op4 → op3 → op2 (with feedback) → op1 (sine carrier)
+            //
+            // fmAmount (0..12) is treated as a master modulation index;
+            // fmRatio is op2's ratio. op3 sits at 2x ratio, op4 at 3x.
+            // Each modulator's index is tapered down the chain so the tone
+            // stays musical instead of dissolving into noise, and op2 carries
+            // self-feedback that gives FM its bell/edge character. Output is
+            // gain-compensated so a high mod-index doesn't peak the bus.
             auto renderFM = [&](int ops) {
-                const float idx = juce::jlimit(0.0f, 1.5f, fmAmount * 0.1f);
-                fmModPhase += (f * fmRatio) / sampleRate;
-                if (fmModPhase >= 1.0) fmModPhase -= 1.0;
-                const float mod1 = std::sin((float) fmModPhase * juce::MathConstants<float>::twoPi);
-                float modSum = mod1 * idx;
+                const float twoPi = juce::MathConstants<float>::twoPi;
+                const float masterIdx = juce::jlimit(0.0f, 8.0f, fmAmount * 0.6f);
+                const float feedbackAmt = juce::jlimit(0.0f, 1.6f, masterIdx * 0.18f);
+
+                // op4 (only used for FM4)
+                float mod4 = 0.0f;
                 if (ops >= 4)
                 {
-                    // 2 additional modulators at 2x and 0.5x ratio, chained.
-                    oscBPhase += (f * fmRatio * 2.0f) / sampleRate;
-                    if (oscBPhase >= 1.0) oscBPhase -= 1.0;
-                    const float mod2 = std::sin((float) oscBPhase * juce::MathConstants<float>::twoPi + mod1 * idx * 0.5f);
-                    subPhase += (f * fmRatio * 0.5f) / sampleRate;
-                    if (subPhase >= 1.0) subPhase -= 1.0;
-                    const float mod3 = std::sin((float) subPhase * juce::MathConstants<float>::twoPi);
-                    modSum = (mod1 + mod2 * 0.7f + mod3 * 0.5f) * idx;
+                    fmOp4Phase += (f * fmRatio * 3.0f) / sampleRate;
+                    if (fmOp4Phase >= 1.0) fmOp4Phase -= 1.0;
+                    mod4 = std::sin((float) fmOp4Phase * twoPi) * (masterIdx * 0.45f);
                 }
+
+                // op3 (only used for FM4), modulated by op4
+                float mod3 = 0.0f;
+                if (ops >= 4)
+                {
+                    fmOp3Phase += (f * fmRatio * 2.0f) / sampleRate;
+                    if (fmOp3Phase >= 1.0) fmOp3Phase -= 1.0;
+                    mod3 = std::sin((float) fmOp3Phase * twoPi + mod4)
+                         * (masterIdx * 0.65f);
+                }
+
+                // op2 — main modulator with self-feedback (the DX edge).
+                fmModPhase += (f * fmRatio) / sampleRate;
+                if (fmModPhase >= 1.0) fmModPhase -= 1.0;
+                const float mod2 = std::sin((float) fmModPhase * twoPi
+                                            + mod3
+                                            + fmFeedbackZ * feedbackAmt)
+                                 * masterIdx;
+                fmFeedbackZ = mod2 / juce::jmax(0.0001f, masterIdx); // normalised -1..1
+
+                // op1 — sine carrier.
                 sineFallbackPhase += f / sampleRate;
                 if (sineFallbackPhase > 1.0) sineFallbackPhase -= 1.0;
-                const float carrier = std::sin((float) sineFallbackPhase
-                    * juce::MathConstants<float>::twoPi + modSum);
-                synL = synR = carrier * 0.5f;
+                const float carrier = std::sin((float) sineFallbackPhase * twoPi + mod2);
+
+                // Gain compensation: as mod index rises the harmonic spread
+                // widens and peak amplitude stays ~1.0, so a fixed 0.5 trim
+                // is enough; tame a touch more when feedback is heavy so the
+                // attack transient doesn't bite.
+                const float compensated = carrier * (0.50f / (1.0f + feedbackAmt * 0.25f));
+                synL = synR = compensated;
             };
 
             // Wavetable: morph sine → triangle → saw → square by macro position
