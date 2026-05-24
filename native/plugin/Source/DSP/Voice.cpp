@@ -333,8 +333,53 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         }
     };
 
+    // ---- Multi-engine partials: render block-rate into scratch, then mix
+    //      into the per-sample sample bus before the filter. PCM partials
+    //      render nothing (handled by the legacy sample path above).
+    const bool partialsActive = hasActivePartials();
+    if (partialsActive)
+    {
+        if (partialScratch.getNumSamples() < numSamples)
+            partialScratch.setSize(2, juce::jmax(numSamples, preparedBlockSize), false, false, true);
+        partialScratch.clear(0, numSamples);
+        auto* pL = partialScratch.getWritePointer(0);
+        auto* pR = partialScratch.getWritePointer(1);
+        dida::engines::ModSnapshot mod;
+        mod.velocity = velocity;
+        for (auto& slot : partials_)
+        {
+            if (! (slot.enabled && slot.engine)) continue;
+            if (slot.engine->type() == dida::engines::EngineType::Pcm) continue;
+            const double midi = (double) currentMidiNote + (double) slot.pitchSemis
+                              + (double) slot.fineCents / 100.0;
+            const float pitchHz = (float) midiToHzD(midi);
+            // Render additively into a private temp range so we can apply
+            // per-partial level/pan before summing into the shared scratch.
+            std::array<float, 2048> tL{}, tR{};
+            const int chunk = juce::jmin((int) tL.size(), numSamples);
+            int done = 0;
+            while (done < numSamples)
+            {
+                const int n = juce::jmin(chunk, numSamples - done);
+                std::fill_n(tL.data(), n, 0.0f);
+                std::fill_n(tR.data(), n, 0.0f);
+                slot.engine->renderAdd(tL.data(), tR.data(), n, pitchHz, mod);
+                const float panAng = (slot.pan + 1.0f) * 0.25f * juce::MathConstants<float>::pi;
+                const float gL = std::cos(panAng) * 1.41421356f * slot.level;
+                const float gR = std::sin(panAng) * 1.41421356f * slot.level;
+                for (int i = 0; i < n; ++i)
+                {
+                    pL[done + i] += tL[i] * gL;
+                    pR[done + i] += tR[i] * gR;
+                }
+                done += n;
+            }
+        }
+    }
+
     for (int s = startSample; s < startSample + numSamples; ++s)
     {
+
         if (glideCoeff > 0.0f)
             currentMidiNote = targetMidiNote + (currentMidiNote - targetMidiNote) * glideCoeff;
         else
