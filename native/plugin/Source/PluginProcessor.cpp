@@ -658,6 +658,7 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                 if (stoppedBlocks == blocksFor700ms)
                 {
                     synthEngine.allNotesOff(0, false);
+                    synthEngine.clearHeldNotes();
                     synthEngine.forEachSynthVoice([](SynthVoice& v) { v.resetNote(); });
                     synthEngine.getFx().reset();
                     didaAudioLog("transport stopped — killed voices and flushed FX tails");
