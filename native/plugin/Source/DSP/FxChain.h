@@ -83,6 +83,11 @@ public:
         // 8) Master gain trim
         masterGain.process(buffer);
 
+        // 8.5) Clip-warning instrumentation — log if any sample crosses the
+        //      brick-wall ceiling BEFORE the limiter saves us. Rate-limited
+        //      to 1 message per ~500ms so a runaway preset can't flood logs.
+        detectAndLogClipping(buffer);
+
         // 9) Final brick-wall safety limiter
         limiter.process(buffer);
     }
