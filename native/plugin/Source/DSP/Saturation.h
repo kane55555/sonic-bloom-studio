@@ -6,6 +6,7 @@
 //  All modes guarantee bounded output (|y| <= 1) so the limiter at the end
 //  of the FX chain never has to deal with runaway values.
 //==============================================================================
+#include <JuceHeader.h>
 #include <cmath>
 #include "UtilityDSP.h"
 
