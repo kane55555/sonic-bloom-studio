@@ -427,7 +427,9 @@ static int lfoShapeIndex(const juce::String& s)
 namespace {
 
 enum class Family {
-    PianoKeys, Lead, Pad, ChoirVox, Brass, Guitar, Bell, Pluck, Bass808, FxRiser, Other
+    PianoKeys, Lead, Pad, ChoirVox, Brass, Guitar, Bell, Pluck, Bass808, FxRiser,
+    Synth,   // vintage analog modeling presets — strict safety caps
+    Other
 };
 
 Family familyOf(const juce::String& categoryIn)
@@ -443,6 +445,7 @@ Family familyOf(const juce::String& categoryIn)
     if (c.contains("pluck"))                                             return Family::Pluck;
     if (c.contains("808")   || c.contains("bass") || c.contains("sub")) return Family::Bass808;
     if (c.contains("fx")    || c.contains("riser"))                     return Family::FxRiser;
+    if (c == "synth" || c.contains("vintage"))                          return Family::Synth;
     return Family::Other;
 }
 
