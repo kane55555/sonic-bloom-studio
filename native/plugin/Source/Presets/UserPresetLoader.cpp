@@ -446,6 +446,49 @@ juce::File resolveSourcePath(const juce::String& rawPath)
         return discovered;
     }
 
+    // Final fallback: if the preset's category folder (e.g. Samples/Synths/)
+    // exists, use ANY mapped sub-instrument the user dropped in there. This is
+    // what lets a user drop "Samples/Synths/My Juno/" and have every vintage
+    // synth preset automatically play it instead of falling through to the
+    // silent factory-synth path.
+    auto tryCategoryFolder = [&](const juce::String& name) -> juce::File
+    {
+        if (name.isEmpty()) return {};
+        auto dir = samplesRoot.getChildFile(name);
+        if (! dir.isDirectory()) return {};
+
+        auto subdirs = dir.findChildFiles(juce::File::findDirectories, false);
+        std::sort(subdirs.begin(), subdirs.end(), [](const juce::File& a, const juce::File& b)
+        {
+            return a.getFileName().compareNatural(b.getFileName()) < 0;
+        });
+        for (auto& sub : subdirs)
+            if (folderHasWavs(sub))
+                return sub;
+
+        if (folderHasWavs(dir))
+            return dir;
+
+        return {};
+    };
+
+    if (preferredParent.isNotEmpty())
+    {
+        for (auto& variant : { preferredParent,
+                               preferredParent.endsWithIgnoreCase("s")
+                                   ? preferredParent.dropLastCharacters(1)
+                                   : preferredParent + "s" })
+        {
+            auto picked = tryCategoryFolder(variant);
+            if (picked.isDirectory())
+            {
+                didaUserPresetLog("resolved missing source " + rawPath
+                    + " -> category fallback " + picked.getFullPathName());
+                return picked;
+            }
+        }
+    }
+
     return candidates.isEmpty() ? juce::File(expanded) : candidates.getFirst();
 }
 
