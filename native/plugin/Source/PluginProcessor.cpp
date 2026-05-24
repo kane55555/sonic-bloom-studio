@@ -567,8 +567,11 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
     const float driveAmt   = presetMacrosActive ? clamp01(getF("fxDistortionAmount"))
                                                 : clamp01(getF("fxDistortionAmount") + m6 * 0.6f);
+    const float satMixAmt  = clamp01(getF("fxSaturationMix"));
     fx.setSaturationDrive(driveAmt);
-    fx.setSaturationMix  (driveAmt > 0.0001f ? 1.0f : 0.0f);
+    // Use the real saturation mix parameter instead of forcing wet=1.0.
+    // Saturation becomes inaudible only when drive *or* mix is zero.
+    fx.setSaturationMix  (driveAmt > 0.0001f ? satMixAmt : 0.0f);
 
     const float chorusMix  = presetMacrosActive ? clamp01(getF("fxChorusMix"))
                                                 : clamp01(getF("fxChorusMix") + m2 * 0.5f);
