@@ -182,6 +182,19 @@ static bool folderHasMappedAudio(const juce::File& folder, bool recursive)
     return false;
 }
 
+// Looser: any audio file at all (used as a fallback when a folder contains
+// samples that aren't named with a midi-root suffix, e.g. "Alto Sax.wav").
+static bool folderHasAnyAudio(const juce::File& folder, bool recursive)
+{
+    if (! folder.isDirectory()) return false;
+    const auto files = folder.findChildFiles(juce::File::findFiles, recursive,
+                                             "*.wav;*.aif;*.aiff;*.flac;*.mp3;*.ogg");
+    for (auto& f : files)
+        if (! f.getFileNameWithoutExtension().endsWithIgnoreCase(".original"))
+            return true;
+    return false;
+}
+
 static bool pathLivesInCategory(const juce::File& folder, const juce::String& category)
 {
     if (! folder.isDirectory() || category.trim().isEmpty()) return false;
@@ -196,23 +209,37 @@ static bool pathLivesInCategory(const juce::File& folder, const juce::String& ca
     return false;
 }
 
+// Resolve the user's category folder tolerantly: exact name, then any
+// immediate child of userPresetRoot that matches via categoryNamesMatch
+// (covers plural/singular drift like "Saxophones" vs "Saxophone").
+static juce::File resolveCategoryDir(const juce::File& userPresetRoot, const juce::String& category)
+{
+    auto exact = userPresetRoot.getChildFile(category);
+    if (exact.isDirectory()) return exact;
+    for (auto& sub : userPresetRoot.findChildFiles(juce::File::findDirectories, false))
+        if (categoryNamesMatch(sub.getFileName(), category))
+            return sub;
+    return {};
+}
+
 static juce::File findCategorySourceFolder(const juce::File& userPresetRoot,
                                            const juce::String& category,
                                            const juce::String& preferredLeaf,
                                            const juce::File& presetFile)
 {
-    auto catDir = userPresetRoot.getChildFile(category);
+    auto catDir = resolveCategoryDir(userPresetRoot, category);
     if (! catDir.isDirectory()) return {};
 
+    // 1) Walk up from the preset file looking for the nearest folder with audio.
     for (auto cursor = presetFile.getParentDirectory();
          cursor.isDirectory() && cursor != catDir.getParentDirectory();)
     {
         if (cursor == catDir)
         {
-            if (folderHasMappedAudio(cursor, false)) return cursor;
+            if (folderHasAnyAudio(cursor, false)) return cursor;
             break;
         }
-        if (folderHasMappedAudio(cursor, true)) return cursor;
+        if (folderHasAnyAudio(cursor, true)) return cursor;
 
         const auto parent = cursor.getParentDirectory();
         if (parent == cursor) break;
@@ -224,14 +251,24 @@ static juce::File findCategorySourceFolder(const juce::File& userPresetRoot,
         return a.getFullPathName().compareNatural(b.getFullPathName()) < 0;
     });
 
+    // 2) Honour the preset's named source folder if it exists in this category.
     if (preferredLeaf.isNotEmpty())
         for (auto& sub : subdirs)
-            if (sub.getFileName().equalsIgnoreCase(preferredLeaf) && folderHasMappedAudio(sub, true))
+            if (sub.getFileName().equalsIgnoreCase(preferredLeaf)
+                && folderHasAnyAudio(sub, true))
                 return sub;
 
+    // 3) Prefer mapped audio (midi-root suffix) anywhere in the category.
     if (folderHasMappedAudio(catDir, false)) return catDir;
     for (auto& sub : subdirs)
         if (folderHasMappedAudio(sub, true))
+            return sub;
+
+    // 4) Final fallback — first subfolder with any audio (e.g. "Saxophone 1"),
+    //    matching the user's rule: "always link to instrument 1 in the folder".
+    if (folderHasAnyAudio(catDir, false)) return catDir;
+    for (auto& sub : subdirs)
+        if (folderHasAnyAudio(sub, true))
             return sub;
 
     return {};
@@ -691,6 +728,13 @@ void PresetManager::loadPreset(int index)
             for (auto& f : files)
                 if (parseRootMidiFromStem(f.getFileNameWithoutExtension()) >= 0)
                     requestedSampleSources.add(f.getFullPathName());
+
+            // Fallback: folder has audio but none follow the midi-root naming
+            // convention (e.g. "Alto Sax.wav"). Still route it — assume root C4.
+            if (requestedSampleSources.isEmpty())
+                for (auto& f : files)
+                    if (! f.getFileNameWithoutExtension().endsWithIgnoreCase(".original"))
+                        requestedSampleSources.add(f.getFullPathName());
 
             didaPresetManagerLog("found WAV count: " + juce::String(files.size()));
             didaPresetManagerLog("valid mapped WAV count: " + juce::String(requestedSampleSources.size()));
