@@ -67,7 +67,6 @@ void PresetManager::scanPresetDirectory()
     loadFactoryPresets();
     loadUserPresets();
     loadDiapresetFiles();
-    autoIndexUserInstrumentFolders();
 
     // Browser source of truth: only .diapreset files inside
     // <Samples>/Presets/User/<Category>/ should appear in the user-facing
@@ -159,6 +158,80 @@ static juce::File chooseRepresentativeMappedWav(const juce::Array<juce::File>& f
     }
 
     return chosen;
+}
+
+static bool categoryNamesMatch(const juce::String& a, const juce::String& b)
+{
+    const auto aa = a.trim();
+    const auto bb = b.trim();
+    if (aa.equalsIgnoreCase(bb)) return true;
+    if (aa.endsWithIgnoreCase("s") && aa.dropLastCharacters(1).equalsIgnoreCase(bb)) return true;
+    if (bb.endsWithIgnoreCase("s") && bb.dropLastCharacters(1).equalsIgnoreCase(aa)) return true;
+    return false;
+}
+
+static bool folderHasMappedAudio(const juce::File& folder, bool recursive)
+{
+    if (! folder.isDirectory()) return false;
+    const auto files = folder.findChildFiles(juce::File::findFiles, recursive,
+                                             "*.wav;*.aif;*.aiff;*.flac;*.mp3;*.ogg");
+    for (auto& f : files)
+        if (! f.getFileNameWithoutExtension().endsWithIgnoreCase(".original")
+            && parseRootMidiFromStem(f.getFileNameWithoutExtension()) >= 0)
+            return true;
+    return false;
+}
+
+static bool pathLivesInCategory(const juce::File& folder, const juce::String& category)
+{
+    if (! folder.isDirectory() || category.trim().isEmpty()) return false;
+    auto cursor = folder;
+    for (int guard = 0; guard < 24 && cursor.getFullPathName().isNotEmpty(); ++guard)
+    {
+        if (categoryNamesMatch(cursor.getFileName(), category)) return true;
+        const auto parent = cursor.getParentDirectory();
+        if (parent == cursor) break;
+        cursor = parent;
+    }
+    return false;
+}
+
+static juce::File findCategorySourceFolder(const juce::File& userPresetRoot,
+                                           const juce::String& category,
+                                           const juce::String& preferredLeaf,
+                                           const juce::File& presetFile)
+{
+    auto catDir = userPresetRoot.getChildFile(category);
+    if (! catDir.isDirectory()) return {};
+
+    for (auto cursor = presetFile.getParentDirectory();
+         cursor.isDirectory() && cursor != catDir.getParentDirectory();
+         cursor = cursor.getParentDirectory())
+    {
+        if (cursor == catDir)
+        {
+            if (folderHasMappedAudio(cursor, false)) return cursor;
+            break;
+        }
+        if (folderHasMappedAudio(cursor, true)) return cursor;
+    }
+
+    auto subdirs = catDir.findChildFiles(juce::File::findDirectories, true);
+    std::sort(subdirs.begin(), subdirs.end(), [](const juce::File& a, const juce::File& b) {
+        return a.getFullPathName().compareNatural(b.getFullPathName()) < 0;
+    });
+
+    if (preferredLeaf.isNotEmpty())
+        for (auto& sub : subdirs)
+            if (sub.getFileName().equalsIgnoreCase(preferredLeaf) && folderHasMappedAudio(sub, true))
+                return sub;
+
+    if (folderHasMappedAudio(catDir, false)) return catDir;
+    for (auto& sub : subdirs)
+        if (folderHasMappedAudio(sub, true))
+            return sub;
+
+    return {};
 }
 
 // Scan one "category root" directory. Each immediate subfolder is treated as
