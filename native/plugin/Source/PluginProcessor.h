@@ -72,6 +72,8 @@ private:
     int appliedPolyphony = SynthEngine::MAX_POLYPHONY;
     int debugBlockCounter = 0;
     int clipBlocksSinceLog = 0;
+    int stoppedBlocks = 0; // transport-stop counter for FX-tail flush
+
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(DiditagainProcessor)
 };
