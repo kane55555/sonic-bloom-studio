@@ -635,9 +635,8 @@ void PresetManager::loadPreset(int index)
 
         didaPresetManagerLog("loading diapreset: " + up.presetName);
 
-        const auto folderCategory = juce::File(info.filePath).getParentDirectory().getFileName();
-        const auto effectiveCategory = folderCategory.isNotEmpty()
-            ? folderCategory
+        const auto effectiveCategory = info.category.isNotEmpty()
+            ? info.category
             : (up.category.isNotEmpty() ? up.category : juce::String("User"));
         const auto sourceLeaf = juce::File(up.source.path.replaceCharacter('\\', '/')).getFileName();
 
