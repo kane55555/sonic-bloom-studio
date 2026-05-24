@@ -120,6 +120,16 @@ public:
         const float wet = mix;
         const float w   = juce::jlimit(0.0f, 1.0f, width);
 
+        // Apply silence-watchdog decay: temporarily scale each comb's
+        // feedback for this block. recompute() restores the nominal value.
+        if (tailDecay < 0.999f)
+        {
+            for (auto& c : combL) c.feedback *= tailDecay;
+            for (auto& c : combR) c.feedback *= tailDecay;
+        }
+
+
+
         for (int i = 0; i < n; ++i)
         {
             const float inL = L[i];
