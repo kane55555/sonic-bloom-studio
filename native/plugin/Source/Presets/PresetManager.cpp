@@ -640,23 +640,28 @@ void PresetManager::loadPreset(int index)
             : (up.category.isNotEmpty() ? up.category : juce::String("User"));
         const auto sourceLeaf = juce::File(up.source.path.replaceCharacter('\\', '/')).getFileName();
 
-        auto resolved = dida::userpreset::resolveSourcePath(up.source.path);
-        if (resolved.isDirectory() && ! pathLivesInCategory(resolved, effectiveCategory))
+        auto resolved = findCategorySourceFolder(getUserPresetDirectory(), effectiveCategory, sourceLeaf, file);
+        if (resolved.isDirectory())
+            didaPresetManagerLog("diapreset routed within folder category=" + effectiveCategory
+                + " folder=" + resolved.getFullPathName());
+
+        if (! resolved.isDirectory())
         {
-            didaPresetManagerLog("diapreset source outside folder category ignored path="
-                + resolved.getFullPathName() + " category=" + effectiveCategory);
-            resolved = {};
+            resolved = dida::userpreset::resolveSourcePath(up.source.path);
+            if (resolved.isDirectory()
+                && ! pathLivesInCategory(resolved, effectiveCategory)
+                && ! pathLivesInCategory(resolved, up.category))
+            {
+                didaPresetManagerLog("diapreset source outside folder category ignored path="
+                    + resolved.getFullPathName() + " category=" + effectiveCategory);
+                resolved = {};
+            }
         }
 
         if (! resolved.isDirectory())
         {
-            resolved = findCategorySourceFolder(getUserPresetDirectory(), effectiveCategory, sourceLeaf, file);
-            if (resolved.isDirectory())
-                didaPresetManagerLog("diapreset routed within folder category=" + effectiveCategory
-                    + " folder=" + resolved.getFullPathName());
-            else
-                didaPresetManagerLog("diapreset source folder missing in category=" + effectiveCategory
-                    + " path=" + up.source.path);
+            didaPresetManagerLog("diapreset source folder missing in category=" + effectiveCategory
+                + " path=" + up.source.path);
         }
 
         // Common reset of sample state; we re-fill it below when we have a folder.
