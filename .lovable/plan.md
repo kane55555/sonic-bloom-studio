@@ -1,68 +1,127 @@
-# Vintage Analog Engine Upgrade
+# Multi-Engine Hybrid Synth Upgrade
 
-Transform the active plugin (`native/plugin`) from a basic subtractive synth into a vintage-inspired analog modeling engine, while preserving APVTS parameter IDs, MIDI playback, preset stepping, and VST3 build stability.
+Transform DIDITAGAIN STUDIO into a true multi-engine workstation while keeping the existing PCM/multisample pipeline and all `.diapreset` files working unchanged.
 
-## Scope
-
-This is a deep DSP upgrade across voice, oscillator, filter, envelope, modulation, chorus, and preset layers. All changes land in `native/plugin/Source/DSP` and `native/plugin/Source/Presets`. Legacy files in `plugin_legacy_broken` are referenced for ideas only — nothing is wholesale restored.
-
-## Architecture overview
+## Architecture
 
 ```text
-[Per-voice]
- OscA + OscB + Sub + Noise (PolyBLEP, drift, phase rand)
-        |
-        v
-   Osc Mixer  --> Pre-filter Drive --> Filter (LP12/LP24/HPF/BP, dual)
-        |                                       |
-        |                                       v
-        |                               Post-filter Saturation
-        |                                       |
-        v                                       v
-                                   VCA (RC-curve amp env)
-                                                |
-[Global FX chain]                               v
- BBD Chorus -> Delay -> Reverb -> EQ -> Glue Comp -> Limiter
-
-[Voice cards]
- 8 persistent calibration profiles scaled by global "Vintage" amount.
+SynthVoice
+  └── Partial[0..3]   (each independently enable-able)
+        ├── engineType: pcm | analog | supersaw | fm | wavetable | granular
+        ├── EngineSource  (polymorphic, see below)
+        ├── FilterModel   (Clean/Analog/Vintage/Ladder/JP/Tape)
+        ├── AmpEnv + LFO
+        ├── ModMatrix slots
+        └── pan / level / enable
+  └── Shared: VoiceCharacter (drift, jitter), Unison, Spread, Exciter
+  └── Global: FxChain (existing)
 ```
 
-## Implementation steps
+Engines all implement a tiny interface:
+```cpp
+struct IEngineSource {
+    virtual void prepare(double sr, int blockSize) = 0;
+    virtual void noteOn(int midi, float vel) = 0;
+    virtual void noteOff() = 0;
+    virtual void renderAdd(float* L, float* R, int n,
+                           float pitchHz, const ModSnapshot&) = 0;
+    virtual void reset() = 0;
+};
+```
 
-1. **VoiceCard system** — new `DSP/VoiceCard.h` holding 8 persistent calibration profiles (pitch/PW/gain/cutoff/res/env/VCA/pan offsets). Global `vintageAmount` (0–1) scales all offsets. `SynthEngine` assigns a card index round-robin to each `SynthVoice`. New APVTS param `vintage_amount` (additive, doesn't break existing IDs).
+## Files to create
 
-2. **Oscillator upgrade** (`DSP/Oscillator.h`) — PolyBLEP saw/square/pulse/triangle, sine, noise. Phase randomization at note-on. Per-voice slow drift LFO (0.03–0.25 Hz). DCO vs VCO mode toggle. PWM input from LFO+env. Hard sync and cross-mod hooks for OscB. Sub osc square one octave down (already present, retune).
+Under `native/plugin/Source/DSP/Engines/`:
 
-3. **Filter upgrade** (`DSP/FilterBlock.h`) — LP12/LP24/HPF/BP modes. Juno-style musical saturation in the ladder. CS-style dual HPF→LPF mode. Pre-filter drive + post-filter soft sat (tanh). Smoothed cutoff/res via one-pole to kill zipper. Key tracking + velocity-to-cutoff inputs. Bipolar env amount.
+- `IEngineSource.h` — shared interface + `ModSnapshot` struct.
+- `PcmEngine.h/.cpp` — thin wrapper over existing multisample voice playback so the current pipeline becomes "engineType: pcm". No behavior change.
+- `AnalogEngine.h/.cpp` — saw/square/pulse/tri/sine/noise + PWM + sub osc + detune, drift, phase randomization. Reuses `UnisonEngine` for 2–8 voices.
+- `SupersawEngine.h/.cpp` — 3–9 detuned saws with detune curve, spread, per-voice phase rand, drift.
+- `FmEngine.h/.cpp` — 4-operator FM with algorithms (stack, pair, parallel, bell), per-op env, feedback on op1.
+- `WavetableEngine.h/.cpp` — single wavetable osc with frame position + morph, unison, warp placeholder (linear/bend), mod-target hooks.
+- `GranularEngine.h/.cpp` — placeholder grain player over a source buffer: grain size, density, position rand, pitch spread, stereo spread. Falls back to silence if no source.
 
-4. **Envelopes** (`DSP/Envelope.h`) — RC-curve analog stages (exponential). Click-free fast attack via min-time clamp + smoothing. Retrigger modes: reset / legato / analog-partial. Per-voice timing scaled by card offsets. Velocity-to-attack scaling.
+Under `native/plugin/Source/DSP/`:
 
-5. **Modulation matrix** (`DSP/ModMatrix.h`) — Fixed-route matrix: LFO1→pitch/cutoff/PW, LFO2→pan, ENV1→cutoff/pitch, ENV2→amp, vel→amp/cutoff/envAmt, modWheel→vibrato, aftertouch→cutoff/vibrato. Evaluated once per block in `SynthVoice::renderNextBlock`.
+- `Partial.h/.cpp` — owns one `IEngineSource`, a `FilterModels` instance, amp env, LFO, mod-matrix slots, pan/level/enable. Renders into a stereo accumulator.
+- Update `Voice.h/.cpp` — replace single render path with up to 4 partials accumulating into the existing post chain (exciter, spread, fx).
 
-6. **BBD chorus** (`DSP/ChorusBlock.h`) — Replace `juce::dsp::Chorus` with two modulated delay lines (6–18 ms base), darkened wet (LP ~6 kHz), optional noise floor, stereo LFO phase offset, modes I / II / I+II. Mono-safe via mid/side handling.
+## Preset schema (backwards compatible)
 
-7. **Gain staging** — Add per-stage compensation constants in `Voice` and `FxChain` so signal hits each stage at ~−12 dBFS RMS. Document with comments.
+Extend `UserPresetFormat.h`:
 
-8. **Category EQ curves** — Extend `HybridPresetApplier` with `applyToneCurveForCategory` (Bass/Brass/Pads/Keys/Leads) wiring into existing `EQBlock` + `setReverbInputHighPass*` helpers.
+```cpp
+struct PartialBlock {
+    bool enabled = false;
+    juce::String engineType = "pcm";   // pcm|analog|supersaw|fm|wavetable|granular
+    float level = 1.0f, pan = 0.0f;
+    int   pitchSemis = 0; float fineCents = 0.0f;
+    // per-engine params kept as juce::var bag for forward-compat
+    juce::var engineParams;
+    FilterBlockData filter;
+    AmpBlock        amp;
+    LfoBlock        lfo;
+    juce::Array<ModMatrixEntry> mods;
+};
 
-9. **Vintage Synth factory bank** — New `Presets/VintageSynthBank.cpp/.h` with 20 sample-free presets (Juno pad, Jupiter brass, Prophet keys, CS pad, analog bass, mono lead, PWM pad, string machine, pluck, bell, dark choir, Reese, soft poly keys, horror lead, tape pad, analog init, +4 fillers). Registered in `PresetManager` under a "Vintage Synth" category. Each preset sets engine mode, osc waveforms, filter mode, env shapes, mod routes, chorus mode.
+struct UserPreset {
+    // ...existing fields unchanged...
+    juce::String engineType;   // optional, default "pcm"
+    juce::Array<PartialBlock> partials;   // optional, up to 4
+};
+```
 
-10. **Wire-up & safety** — `PluginProcessor`: register `vintage_amount` and any new IDs additively; attach listeners. `SynthEngine`: distribute voice cards; route new setters to voices. Confirm preset stepping during MIDI playback still uses existing `canSafelyMutateVoices` guard. CMake auto-globs new files.
+Rules for backwards compat in `UserPresetLoader::fromJson`:
+- Missing `engineType` and missing `partials` → behave exactly as today (synthesize a single implicit PCM partial from existing amp/filter/main/layer2 fields).
+- If `partials` present, those drive `Voice` and the legacy main/layer2 blocks are still applied to partial[0]/[1] for compatibility.
+- Unknown `engineType` values fall back to `pcm` with a logged warning.
 
-## Technical notes
+`UserPresetLoader::applyUserPreset` translates partials → engine instances on the voice. Logs `[Preset] <name> engines: [pcm, analog]` etc.
 
-- **APVTS stability**: only *add* parameter IDs; never rename/remove. New IDs: `vintage_amount`, `osc_mode` (DCO/VCO), `filter_mode` (LP12/LP24/HPF/BP/Dual), `chorus_mode` (I/II/I+II), `env_retrigger`.
-- **Voice card persistence**: card table generated once at engine construction with a fixed seed so the same card always sounds the same across sessions.
-- **PolyBLEP**: standard 2-sample correction; avoids extra latency.
-- **Filter smoothing**: 5 ms one-pole on cutoff/res/envAmount.
-- **Legacy migration**: only `LFO.h` shape ideas and ModMatrix structure are referenced from `plugin_legacy_broken`; no files copied verbatim — all rewritten with comments noting origin.
-- **Build**: header-heavy DSP keeps CMake source globs happy; new `.cpp` stubs added where the existing pattern requires them (matches `LayerBusProcessor.cpp` precedent).
-- **No removals**: all current setters on `FxChain`, `Voice`, `SynthEngine` remain; new behavior is opt-in via new parameters defaulting to mild vintage (0.25).
+## Filter upgrades
 
-## Validation
+Extend `DSP/Synthesis/FilterModels.h`:
+- Add `Mode::Clean/Analog/Vintage/Ladder/JP/Tape`.
+- Each mode = SVF core + per-mode drive curve, soft-clip in feedback path, and resonance shaping.
+- Add `keytrack`, `envAmount` inputs that the partial feeds in.
 
-- Build VST3 cleanly (`DIDITAGAIN_STUDIO_VST3` target).
-- Smoke-load each new factory preset and confirm no NaNs / silence.
-- Confirm preset switching mid-MIDI-playback still honors `canSafelyMutateVoices`.
-- A/B a chord on a Juno pad preset: voices should detune slightly, chorus should warble BBD-style, filter should saturate without harshness.
+## Modulation matrix
+
+Reuse existing `ModMatrixEntry` schema. Wire these destinations at the partial level so every engine gets them:
+- `filter.cutoff`, `filter.reso`, `amp.gain`, `amp.pan`, `osc.pitch`, `osc.pulseWidth`, `wt.position`, `fm.opXLevel`.
+
+Sources: `env1`, `env2`, `lfo1`, `lfo2`, `velocity`, `modwheel`, `aftertouch`, `keytrack`. Resolved in `Partial::renderAdd` into a `ModSnapshot` passed to each engine per block.
+
+## Voice character
+
+Extend existing `AnalogDrift` + `VoiceRandomizer` so they expose:
+- pitch instability (cents)
+- cutoff jitter
+- envelope time jitter
+- per-voice pan offset
+
+`Voice` owns one of each and feeds them into every partial's `ModSnapshot`.
+
+## Preset categories
+
+Just add the new category strings to `PresetIndex` / `UserPreset.category` parsing — no schema work needed. New banks (AnalogLeads/Pads, SupersawLeads, VintageKeys, FmBells, FmEPs, WavetableLeads/Pads, AmbientTextures) come in a follow-up; this task only ships the engine + 2–3 demo `.diapreset` files per new engine so the user can audition each engine. Existing categories untouched.
+
+## CPU + safety
+
+- Partials short-circuit when `enabled == false` (no allocations in audio thread).
+- Wavetable + granular cap unison/grain counts.
+- Reuse existing per-voice saturation + safety caps from the Vintage Synth pass.
+- Debug log at preset load (rate-limited).
+
+## Out of scope for this PR
+
+- Full new factory preset banks for every new category (will follow once engines are validated).
+- GUI partial editor — current MainSynthPanel keeps editing partial[0]; later PR adds a partial selector.
+- Real granular DSP polish — ships as functional placeholder per spec.
+
+## Verification
+
+- Existing `.diapreset` files load unchanged (no `partials` key) and sound identical (PCM path).
+- New presets with `"engineType": "analog"` etc. produce engine-specific sound.
+- Debug log prints active engines per preset.
+- Build passes; harness runs build automatically.

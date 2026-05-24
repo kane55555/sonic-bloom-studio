@@ -238,6 +238,73 @@ bool parseFile(const juce::File& file, UserPreset& out, juce::String& errorOut)
         }
     }
 
+    // ------- Multi-engine partials (v2 additive) -------
+    // Absent => leave out.partials empty and let the engine run the legacy
+    // PCM/multisample path exactly as before. We never fail parse on a bad
+    // partial entry: invalid ones are dropped with a log warning.
+    out.engineType = getS(json, "engineType", {});
+    out.partials.clearQuick();
+    auto parts = json.getProperty("partials", juce::var());
+    if (parts.isArray())
+    {
+        for (auto& v : *parts.getArray())
+        {
+            if (! v.isObject()) continue;
+            if (out.partials.size() >= 4) break;
+            UserPreset::PartialBlock pb;
+            pb.enabled    = getB(v, "enabled",    pb.enabled);
+            pb.engineType = getS(v, "engineType", pb.engineType);
+            pb.level      = getF(v, "level",      pb.level);
+            pb.pan        = getF(v, "pan",        pb.pan);
+            pb.pitchSemis = getI(v, "pitchSemis", pb.pitchSemis);
+            pb.fineCents  = getF(v, "fineCents",  pb.fineCents);
+            pb.engineParams = v.getProperty("engineParams", juce::var());
+
+            auto pAmp = v.getProperty("amp", juce::var());
+            pb.amp.gainDb    = getF(pAmp, "gainDb",    pb.amp.gainDb);
+            pb.amp.pan       = getF(pAmp, "pan",       pb.amp.pan);
+            pb.amp.attackMs  = getF(pAmp, "attackMs",  pb.amp.attackMs);
+            pb.amp.decayMs   = getF(pAmp, "decayMs",   pb.amp.decayMs);
+            pb.amp.sustain   = getF(pAmp, "sustain",   pb.amp.sustain);
+            pb.amp.releaseMs = getF(pAmp, "releaseMs", pb.amp.releaseMs);
+
+            auto pFlt = v.getProperty("filter", juce::var());
+            pb.filter.enabled   = getB(pFlt, "enabled",   pb.filter.enabled);
+            pb.filter.type      = getS(pFlt, "type",      pb.filter.type);
+            pb.filter.cutoffHz  = getF(pFlt, "cutoffHz",  pb.filter.cutoffHz);
+            pb.filter.resonance = getF(pFlt, "resonance", pb.filter.resonance);
+            pb.filter.drive     = getF(pFlt, "drive",     pb.filter.drive);
+            pb.filter.keytrack  = getF(pFlt, "keytrack",  pb.filter.keytrack);
+
+            auto pLfo = v.getProperty("lfo", juce::var());
+            if (pLfo.isObject())
+            {
+                pb.lfo.enabled = getB(pLfo, "enabled", pb.lfo.enabled);
+                pb.lfo.target  = getS(pLfo, "target",  pb.lfo.target);
+                pb.lfo.shape   = getS(pLfo, "shape",   pb.lfo.shape);
+                pb.lfo.rateHz  = getF(pLfo, "rateHz",  pb.lfo.rateHz);
+                pb.lfo.depth   = getF(pLfo, "depth",   pb.lfo.depth);
+            }
+
+            auto pMods = v.getProperty("mods", juce::var());
+            if (pMods.isArray())
+            {
+                for (auto& mv : *pMods.getArray())
+                {
+                    ModMatrixEntry e;
+                    e.source  = mv.getProperty("source",  "").toString();
+                    e.dest    = mv.getProperty("dest",    "").toString();
+                    e.amount  = (float) (double) mv.getProperty("amount",  0.0);
+                    e.bipolar = (bool)         mv.getProperty("bipolar", true);
+                    if (e.source.isNotEmpty() && e.dest.isNotEmpty())
+                        pb.mods.add(e);
+                }
+            }
+
+            out.partials.add(pb);
+        }
+    }
+
     return true;
 }
 
@@ -722,6 +789,25 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
         + " chorusMix=" + juce::String(juce::jmin(p.chorus.mix, fxL.chorusMax), 2)
         + " macros.warmth=" + juce::String(p.macros.warmth, 2)
         + " macros.space="  + juce::String(p.macros.space, 2));
+
+    // Engine summary log — makes the active engine list visible in the host
+    // console so users can confirm which engine(s) a preset is exercising.
+    if (! p.partials.isEmpty() || p.engineType.isNotEmpty())
+    {
+        juce::StringArray engines;
+        if (! p.partials.isEmpty())
+        {
+            for (auto& pb : p.partials)
+                if (pb.enabled) engines.add(pb.engineType.isNotEmpty() ? pb.engineType : juce::String("pcm"));
+        }
+        else
+        {
+            engines.add(p.engineType);
+        }
+        didaUserPresetLog("engines name=" + p.presetName
+            + " active=[" + engines.joinIntoString(",") + "]"
+            + " partials=" + juce::String(p.partials.size()));
+    }
 }
 
 juce::String toJson(const UserPreset& p)
@@ -851,6 +937,61 @@ juce::String toJson(const UserPreset& p)
         mm.add(juce::var(o));
     }
     obj->setProperty("modMatrix", mm);
+
+    // ------- Partials (v2 additive). Omitted when empty so existing
+    //         .diapreset files round-trip byte-identically. -------
+    if (p.engineType.isNotEmpty())
+        obj->setProperty("engineType", p.engineType);
+
+    if (! p.partials.isEmpty())
+    {
+        juce::Array<juce::var> ps;
+        for (auto& pb : p.partials)
+        {
+            auto* po = new juce::DynamicObject();
+            po->setProperty("enabled",    pb.enabled);
+            po->setProperty("engineType", pb.engineType);
+            po->setProperty("level",      pb.level);
+            po->setProperty("pan",        pb.pan);
+            po->setProperty("pitchSemis", pb.pitchSemis);
+            po->setProperty("fineCents",  pb.fineCents);
+            if (! pb.engineParams.isVoid())
+                po->setProperty("engineParams", pb.engineParams);
+
+            auto* pa = new juce::DynamicObject();
+            pa->setProperty("gainDb", pb.amp.gainDb); pa->setProperty("pan", pb.amp.pan);
+            pa->setProperty("attackMs", pb.amp.attackMs); pa->setProperty("decayMs", pb.amp.decayMs);
+            pa->setProperty("sustain", pb.amp.sustain); pa->setProperty("releaseMs", pb.amp.releaseMs);
+            po->setProperty("amp", juce::var(pa));
+
+            auto* pf = new juce::DynamicObject();
+            pf->setProperty("enabled", pb.filter.enabled); pf->setProperty("type", pb.filter.type);
+            pf->setProperty("cutoffHz", pb.filter.cutoffHz); pf->setProperty("resonance", pb.filter.resonance);
+            pf->setProperty("drive", pb.filter.drive); pf->setProperty("keytrack", pb.filter.keytrack);
+            po->setProperty("filter", juce::var(pf));
+
+            auto* pl = new juce::DynamicObject();
+            pl->setProperty("enabled", pb.lfo.enabled); pl->setProperty("target", pb.lfo.target);
+            pl->setProperty("shape", pb.lfo.shape); pl->setProperty("rateHz", pb.lfo.rateHz);
+            pl->setProperty("depth", pb.lfo.depth);
+            po->setProperty("lfo", juce::var(pl));
+
+            juce::Array<juce::var> pmods;
+            for (auto& e : pb.mods)
+            {
+                auto* eo = new juce::DynamicObject();
+                eo->setProperty("source",  e.source);
+                eo->setProperty("dest",    e.dest);
+                eo->setProperty("amount",  e.amount);
+                eo->setProperty("bipolar", e.bipolar);
+                pmods.add(juce::var(eo));
+            }
+            po->setProperty("mods", pmods);
+
+            ps.add(juce::var(po));
+        }
+        obj->setProperty("partials", ps);
+    }
 
     return juce::JSON::toString(juce::var(obj));
 }
