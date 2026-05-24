@@ -1179,3 +1179,137 @@ void PresetManager::seedVintageSynthBankIfMissing()
         didaPresetManagerLog("seeded vintage synth bank count=" + juce::String(written)
             + " dir=" + dir.getFullPathName());
 }
+
+//==============================================================================
+// autoIndexUserInstrumentFolders
+//
+// User layout reality (per their screenshot):
+//   <Samples>/Presets/User/<Category>/<Instrument>/<root-mapped>.wav
+//   <Samples>/Presets/User/<Category>/<*.wav>                  (flat)
+//
+// The browser already lists every `.diapreset` from `loadDiapresetFiles`. That
+// alone leaves freshly-added instrument folders invisible — the user has to
+// hand-author a `.diapreset` for each one. This pass closes the gap:
+//
+//   * Any subfolder under a category that contains at least one root-mapped
+//     WAV becomes a playable preset entry (sample-drop style) in the same
+//     category, named after the folder leaf.
+//   * If a category folder itself has root-mapped WAVs directly inside it,
+//     the category folder is exposed as one preset named after the category.
+//   * Categories with no recognisable WAV content are skipped (the
+//     `.diapreset` files inside still show via the earlier pass).
+//   * We de-dupe against entries already added by `loadDiapresetFiles`
+//     (same category + same name) so a curated `.diapreset` always wins.
+//
+// Net effect: drop a new folder of mapped WAVs under
+// `Presets/User/<Category>/` and it shows up in the browser on next rescan
+// with zero JSON authoring.
+//==============================================================================
+void PresetManager::autoIndexUserInstrumentFolders()
+{
+    auto root = getUserPresetDirectory();
+    if (! root.isDirectory()) return;
+
+    auto countMappedWavs = [](const juce::File& dir, bool recursive) -> int
+    {
+        if (! dir.isDirectory()) return 0;
+        auto wavs = dir.findChildFiles(juce::File::findFiles, recursive, "*.wav");
+        int n = 0;
+        for (auto& w : wavs)
+            if (parseRootMidiFromStem(w.getFileNameWithoutExtension()) >= 0)
+                ++n;
+        return n;
+    };
+
+    auto findRepresentativeWav = [](const juce::File& dir, int& outRoot,
+                                    juce::StringArray& outAll) -> juce::File
+    {
+        outRoot = 60;
+        outAll.clear();
+        auto wavs = dir.findChildFiles(juce::File::findFiles, true, "*.wav");
+        std::sort(wavs.begin(), wavs.end(),
+            [](const juce::File& a, const juce::File& b)
+            { return a.getFileName().compareNatural(b.getFileName()) < 0; });
+
+        juce::Array<juce::File> mapped;
+        for (auto& w : wavs)
+            if (parseRootMidiFromStem(w.getFileNameWithoutExtension()) >= 0)
+            { mapped.add(w); outAll.add(w.getFullPathName()); }
+
+        if (mapped.isEmpty()) return {};
+        const auto rep = chooseRepresentativeMappedWav(mapped, outRoot);
+        if (outAll.size() < 2) outAll.clear();
+        return rep;
+    };
+
+    auto alreadyHasEntry = [this](const juce::String& cat, const juce::String& name) -> bool
+    {
+        for (const auto& p : presets)
+            if (p.category.equalsIgnoreCase(cat) && p.name.equalsIgnoreCase(name))
+                return true;
+        return false;
+    };
+
+    auto addEntry = [&](const juce::String& cat, const juce::String& name,
+                        const juce::File& folder)
+    {
+        int rep = 60;
+        juce::StringArray allPaths;
+        const auto chosen = findRepresentativeWav(folder, rep, allPaths);
+        if (! chosen.existsAsFile()) return;
+
+        PresetInfo info;
+        info.name              = name;
+        info.author            = "User";
+        info.category          = cat;
+        info.description       = juce::String(allPaths.isEmpty() ? 1 : allPaths.size()) + " samples";
+        info.filePath          = chosen.getFullPathName();
+        info.isFactory         = false;
+        info.isSampleDrop      = true;
+        info.sampleSourcePath  = chosen.getFullPathName();
+        info.sampleSourcePaths = allPaths;
+        info.sampleFolderPath  = folder.getFullPathName();
+        info.sampleRootMidi    = rep;
+        info.sampleLooping     = isSustainedSampleCategory(cat);
+        presets.push_back(info);
+    };
+
+    int added = 0;
+    auto categoryDirs = root.findChildFiles(juce::File::findDirectories, false);
+    std::sort(categoryDirs.begin(), categoryDirs.end(),
+        [](const juce::File& a, const juce::File& b)
+        { return a.getFileName().compareNatural(b.getFileName()) < 0; });
+
+    for (auto& catDir : categoryDirs)
+    {
+        const auto cat = catDir.getFileName();
+
+        // 1) Flat layout: WAVs directly in the category folder -> one preset
+        //    named after the category itself.
+        if (countMappedWavs(catDir, false) > 0)
+        {
+            if (! alreadyHasEntry(cat, cat))
+            { addEntry(cat, cat, catDir); ++added; }
+        }
+
+        // 2) Nested layout: each subfolder with mapped WAVs becomes its own
+        //    preset (e.g. Brass/TRUMPET 1, Saxophone/Alto Sax).
+        auto subdirs = catDir.findChildFiles(juce::File::findDirectories, false);
+        std::sort(subdirs.begin(), subdirs.end(),
+            [](const juce::File& a, const juce::File& b)
+            { return a.getFileName().compareNatural(b.getFileName()) < 0; });
+
+        for (auto& sub : subdirs)
+        {
+            if (countMappedWavs(sub, true) <= 0) continue;
+            const auto name = sub.getFileName();
+            if (alreadyHasEntry(cat, name)) continue;
+            addEntry(cat, name, sub);
+            ++added;
+        }
+    }
+
+    juce::Logger::writeToLog(juce::String("[DIDITAGAIN browser] autoIndexed instrument folders=")
+        + juce::String(added));
+}
+
