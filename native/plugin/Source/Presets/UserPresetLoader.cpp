@@ -464,6 +464,7 @@ juce::StringArray expectedParentsFor(Family f)
         case Family::Pluck:     return { "Plucks", "Synths" };
         case Family::Bass808:   return { "808", "Bass", "Subs" };
         case Family::FxRiser:   return { "FX", "Risers" };
+        case Family::Synth:     return { "Synths", "Synth", "Leads", "Pads" };
         default:                return {};
     }
 }
