@@ -423,6 +423,15 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             advanceLoop(*hiZone, hiReadPos, hiFinished);
         }
 
+        if (partialsActive)
+        {
+            const int idx = s - startSample;
+            sampL += partialScratch.getSample(0, idx);
+            sampR += partialScratch.getSample(1, idx);
+        }
+
+
+
         // Legacy synth fallback only for factory/pure-synth presets. Imported
         // hybrid presets disable this so a missing sample cannot masquerade as
         // the same cheap synth sound.
