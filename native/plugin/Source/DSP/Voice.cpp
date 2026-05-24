@@ -343,10 +343,25 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             const double totalCents = (double) oscADetuneCents + (double) extraCentsNow();
             const double f = midiToHzD((double) currentMidiNote + (double) pitchOffsetSemis
                                        + totalCents / 100.0);
-            sineFallbackPhase += f / sampleRate;
-            if (sineFallbackPhase > 1.0) sineFallbackPhase -= 1.0;
-            const float v = renderOscShape(oscAWave, (float) sineFallbackPhase, oscAPulseWidth) * 0.5f;
-            sampL += v; sampR += v;
+            if (unisonRenderVoices > 1)
+            {
+                // True unison stack — supersaw-style. Uses Osc A waveform when saw/square/triangle.
+                auto shape = dida::UnisonEngine::Shape::Saw;
+                if (oscAWave == Oscillator::Waveform::Square || oscAWave == Oscillator::Waveform::Pulse)
+                    shape = dida::UnisonEngine::Shape::Square;
+                else if (oscAWave == Oscillator::Waveform::Triangle)
+                    shape = dida::UnisonEngine::Shape::Triangle;
+                float ul = 0.0f, ur = 0.0f;
+                unison.renderSample((float) f, shape, ul, ur);
+                sampL += ul * 0.5f; sampR += ur * 0.5f;
+            }
+            else
+            {
+                sineFallbackPhase += f / sampleRate;
+                if (sineFallbackPhase > 1.0) sineFallbackPhase -= 1.0;
+                const float v = renderOscShape(oscAWave, (float) sineFallbackPhase, oscAPulseWidth) * 0.5f;
+                sampL += v; sampR += v;
+            }
         }
 
 
