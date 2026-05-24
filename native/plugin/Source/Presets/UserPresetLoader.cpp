@@ -817,7 +817,41 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
             + " active=[" + engines.joinIntoString(",") + "]"
             + " partials=" + juce::String(p.partials.size()));
     }
+
+    // ---- Instantiate partial engines on every voice ----------------------
+    if (auto* dp = dynamic_cast<DiditagainProcessor*>(&proc))
+    {
+        auto makeEngine = [](const juce::String& t)
+            -> std::unique_ptr<dida::engines::IEngineSource>
+        {
+            switch (dida::engines::engineTypeFromString(t))
+            {
+                case dida::engines::EngineType::Analog:    return std::make_unique<dida::engines::AnalogEngine>();
+                case dida::engines::EngineType::Supersaw:  return std::make_unique<dida::engines::SupersawEngine>();
+                case dida::engines::EngineType::Fm:        return std::make_unique<dida::engines::FmEngine>();
+                case dida::engines::EngineType::Wavetable: return std::make_unique<dida::engines::WavetableEngine>();
+                case dida::engines::EngineType::Granular:  return std::make_unique<dida::engines::GranularEngine>();
+                case dida::engines::EngineType::Pcm:
+                default:                                   return std::make_unique<dida::engines::PcmEngine>();
+            }
+        };
+
+        dp->getSynthEngine().forEachSynthVoice([&](SynthVoice& v)
+        {
+            v.clearPartials();
+            const int count = juce::jmin((int) SynthVoice::kMaxPartials, p.partials.size());
+            for (int i = 0; i < count; ++i)
+            {
+                const auto& pb = p.partials.getReference(i);
+                auto eng = makeEngine(pb.engineType);
+                if (eng == nullptr) continue;
+                v.setPartial(i, std::move(eng), pb.enabled, pb.level, pb.pan,
+                             pb.pitchSemis, pb.fineCents);
+            }
+        });
+    }
 }
+
 
 juce::String toJson(const UserPreset& p)
 {
