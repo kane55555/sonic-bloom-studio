@@ -209,14 +209,17 @@ struct UserPreset
         float         pan        = 0.0f;
         int           pitchSemis = 0;
         float         fineCents  = 0.0f;
-        // Per-engine parameter bag — kept as raw juce::var so we can extend
-        // each engine without bumping the schema. Engines fall back to
-        // defaults for any missing keys.
         juce::var     engineParams;
         FilterBlockData filter;
         AmpBlock        amp;
         LfoBlock        lfo;
         juce::Array<ModMatrixEntry> mods;
+
+        // v2.1 blend-mode contract — see LayerBlock above for the value list.
+        juce::String blendMode;
+        juce::String eqRole;
+        bool         followMainEnvelope = true;
+        float        maxGainDb = 0.0f;
     };
 
     juce::String              engineType;   // optional; default "" => pcm
