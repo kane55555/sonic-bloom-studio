@@ -60,25 +60,47 @@ public:
     inline void renderSample(float hz, Shape shape, float& outL, float& outR) noexcept
     {
         outL = outR = 0.0f;
-        const float inv = 1.0f / static_cast<float>(numVoices);
+        // Decorrelated voices sum incoherently → use 1/sqrt(N) so a 7-voice
+        // stack is the same loudness as a single saw instead of being too
+        // quiet (1/N) or pile-driving the limiter when coherent.
+        const float inv = 1.0f / std::sqrt(static_cast<float>(numVoices));
+        const float sr  = static_cast<float>(sampleRate);
         for (int i = 0; i < numVoices; ++i)
         {
-            // Vintage drift wiggle in cents.
-            driftPhases[i] += driftRates[i] / static_cast<float>(sampleRate);
+            driftPhases[i] += driftRates[i] / sr;
             if (driftPhases[i] >= 1.0f) driftPhases[i] -= 1.0f;
             const float driftCents = std::sin(driftPhases[i] * 6.2831853f) * (3.0f * driftAmt);
 
             const float ratio = std::pow(2.0f, (detuneCents[i] + driftCents) / 1200.0f);
-            const float inc   = (hz * ratio) / static_cast<float>(sampleRate);
+            const float inc   = (hz * ratio) / sr;
             phases[i] += inc;
             if (phases[i] >= 1.0f) phases[i] -= 1.0f;
 
-            float v = 0.0f;
             const float p = phases[i];
+            float v = 0.0f;
+            // Tiny inline polyBLEP for saw/square — kills the worst aliasing
+            // at high notes which is the main "cheap/buzzy" complaint.
+            auto blep = [](float t, float dt) -> float
+            {
+                if (dt <= 0.0f) return 0.0f;
+                if (t < dt)        { const float x = t / dt;          return x + x - x * x - 1.0f; }
+                if (t > 1.0f - dt) { const float x = (t - 1.0f) / dt; return x * x + x + x + 1.0f; }
+                return 0.0f;
+            };
             switch (shape)
             {
-                case Shape::Saw:      v = 2.0f * (p - std::floor(p + 0.5f)); break;
-                case Shape::Square:   v = (p < 0.5f) ? 1.0f : -1.0f; break;
+                case Shape::Saw:
+                    v = 2.0f * p - 1.0f;
+                    v -= blep(p, inc);
+                    break;
+                case Shape::Square:
+                {
+                    v = (p < 0.5f) ? 1.0f : -1.0f;
+                    v += blep(p, inc);
+                    const float p2 = (p + 0.5f) - std::floor(p + 0.5f);
+                    v -= blep(p2, inc);
+                    break;
+                }
                 case Shape::Triangle: v = 4.0f * std::abs(p - std::floor(p + 0.5f)) - 1.0f; break;
             }
 
