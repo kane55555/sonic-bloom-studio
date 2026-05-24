@@ -576,7 +576,8 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
                                    && (hiZone == nullptr || hiFinished);
         // End the voice only when amp env is idle. If a sample finishes but
         // synth layers are still active, keep rendering until release.
-        const bool synthLayersSilent = (oscBLevel + subLevel + noiseLevel) < 0.0001f;
+        const bool synthLayersSilent = (oscBLevel + subLevel + noiseLevel) < 0.0001f
+                                     && ! partialsActive;
         if (! ampEnv.isActive()
             || (sampleSourceDone && multisample && hasSampleSource && synthLayersSilent))
         {
