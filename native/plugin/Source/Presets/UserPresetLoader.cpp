@@ -993,6 +993,10 @@ juce::String toJson(const UserPreset& p)
         o->setProperty("enabled", l.enabled); o->setProperty("gainDb", l.gainDb);
         o->setProperty("pan", l.pan); o->setProperty("octave", l.octave);
         o->setProperty("semitone", l.semitone); o->setProperty("detuneCents", l.detuneCents);
+        if (l.blendMode.isNotEmpty()) o->setProperty("blendMode", l.blendMode);
+        if (l.eqRole.isNotEmpty())    o->setProperty("eqRole",    l.eqRole);
+        o->setProperty("followMainEnvelope", l.followMainEnvelope);
+        if (l.maxGainDb != 0.0f)      o->setProperty("maxGainDb", l.maxGainDb);
         return juce::var(o);
     };
     auto layers = new juce::DynamicObject();
