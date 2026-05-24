@@ -238,6 +238,73 @@ bool parseFile(const juce::File& file, UserPreset& out, juce::String& errorOut)
         }
     }
 
+    // ------- Multi-engine partials (v2 additive) -------
+    // Absent => leave out.partials empty and let the engine run the legacy
+    // PCM/multisample path exactly as before. We never fail parse on a bad
+    // partial entry: invalid ones are dropped with a log warning.
+    out.engineType = getS(json, "engineType", {});
+    out.partials.clearQuick();
+    auto parts = json.getProperty("partials", juce::var());
+    if (parts.isArray())
+    {
+        for (auto& v : *parts.getArray())
+        {
+            if (! v.isObject()) continue;
+            if (out.partials.size() >= 4) break;
+            UserPreset::PartialBlock pb;
+            pb.enabled    = getB(v, "enabled",    pb.enabled);
+            pb.engineType = getS(v, "engineType", pb.engineType);
+            pb.level      = getF(v, "level",      pb.level);
+            pb.pan        = getF(v, "pan",        pb.pan);
+            pb.pitchSemis = getI(v, "pitchSemis", pb.pitchSemis);
+            pb.fineCents  = getF(v, "fineCents",  pb.fineCents);
+            pb.engineParams = v.getProperty("engineParams", juce::var());
+
+            auto pAmp = v.getProperty("amp", juce::var());
+            pb.amp.gainDb    = getF(pAmp, "gainDb",    pb.amp.gainDb);
+            pb.amp.pan       = getF(pAmp, "pan",       pb.amp.pan);
+            pb.amp.attackMs  = getF(pAmp, "attackMs",  pb.amp.attackMs);
+            pb.amp.decayMs   = getF(pAmp, "decayMs",   pb.amp.decayMs);
+            pb.amp.sustain   = getF(pAmp, "sustain",   pb.amp.sustain);
+            pb.amp.releaseMs = getF(pAmp, "releaseMs", pb.amp.releaseMs);
+
+            auto pFlt = v.getProperty("filter", juce::var());
+            pb.filter.enabled   = getB(pFlt, "enabled",   pb.filter.enabled);
+            pb.filter.type      = getS(pFlt, "type",      pb.filter.type);
+            pb.filter.cutoffHz  = getF(pFlt, "cutoffHz",  pb.filter.cutoffHz);
+            pb.filter.resonance = getF(pFlt, "resonance", pb.filter.resonance);
+            pb.filter.drive     = getF(pFlt, "drive",     pb.filter.drive);
+            pb.filter.keytrack  = getF(pFlt, "keytrack",  pb.filter.keytrack);
+
+            auto pLfo = v.getProperty("lfo", juce::var());
+            if (pLfo.isObject())
+            {
+                pb.lfo.enabled = getB(pLfo, "enabled", pb.lfo.enabled);
+                pb.lfo.target  = getS(pLfo, "target",  pb.lfo.target);
+                pb.lfo.shape   = getS(pLfo, "shape",   pb.lfo.shape);
+                pb.lfo.rateHz  = getF(pLfo, "rateHz",  pb.lfo.rateHz);
+                pb.lfo.depth   = getF(pLfo, "depth",   pb.lfo.depth);
+            }
+
+            auto pMods = v.getProperty("mods", juce::var());
+            if (pMods.isArray())
+            {
+                for (auto& mv : *pMods.getArray())
+                {
+                    ModMatrixEntry e;
+                    e.source  = mv.getProperty("source",  "").toString();
+                    e.dest    = mv.getProperty("dest",    "").toString();
+                    e.amount  = (float) (double) mv.getProperty("amount",  0.0);
+                    e.bipolar = (bool)         mv.getProperty("bipolar", true);
+                    if (e.source.isNotEmpty() && e.dest.isNotEmpty())
+                        pb.mods.add(e);
+                }
+            }
+
+            out.partials.add(pb);
+        }
+    }
+
     return true;
 }
 
