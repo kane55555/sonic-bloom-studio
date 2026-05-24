@@ -71,6 +71,7 @@ private:
     bool appliedMonoMode = false;
     int appliedPolyphony = SynthEngine::MAX_POLYPHONY;
     int debugBlockCounter = 0;
+    int clipBlocksSinceLog = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(DiditagainProcessor)
 };
