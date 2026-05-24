@@ -169,6 +169,8 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
     loFinished = (loZone == nullptr);
     hiFinished = (hiZone == nullptr);
     oscBPhase = subPhase = fmModPhase = 0.0;
+    fmOp3Phase = fmOp4Phase = 0.0;
+    fmFeedbackZ = 0.0f;
 
     // ---- Per-layer micro-timing offsets (0.5..8 ms): each note picks new
     //      small random delays per support layer. Reduces the "stacked WAVs"
