@@ -1093,8 +1093,9 @@ juce::String PresetManager::computeChecksum(const juce::String& jsonContent)
 
 void PresetManager::loadDiapresetFiles()
 {
-    // Scan <Samples>/Presets/User/<Category>/*.diapreset and add one entry
-    // per file. Categories are inferred from the immediate parent folder.
+    // Scan <Samples>/Presets/User/<Category>/**/*.diapreset and add one entry
+    // per file. The immediate folder under User is always the browser category,
+    // so nested instrument/source folders never become UI subcategories.
     auto root = getUserPresetDirectory();
     if (! root.isDirectory()) return;
 
@@ -1106,7 +1107,7 @@ void PresetManager::loadDiapresetFiles()
     for (auto& catDir : categoryDirs)
     {
         const auto cat = catDir.getFileName();
-        auto files = catDir.findChildFiles(juce::File::findFiles, false, "*.diapreset");
+        auto files = catDir.findChildFiles(juce::File::findFiles, true, "*.diapreset");
         std::sort(files.begin(), files.end(),
             [](const juce::File& a, const juce::File& b)
             { return a.getFileName().compareNatural(b.getFileName()) < 0; });
