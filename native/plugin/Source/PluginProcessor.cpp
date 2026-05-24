@@ -202,6 +202,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createP
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"fxDistortionAmount", 1}, "Distortion",
         juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+    // Real saturation wet/dry mix — was previously forced to 100% whenever
+    // drive was nonzero, turning subtle warmth into full distortion.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"fxSaturationMix", 1}, "Saturation Mix",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.15f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"fxPhaserMix", 1}, "Phaser Mix",
         juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
