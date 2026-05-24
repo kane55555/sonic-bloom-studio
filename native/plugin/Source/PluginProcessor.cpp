@@ -35,10 +35,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createP
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    // Master
+    // Master — default -6 dB for safe headroom on chords/layered presets.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"masterGain", 1}, "Master Gain",
-        juce::NormalisableRange<float>(-60.0f, 12.0f, 0.1f), 0.0f));
+        juce::NormalisableRange<float>(-60.0f, 12.0f, 0.1f), -6.0f));
 
     // Engine
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
@@ -202,6 +202,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createP
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"fxDistortionAmount", 1}, "Distortion",
         juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
+    // Real saturation wet/dry mix — was previously forced to 100% whenever
+    // drive was nonzero, turning subtle warmth into full distortion.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"fxSaturationMix", 1}, "Saturation Mix",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 0.15f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"fxPhaserMix", 1}, "Phaser Mix",
         juce::NormalisableRange<float>(0.0f, 1.0f), 0.0f));
@@ -562,8 +567,11 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
     const float driveAmt   = presetMacrosActive ? clamp01(getF("fxDistortionAmount"))
                                                 : clamp01(getF("fxDistortionAmount") + m6 * 0.6f);
+    const float satMixAmt  = clamp01(getF("fxSaturationMix"));
     fx.setSaturationDrive(driveAmt);
-    fx.setSaturationMix  (driveAmt > 0.0001f ? 1.0f : 0.0f);
+    // Use the real saturation mix parameter instead of forcing wet=1.0.
+    // Saturation becomes inaudible only when drive *or* mix is zero.
+    fx.setSaturationMix  (driveAmt > 0.0001f ? satMixAmt : 0.0f);
 
     const float chorusMix  = presetMacrosActive ? clamp01(getF("fxChorusMix"))
                                                 : clamp01(getF("fxChorusMix") + m2 * 0.5f);

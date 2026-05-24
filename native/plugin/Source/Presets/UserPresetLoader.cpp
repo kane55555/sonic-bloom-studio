@@ -720,8 +720,16 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     setParamById(proc, "fxDelayFeedback",    p.delay.feedback);
     setParamById(proc, "fxReverbMix",        reverbMix);
     setParamById(proc, "fxReverbSize",       p.reverb.size);
-    setParamById(proc, "fxDistortionAmount",
-                 juce::jlimit(0.0f, fxL.satMax,    p.saturation.enabled ? p.saturation.drive : 0.0f));
+    const float satDrive = juce::jlimit(0.0f, fxL.satMax,
+                                        p.saturation.enabled ? p.saturation.drive : 0.0f);
+    setParamById(proc, "fxDistortionAmount", satDrive);
+    // Saturation mix: clamp tighter for Synth family so vintage presets stay
+    // warm instead of distorted. Other families also get a reasonable cap.
+    const float satMixCap = (fam == Family::Synth) ? 0.18f : 0.50f;
+    const float satMix = p.saturation.enabled
+        ? juce::jlimit(0.0f, satMixCap, p.saturation.mix)
+        : 0.0f;
+    setParamById(proc, "fxSaturationMix", satMix);
 
     // -- LFOs (rate + shape; routing matrix is owned by the engine elsewhere)
     setParamById(proc, "lfo1Rate", p.lfo1.rateHz);

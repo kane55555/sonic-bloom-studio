@@ -224,10 +224,24 @@ void SynthVoice::readZone(const dida::SampleZone& z, double readPos,
     outR = R[i0] + (R[i0 + 1] - R[i0]) * frac;
 }
 
+// PolyBLEP correction (after Välimäki/Huovilainen). Removes the worst of
+// the aliasing on saw/square/pulse at high pitches with ~zero CPU cost.
+// dt is the per-sample phase increment (freq / sampleRate), assumed > 0.
+static inline float polyBLEP(float t, float dt) noexcept
+{
+    if (dt <= 0.0f) return 0.0f;
+    if (t < dt)        { const float x = t / dt;       return x + x - x * x - 1.0f; }
+    if (t > 1.0f - dt) { const float x = (t - 1.0f) / dt; return x * x + x + x + 1.0f; }
+    return 0.0f;
+}
+
 float SynthVoice::renderOscShape(Oscillator::Waveform w, float p, float pw) const noexcept
 {
     using W = Oscillator::Waveform;
     const float twoPi = juce::MathConstants<float>::twoPi;
+    // dt is unknown here (call sites that need anti-aliasing pass through
+    // renderOscShapeAA below). This path keeps the naive shape for shapes
+    // that don't alias (sine/triangle) or as a safe fallback.
     switch (w)
     {
         case W::Sine:      return std::sin(p * twoPi);
@@ -245,6 +259,60 @@ float SynthVoice::renderOscShape(Oscillator::Waveform w, float p, float pw) cons
                 s += 2.0f * (ph - std::floor(ph + 0.5f));
             }
             return s * 0.2f;
+        }
+        case W::FmCarrier: return std::sin(p * twoPi);
+        case W::Wavetable: return std::sin(p * twoPi) + 0.3f * std::sin(p * twoPi * 3.0f);
+        default:           return std::sin(p * twoPi);
+    }
+}
+
+// Band-limited variant used by hot oscillator paths (Osc A fallback, Osc B).
+// Saw / Square / Pulse get polyBLEP correction; everything else falls through.
+static inline float renderOscShapeAA(Oscillator::Waveform w, float p, float pw, float dt) noexcept
+{
+    using W = Oscillator::Waveform;
+    const float twoPi = juce::MathConstants<float>::twoPi;
+    auto wrap = [](float x) { return x - std::floor(x); };
+    p = wrap(p);
+    switch (w)
+    {
+        case W::Sine:      return std::sin(p * twoPi);
+        case W::Triangle:  return 4.0f * std::abs(p - std::floor(p + 0.5f)) - 1.0f;
+        case W::Saw:
+        {
+            float v = 2.0f * p - 1.0f;
+            v -= polyBLEP(p, dt);
+            return v;
+        }
+        case W::Square:
+        {
+            float v = (p < 0.5f) ? 1.0f : -1.0f;
+            v += polyBLEP(p, dt);
+            v -= polyBLEP(wrap(p + 0.5f), dt);
+            return v;
+        }
+        case W::Pulse:
+        {
+            const float pwC = juce::jlimit(0.05f, 0.95f, pw);
+            float v = (p < pwC) ? 1.0f : -1.0f;
+            v += polyBLEP(p, dt);
+            v -= polyBLEP(wrap(p + (1.0f - pwC)), dt);
+            return v;
+        }
+        case W::SuperSaw:
+        {
+            // Mini 5-voice supersaw with polyBLEP on each saw. 1/sqrt(N)
+            // normalisation keeps the stack at unity loudness.
+            float s = 0.0f;
+            for (int i = 0; i < 5; ++i)
+            {
+                const float det = 1.0f + 0.005f * (i - 2);
+                const float ph  = wrap(p * det);
+                float v = 2.0f * ph - 1.0f;
+                v -= polyBLEP(ph, dt * det);
+                s += v;
+            }
+            return s * 0.4472136f; // 1/sqrt(5)
         }
         case W::FmCarrier: return std::sin(p * twoPi);
         case W::Wavetable: return std::sin(p * twoPi) + 0.3f * std::sin(p * twoPi * 3.0f);
@@ -455,9 +523,10 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             }
             else
             {
+                const float dt = (float) (f / sampleRate);
                 sineFallbackPhase += f / sampleRate;
                 if (sineFallbackPhase > 1.0) sineFallbackPhase -= 1.0;
-                const float v = renderOscShape(oscAWave, (float) sineFallbackPhase, oscAPulseWidth) * 0.5f;
+                const float v = renderOscShapeAA(oscAWave, (float) sineFallbackPhase, oscAPulseWidth, dt) * 0.5f;
                 sampL += v; sampR += v;
             }
         }
@@ -485,10 +554,11 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
                          * fmAmount * 0.1f;
             }
 
+            const float bDt = (float) (bHz / sampleRate);
             oscBPhase += bHz / sampleRate;
             if (oscBPhase > 1.0) oscBPhase -= 1.0;
             const float ph = (float) oscBPhase + fmOffset;
-            oscBOut = renderOscShape(oscBWave, ph - std::floor(ph), oscBPulseWidth) * oscBLevel;
+            oscBOut = renderOscShapeAA(oscBWave, ph - std::floor(ph), oscBPulseWidth, bDt) * oscBLevel;
             // Gentle HP carve so Osc B body does not muddy the sample low end.
             oscBOut = oscBHp.process(oscBOut);
         }
@@ -567,6 +637,13 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         // Advance slow analog drift phase.
         driftPhase += driftInc;
         if (driftPhase >= 1.0) driftPhase -= 1.0;
+
+        // Per-voice output trim (-6 dB). This is the single biggest contributor
+        // to clean chord/poly playback: each voice contributes half the gain
+        // so 4-8 simultaneous notes stay well below 0 dBFS before the FX
+        // chain's master gain + limiter.
+        constexpr float kVoiceTrim = 0.5f;
+        l *= kVoiceTrim; r *= kVoiceTrim;
 
         if (numCh >= 2) { outputBuffer.addSample(0, s, l); outputBuffer.addSample(1, s, r); }
         else            { outputBuffer.addSample(0, s, 0.5f * (l + r)); }
