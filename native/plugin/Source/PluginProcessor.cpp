@@ -647,18 +647,24 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                 stoppedBlocks++;
                 const double sr = getSampleRate() > 0 ? getSampleRate() : 44100.0;
                 const int blockSamples = juce::jmax(1, buffer.getNumSamples());
-                const int blocksFor500ms = (int) (0.5 * sr / blockSamples);
-                if (stoppedBlocks == blocksFor500ms
-                    && ! synthEngine.hasActiveVoices()
-                    && ! synthEngine.hasHeldNotes())
+                const int blocksFor120ms = juce::jmax(1, (int) (0.12 * sr / blockSamples));
+                const int blocksFor700ms = juce::jmax(blocksFor120ms + 1, (int) (0.70 * sr / blockSamples));
+
+                if (stoppedBlocks >= blocksFor120ms)
+                    synthEngine.getFx().notifyTransportStopped(blockSamples);
+
+                if (stoppedBlocks == blocksFor700ms)
                 {
+                    synthEngine.allNotesOff(0, false);
+                    synthEngine.forEachSynthVoice([](SynthVoice& v) { v.resetNote(); });
                     synthEngine.getFx().reset();
-                    didaAudioLog("transport stopped — flushed FX tails");
+                    didaAudioLog("transport stopped — killed voices and flushed FX tails");
                 }
             }
             else
             {
                 stoppedBlocks = 0;
+                synthEngine.getFx().notifyTransportPlaying();
             }
         }
     }
