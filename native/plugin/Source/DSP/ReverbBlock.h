@@ -265,6 +265,29 @@ public:
         silenceSamples = 0;
     }
 
+    /** Called by the host when transport is stopped. It keeps a little tail
+        for musical stops, then rapidly drains and finally clears the tank. */
+    void notifyTransportStopped(int numSamples) noexcept
+    {
+        const int n = juce::jmax(1, numSamples);
+        silenceSamples += n;
+        if (silenceSamples > (int) (sampleRate * 1.0))
+        {
+            reset();
+            return;
+        }
+
+        const float decay = silenceSamples > (int) (sampleRate * 0.10) ? 0.72f : 0.88f;
+        for (auto& c : combL) c.decayState(decay);
+        for (auto& c : combR) c.decayState(decay);
+        for (auto& a : apL) a.decayState(decay);
+        for (auto& a : apR) a.decayState(decay);
+        for (auto& a : outApL) a.decayState(decay);
+        for (auto& a : outApR) a.decayState(decay);
+    }
+
+    void notifyTransportPlaying() noexcept { silenceSamples = 0; }
+
 
 private:
     struct OnePoleTone
@@ -308,6 +331,7 @@ private:
 
         void prepare(int sz) { size = std::max(1, sz); buf.assign((size_t) size, 0.0f); idx = 0; }
         void reset()         { std::fill(buf.begin(), buf.end(), 0.0f); idx = 0; }
+        void decayState(float g) noexcept { for (auto& x : buf) x *= g; }
         float process(float x) noexcept
         {
             const float bufOut = buf[(size_t) idx];
@@ -342,6 +366,11 @@ private:
             lfoPhase = 0.0f;
         }
         void reset() { std::fill(buf.begin(), buf.end(), 0.0f); writeIdx = 0; dampState = 0.0f; }
+        void decayState(float g) noexcept
+        {
+            for (auto& x : buf) x *= g;
+            dampState *= g;
+        }
 
         float process(float in) noexcept
         {
