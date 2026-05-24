@@ -34,7 +34,16 @@
 #include "HybridPresetApplier.h"
 #include "../PluginProcessor.h"
 #include "../DSP/SynthEngine.h"
+#include "../DSP/Voice.h"
+#include "../DSP/Engines/IEngineSource.h"
+#include "../DSP/Engines/AnalogEngine.h"
+#include "../DSP/Engines/SupersawEngine.h"
+#include "../DSP/Engines/FmEngine.h"
+#include "../DSP/Engines/WavetableEngine.h"
+#include "../DSP/Engines/GranularEngine.h"
+#include "../DSP/Engines/PcmEngine.h"
 #include <algorithm>
+
 
 namespace dida { namespace userpreset {
 
