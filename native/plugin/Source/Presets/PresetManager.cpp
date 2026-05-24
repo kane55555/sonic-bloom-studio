@@ -1124,7 +1124,7 @@ void PresetManager::loadDiapresetFiles()
             PresetInfo info;
             info.name           = up.presetName;
             info.author         = "User";
-            info.category       = up.category.isNotEmpty() ? up.category : cat;
+            info.category       = cat;
             info.description    = "User preset (" + up.source.type + ")";
             info.filePath       = f.getFullPathName();
             info.isFactory      = false;
