@@ -201,11 +201,34 @@ private:
         for (auto& c : categoryOrder())
             if (c.equalsIgnoreCase(hintCat)) return c;
 
-        // 1b) Unknown but non-empty folder hint: preserve the user's exact
+        // 1b) Folder hints like "Trap Brass" or "Sad Piano" are descriptive
+        //     child folders, not new browser sections. Keep them in the broad
+        //     instrument bucket the user expects.
+        const auto h = hintCat.toLowerCase();
+        auto hintAny = [&](std::initializer_list<const char*> kws) {
+            for (auto* k : kws) if (h.contains(k)) return true;
+            return false;
+        };
+        if (hintAny({"piano", "grand", "upright", "rhodes", "wurli"}))      return "Pianos";
+        if (hintAny({"guitar", "nylon", "strat", "tele", "acoustic"}))      return "Guitars";
+        if (hintAny({"choir", "vocal", "vox", "ahh", "ooh", "voice"}))      return "Choirs";
+        if (hintAny({"violin", "viola", "cello", "orchestra", "string"}))   return "Strings";
+        if (hintAny({"brass", "trumpet", "trombone", "horn", "tuba", "sax"})) return "Brass";
+        if (hintAny({"flute", "clarinet", "oboe", "bassoon", "wind"}))      return "Winds";
+        if (hintAny({"bell", "mallet", "music box", "chime", "glock"}))     return "Bells";
+        if (hintAny({"pluck"}))                                              return "Plucks";
+        if (hintAny({"pad", "ambient", "atmosphere", "drone"}))             return "Pads";
+        if (hintAny({"lead", "solo"}))                                       return "Leads";
+        if (hintAny({"bass", "808", "sub"}))                                return "Bass";
+        if (hintAny({"drum", "kick", "snare", "clap", "hat", "perc", "tom", "cymbal"})) return "Drums";
+        if (hintAny({"fx", "texture", "noise", "sweep", "riser", "impact", "hit"})) return "FX";
+        if (hintAny({"key", "ep", "organ", "clav"}))                        return "Keys";
+        if (hintAny({"synth"}))                                              return "Synths";
+
+        // 1c) Unknown but non-empty folder hint: preserve the user's exact
         //     folder name so custom folders under Samples/Presets/User/
         //     appear as their own category tab labelled as typed.
         if (hintCat.trim().isNotEmpty()) return hintCat;
-
 
         // 2) Otherwise infer from the preset name.
         const auto n = nameIn.toLowerCase();

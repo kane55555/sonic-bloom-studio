@@ -67,7 +67,6 @@ void PresetManager::scanPresetDirectory()
     loadFactoryPresets();
     loadUserPresets();
     loadDiapresetFiles();
-    autoIndexUserInstrumentFolders();
 
     // Browser source of truth: only .diapreset files inside
     // <Samples>/Presets/User/<Category>/ should appear in the user-facing
@@ -159,6 +158,83 @@ static juce::File chooseRepresentativeMappedWav(const juce::Array<juce::File>& f
     }
 
     return chosen;
+}
+
+static bool categoryNamesMatch(const juce::String& a, const juce::String& b)
+{
+    const auto aa = a.trim();
+    const auto bb = b.trim();
+    if (aa.equalsIgnoreCase(bb)) return true;
+    if (aa.endsWithIgnoreCase("s") && aa.dropLastCharacters(1).equalsIgnoreCase(bb)) return true;
+    if (bb.endsWithIgnoreCase("s") && bb.dropLastCharacters(1).equalsIgnoreCase(aa)) return true;
+    return false;
+}
+
+static bool folderHasMappedAudio(const juce::File& folder, bool recursive)
+{
+    if (! folder.isDirectory()) return false;
+    const auto files = folder.findChildFiles(juce::File::findFiles, recursive,
+                                             "*.wav;*.aif;*.aiff;*.flac;*.mp3;*.ogg");
+    for (auto& f : files)
+        if (! f.getFileNameWithoutExtension().endsWithIgnoreCase(".original")
+            && parseRootMidiFromStem(f.getFileNameWithoutExtension()) >= 0)
+            return true;
+    return false;
+}
+
+static bool pathLivesInCategory(const juce::File& folder, const juce::String& category)
+{
+    if (! folder.isDirectory() || category.trim().isEmpty()) return false;
+    auto cursor = folder;
+    for (int guard = 0; guard < 24 && cursor.getFullPathName().isNotEmpty(); ++guard)
+    {
+        if (categoryNamesMatch(cursor.getFileName(), category)) return true;
+        const auto parent = cursor.getParentDirectory();
+        if (parent == cursor) break;
+        cursor = parent;
+    }
+    return false;
+}
+
+static juce::File findCategorySourceFolder(const juce::File& userPresetRoot,
+                                           const juce::String& category,
+                                           const juce::String& preferredLeaf,
+                                           const juce::File& presetFile)
+{
+    auto catDir = userPresetRoot.getChildFile(category);
+    if (! catDir.isDirectory()) return {};
+
+    for (auto cursor = presetFile.getParentDirectory();
+         cursor.isDirectory() && cursor != catDir.getParentDirectory();)
+    {
+        if (cursor == catDir)
+        {
+            if (folderHasMappedAudio(cursor, false)) return cursor;
+            break;
+        }
+        if (folderHasMappedAudio(cursor, true)) return cursor;
+
+        const auto parent = cursor.getParentDirectory();
+        if (parent == cursor) break;
+        cursor = parent;
+    }
+
+    auto subdirs = catDir.findChildFiles(juce::File::findDirectories, true);
+    std::sort(subdirs.begin(), subdirs.end(), [](const juce::File& a, const juce::File& b) {
+        return a.getFullPathName().compareNatural(b.getFullPathName()) < 0;
+    });
+
+    if (preferredLeaf.isNotEmpty())
+        for (auto& sub : subdirs)
+            if (sub.getFileName().equalsIgnoreCase(preferredLeaf) && folderHasMappedAudio(sub, true))
+                return sub;
+
+    if (folderHasMappedAudio(catDir, false)) return catDir;
+    for (auto& sub : subdirs)
+        if (folderHasMappedAudio(sub, true))
+            return sub;
+
+    return {};
 }
 
 // Scan one "category root" directory. Each immediate subfolder is treated as
@@ -562,70 +638,31 @@ void PresetManager::loadPreset(int index)
 
         didaPresetManagerLog("loading diapreset: " + up.presetName);
 
-        // Resolution order for the multisample source:
-        //   1. The path stored in the .diapreset itself (works on the
-        //      author's machine).
-        //   2. An already-indexed sample-drop instrument with the same leaf
-        //      folder name (e.g. "Guitar 1") regardless of category.
-        //   3. ANY instrument subfolder dropped under
-        //      <UserPresetDir>/<Category>/  — this is what lets the user
-        //      simply drop one instrument folder per category (Guitars/Guitar 1,
-        //      Pianos/Grand 1, Pads/Warm 1, ...) and have every .diapreset
-        //      in that category auto-route to it.
-        //   4. None — apply the preset's sound design to the factory synth
-        //      (used by the Synths category, where there is no sample folder).
-        auto resolved = dida::userpreset::resolveSourcePath(up.source.path);
+        const auto effectiveCategory = info.category.isNotEmpty()
+            ? info.category
+            : (up.category.isNotEmpty() ? up.category : juce::String("User"));
+        const auto sourceLeaf = juce::File(up.source.path.replaceCharacter('\\', '/')).getFileName();
+
+        auto resolved = findCategorySourceFolder(getUserPresetDirectory(), effectiveCategory, sourceLeaf, file);
+        if (resolved.isDirectory())
+            didaPresetManagerLog("diapreset routed within folder category=" + effectiveCategory
+                + " folder=" + resolved.getFullPathName());
+
         if (! resolved.isDirectory())
         {
-            didaPresetManagerLog("diapreset source folder missing path=" + up.source.path);
-
-            const auto sourceLeaf = juce::File(up.source.path.replaceCharacter('\\', '/')).getFileName();
-            for (const auto& candidate : presets)
+            resolved = dida::userpreset::resolveSourcePath(up.source.path);
+            if (resolved.isDirectory() && ! pathLivesInCategory(resolved, effectiveCategory))
             {
-                if (! candidate.isSampleDrop || candidate.sampleFolderPath.isEmpty())
-                    continue;
-
-                const auto candidateFolder = juce::File(candidate.sampleFolderPath);
-                if (candidate.name.equalsIgnoreCase(sourceLeaf) && candidateFolder.isDirectory())
-                {
-                    resolved = candidateFolder;
-                    didaPresetManagerLog("diapreset routed to indexed source " + candidate.name
-                        + " folder=" + resolved.getFullPathName());
-                    break;
-                }
+                didaPresetManagerLog("diapreset source outside folder category ignored path="
+                    + resolved.getFullPathName() + " category=" + effectiveCategory);
+                resolved = {};
             }
         }
 
-        // Step 3: scan <UserPresetDir>/<Category>/ for any subfolder that
-        // contains mapped WAVs and use the first one. This is the "drop one
-        // instrument folder per category" behaviour the user asked for.
         if (! resolved.isDirectory())
         {
-            const auto cat = up.category.isNotEmpty()
-                ? up.category
-                : juce::File(info.filePath).getParentDirectory().getFileName();
-            auto catDir = getUserPresetDirectory().getChildFile(cat);
-            if (catDir.isDirectory())
-            {
-                auto subdirs = catDir.findChildFiles(juce::File::findDirectories, false);
-                std::sort(subdirs.begin(), subdirs.end(), [](const juce::File& a, const juce::File& b) {
-                    return a.getFileName().compareNatural(b.getFileName()) < 0;
-                });
-                for (auto& sub : subdirs)
-                {
-                    auto wavs = sub.findChildFiles(juce::File::findFiles, true, "*.wav");
-                    bool anyMapped = false;
-                    for (auto& w : wavs)
-                        if (parseRootMidiFromStem(w.getFileNameWithoutExtension()) >= 0)
-                        { anyMapped = true; break; }
-                    if (anyMapped)
-                    {
-                        resolved = sub;
-                        didaPresetManagerLog("diapreset auto-routed to category instrument folder=" + resolved.getFullPathName());
-                        break;
-                    }
-                }
-            }
+            didaPresetManagerLog("diapreset source folder missing in category=" + effectiveCategory
+                + " path=" + up.source.path);
         }
 
         // Common reset of sample state; we re-fill it below when we have a folder.
@@ -635,8 +672,8 @@ void PresetManager::loadPreset(int index)
         requestedSampleFolderPath  = {};
         requestedSampleDisplayName = up.presetName;
         requestedSampleRootMidi    = 60;
-        requestedSampleLooping     = isSustainedSampleCategory(up.category);
-        requestedCategory          = up.category;
+        requestedSampleLooping     = isSustainedSampleCategory(effectiveCategory);
+        requestedCategory          = effectiveCategory;
         macroMapper.clear();
         requestedPresetIsUserDiapreset = true;
         pendingUserDiapreset = up;
@@ -1061,8 +1098,9 @@ juce::String PresetManager::computeChecksum(const juce::String& jsonContent)
 
 void PresetManager::loadDiapresetFiles()
 {
-    // Scan <Samples>/Presets/User/<Category>/*.diapreset and add one entry
-    // per file. Categories are inferred from the immediate parent folder.
+    // Scan <Samples>/Presets/User/<Category>/**/*.diapreset and add one entry
+    // per file. The immediate folder under User is always the browser category,
+    // so nested instrument/source folders never become UI subcategories.
     auto root = getUserPresetDirectory();
     if (! root.isDirectory()) return;
 
@@ -1074,7 +1112,7 @@ void PresetManager::loadDiapresetFiles()
     for (auto& catDir : categoryDirs)
     {
         const auto cat = catDir.getFileName();
-        auto files = catDir.findChildFiles(juce::File::findFiles, false, "*.diapreset");
+        auto files = catDir.findChildFiles(juce::File::findFiles, true, "*.diapreset");
         std::sort(files.begin(), files.end(),
             [](const juce::File& a, const juce::File& b)
             { return a.getFileName().compareNatural(b.getFileName()) < 0; });
@@ -1092,7 +1130,7 @@ void PresetManager::loadDiapresetFiles()
             PresetInfo info;
             info.name           = up.presetName;
             info.author         = "User";
-            info.category       = up.category.isNotEmpty() ? up.category : cat;
+            info.category       = cat;
             info.description    = "User preset (" + up.source.type + ")";
             info.filePath       = f.getFullPathName();
             info.isFactory      = false;
