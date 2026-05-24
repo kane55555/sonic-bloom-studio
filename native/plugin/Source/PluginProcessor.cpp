@@ -585,11 +585,13 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     fx.setDelayTime(getF("fxDelayTime"));
     fx.setDelayFeedback(getF("fxDelayFeedback"));
 
-    fx.setReverbMix (directMonitor ? 0.0f
-                                   : (presetMacrosActive ? clamp01(getF("fxReverbMix"))
-                                                         : clamp01(getF("fxReverbMix")  + m7 * 0.6f)));
-    fx.setReverbSize(presetMacrosActive ? clamp01(getF("fxReverbSize"))
-                                        : clamp01(getF("fxReverbSize") + m5 * 0.5f));
+    const float reverbMix = directMonitor ? 0.0f
+        : (presetMacrosActive ? clamp01(getF("fxReverbMix"))
+                              : clamp01(getF("fxReverbMix") + m7 * 0.25f));
+    const float reverbSize = presetMacrosActive ? clamp01(getF("fxReverbSize"))
+                                                : clamp01(getF("fxReverbSize") + m5 * 0.20f);
+    fx.setReverbMix (juce::jlimit(0.0f, 0.45f, reverbMix));
+    fx.setReverbSize(juce::jlimit(0.0f, 0.78f, reverbSize));
 
     fx.setChorusMode(static_cast<int>(getF("chorusMode")));
     fx.setEqLowDb (getF("eqLow"));
