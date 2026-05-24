@@ -636,6 +636,30 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // ---- Render voices + FX (master gain + limiter applied inside FX chain) ----
     synthEngine.renderBlockWithFx(buffer, midiMessages, 0, buffer.getNumSamples());
 
+    // ---- Output clipping meter: warn if the master bus exceeds -1 dBFS
+    //      (~0.891). Throttled to once every ~1s to avoid log spam. ----
+    {
+        float peak = 0.0f;
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+            peak = juce::jmax(peak, buffer.getMagnitude(ch, 0, buffer.getNumSamples()));
+        if (peak > 0.891f)
+        {
+            ++clipBlocksSinceLog;
+            const double sr = getSampleRate() > 0 ? getSampleRate() : 44100.0;
+            const int blocksPerSecond = juce::jmax(1, (int) (sr / juce::jmax(1, buffer.getNumSamples())));
+            if (clipBlocksSinceLog >= blocksPerSecond)
+            {
+                didaAudioLog(juce::String("CLIP WARNING outputPeak=")
+                    + juce::String(20.0f * std::log10(juce::jmax(1.0e-9f, peak)), 2) + " dBFS");
+                clipBlocksSinceLog = 0;
+            }
+        }
+        else
+        {
+            clipBlocksSinceLog = 0;
+        }
+    }
+
    #if JUCE_DEBUG
     static int s_renderTraceCounter = 0;
     if ((++s_renderTraceCounter % 512) == 0)
