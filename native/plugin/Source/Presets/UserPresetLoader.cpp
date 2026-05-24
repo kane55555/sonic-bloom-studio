@@ -752,40 +752,89 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
         || fam == Family::Guitar    || fam == Family::Bell
         || fam == Family::Pluck     || fam == Family::Other;
 
-    float layer2GainDb = p.layer2.gainDb;
-    if (p.layer2.enabled && isPcmFamily && ! p.experimental)
+    // ------- BlendMode-driven layer-2 contract -------
+    // Resolve the effective blend mode: explicit JSON wins; otherwise pick a
+    // sane default per family. Each mode carries its own max-gain cap and
+    // sine-on-PCM swap policy. Experimental presets opt out of clamping.
+    auto resolveBlendMode = [&]() -> juce::String
     {
-        // PCM reinforcement contract:
-        //   * absolute ceiling = -15 dB (any louder gets snapped to the
-        //     safe default of -22 dB and logged)
-        //   * raw Sine on top of a real instrument is the #1 cause of the
-        //     "beep stacked over the sample" complaint — auto-swap to a
-        //     Triangle so the reinforcement blends instead of whistling
-        const float kReinforcementMaxDb     = -15.0f;
-        const float kReinforcementDefaultDb = -22.0f;
-        if (layer2GainDb > kReinforcementMaxDb)
+        const auto explicitMode = p.layer2.blendMode.trim().toLowerCase();
+        if (explicitMode.isNotEmpty()) return explicitMode;
+        switch (fam)
+        {
+            case Family::Brass:     return "addwarmth";
+            case Family::Guitar:    return "hiddentexture";
+            case Family::PianoKeys: return "addair";
+            case Family::ChoirVox:  return "addair";
+            case Family::Pad:       return "addair";
+            case Family::Bell:      return "addair";
+            case Family::Pluck:     return "hiddentexture";
+            case Family::Bass808:   return "subsupport";
+            case Family::Lead:      return "leadlayer";
+            case Family::Synth:     return "leadlayer";
+            default:                return "reinforcebody";
+        }
+    };
+
+    struct BlendPolicy { float maxGainDb; float defaultGainDb; bool swapSineToTriangle; };
+    auto policyFor = [](const juce::String& mode) -> BlendPolicy
+    {
+        if (mode == "leadlayer")     return { 0.0f,    -3.0f,  false };
+        if (mode == "subsupport")    return { -12.0f, -15.0f,  false };
+        if (mode == "reinforcebody") return { -15.0f, -18.0f,  true  };
+        if (mode == "addwarmth")     return { -18.0f, -22.0f,  true  };
+        if (mode == "addair")        return { -22.0f, -26.0f,  false }; // sine is fine, just quiet
+        if (mode == "hiddentexture") return { -28.0f, -32.0f,  false };
+        return { -15.0f, -22.0f, true }; // unknown -> safest PCM cap
+    };
+
+    float layer2GainDb = p.layer2.gainDb;
+    if (p.layer2.enabled && ! p.experimental)
+    {
+        const auto mode    = resolveBlendMode();
+        const auto policy  = policyFor(mode);
+
+        // Explicit per-preset maxGainDb beats the mode default, but never
+        // overrides the family ceiling for PCM presets.
+        float effectiveMax = policy.maxGainDb;
+        if (p.layer2.maxGainDb < 0.0f)
+            effectiveMax = juce::jmin(effectiveMax, p.layer2.maxGainDb);
+
+        // subSupport is only musical for Bass808 — fold to addAir for everyone else.
+        const bool subSupportInvalid = (mode == "subsupport") && (fam != Family::Bass808);
+
+        // Only PCM/sample families enforce the clamp; true synth families
+        // can run loud oscillator layers as their main sound.
+        const bool enforce = isPcmFamily || subSupportInvalid;
+        if (enforce && layer2GainDb > effectiveMax)
         {
             juce::Logger::writeToLog(juce::String("[DIDITAGAIN layer-safety] preset=")
-                + p.presetName + " layer=layer2 reason=PCM synth reinforcement too loud"
+                + p.presetName + " layer=layer2"
+                + " blendMode=" + mode
+                + " reason=" + (subSupportInvalid ? juce::String("subSupport invalid for category")
+                                                  : juce::String("over blendMode cap"))
                 + " oldGain=" + juce::String(layer2GainDb, 1)
-                + " newGain=" + juce::String(kReinforcementDefaultDb, 1)
+                + " newGain=" + juce::String(policy.defaultGainDb, 1)
                 + " category=" + p.category);
-            layer2GainDb = kReinforcementDefaultDb;
+            layer2GainDb = policy.defaultGainDb;
         }
 
-        // Auto-swap raw Sine → Triangle on PCM presets. Triangle has the
-        // same fundamental energy but enough upper-harmonic content to be
-        // masked by the sampled instrument instead of poking out as a tone.
-        for (auto* param : proc.getParameters())
-            if (auto* c = dynamic_cast<juce::AudioParameterChoice*>(param))
-                if (c->paramID == "oscBWaveform" && c->getIndex() == 0 /*Sine*/)
-                {
-                    setParamRaw(c, c->convertTo0to1(1.0f)); // Triangle
-                    juce::Logger::writeToLog(juce::String("[DIDITAGAIN layer-safety] preset=")
-                        + p.presetName + " layer=layer2 swappedSineToTriangle=1"
-                        + " category=" + p.category);
-                    break;
-                }
+        // Auto-swap raw Sine → Triangle when the blend mode says so. Lead/
+        // air/subSupport presets are allowed to keep a sine since they're
+        // either supposed to be loud (lead) or already bandwidth-limited.
+        if (policy.swapSineToTriangle && isPcmFamily)
+        {
+            for (auto* param : proc.getParameters())
+                if (auto* c = dynamic_cast<juce::AudioParameterChoice*>(param))
+                    if (c->paramID == "oscBWaveform" && c->getIndex() == 0 /*Sine*/)
+                    {
+                        setParamRaw(c, c->convertTo0to1(1.0f)); // Triangle
+                        juce::Logger::writeToLog(juce::String("[DIDITAGAIN layer-safety] preset=")
+                            + p.presetName + " layer=layer2 blendMode=" + mode
+                            + " swappedSineToTriangle=1 category=" + p.category);
+                        break;
+                    }
+        }
     }
 
     setParamById(proc, "oscBLevel",  p.layer2.enabled
