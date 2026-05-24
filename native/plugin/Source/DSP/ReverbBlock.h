@@ -96,7 +96,14 @@ public:
         if (blockRms < kSilenceThresh)
             silenceSamples += n;
         else
+        {
+            if (silenceSamples > 0)
+            {
+                dirty = true;
+                recompute();
+            }
             silenceSamples = 0;
+        }
 
         const int silenceDecayStart = (int) (sampleRate * 0.25); // 250 ms
         const int silenceHardReset  = (int) (sampleRate * 2.0);  // 2 s
@@ -286,7 +293,7 @@ public:
         for (auto& a : outApR) a.decayState(decay);
     }
 
-    void notifyTransportPlaying() noexcept { silenceSamples = 0; }
+    void notifyTransportPlaying() noexcept { silenceSamples = 0; dirty = true; }
 
 
 private:
