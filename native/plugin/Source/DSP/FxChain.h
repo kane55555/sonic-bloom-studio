@@ -127,6 +127,15 @@ public:
     {
         reverb.setLowMonoControl(cutoffHz, lowWidth);
     }
+    void notifyTransportStopped(int numSamples)
+    {
+        delay.reset();
+        reverb.notifyTransportStopped(numSamples);
+    }
+    void notifyTransportPlaying()
+    {
+        reverb.notifyTransportPlaying();
+    }
 
     void setEqLowDb (float db) { eq.setLowDb(db); }
     void setEqMidDb (float db) { eq.setMidDb(db); }
