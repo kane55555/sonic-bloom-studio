@@ -729,6 +729,13 @@ void PresetManager::loadPreset(int index)
                 if (parseRootMidiFromStem(f.getFileNameWithoutExtension()) >= 0)
                     requestedSampleSources.add(f.getFullPathName());
 
+            // Fallback: folder has audio but none follow the midi-root naming
+            // convention (e.g. "Alto Sax.wav"). Still route it — assume root C4.
+            if (requestedSampleSources.isEmpty())
+                for (auto& f : files)
+                    if (! f.getFileNameWithoutExtension().endsWithIgnoreCase(".original"))
+                        requestedSampleSources.add(f.getFullPathName());
+
             didaPresetManagerLog("found WAV count: " + juce::String(files.size()));
             didaPresetManagerLog("valid mapped WAV count: " + juce::String(requestedSampleSources.size()));
 
