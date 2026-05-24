@@ -747,16 +747,37 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     float layer2GainDb = p.layer2.gainDb;
     if (p.layer2.enabled && isPcmFamily && ! p.experimental)
     {
-        const float kReinforcementMaxDb = -15.0f;
+        // PCM reinforcement contract:
+        //   * absolute ceiling = -15 dB (any louder gets snapped to the
+        //     safe default of -22 dB and logged)
+        //   * raw Sine on top of a real instrument is the #1 cause of the
+        //     "beep stacked over the sample" complaint — auto-swap to a
+        //     Triangle so the reinforcement blends instead of whistling
+        const float kReinforcementMaxDb     = -15.0f;
+        const float kReinforcementDefaultDb = -22.0f;
         if (layer2GainDb > kReinforcementMaxDb)
         {
             juce::Logger::writeToLog(juce::String("[DIDITAGAIN layer-safety] preset=")
-                + p.presetName + " layer=layer2 reason=sine reinforcement too loud"
+                + p.presetName + " layer=layer2 reason=PCM synth reinforcement too loud"
                 + " oldGain=" + juce::String(layer2GainDb, 1)
-                + " newGain=" + juce::String(kReinforcementMaxDb, 1)
+                + " newGain=" + juce::String(kReinforcementDefaultDb, 1)
                 + " category=" + p.category);
-            layer2GainDb = kReinforcementMaxDb;
+            layer2GainDb = kReinforcementDefaultDb;
         }
+
+        // Auto-swap raw Sine → Triangle on PCM presets. Triangle has the
+        // same fundamental energy but enough upper-harmonic content to be
+        // masked by the sampled instrument instead of poking out as a tone.
+        for (auto* param : proc.getParameters())
+            if (auto* c = dynamic_cast<juce::AudioParameterChoice*>(param))
+                if (c->paramID == "oscBWaveform" && c->getIndex() == 0 /*Sine*/)
+                {
+                    setParamRaw(c, c->convertTo0to1(1.0f)); // Triangle
+                    juce::Logger::writeToLog(juce::String("[DIDITAGAIN layer-safety] preset=")
+                        + p.presetName + " layer=layer2 swappedSineToTriangle=1"
+                        + " category=" + p.category);
+                    break;
+                }
     }
 
     setParamById(proc, "oscBLevel",  p.layer2.enabled
