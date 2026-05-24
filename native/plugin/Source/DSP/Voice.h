@@ -14,6 +14,9 @@
 #include "FilterBlock.h"
 #include "Envelope.h"
 #include "SampleLibrary.h"
+#include "Synthesis/UnisonEngine.h"
+#include "Synthesis/HarmonicExciter.h"
+#include "Synthesis/StereoSpread.h"
 #include "Layers/LayerEQCarver.h"
 
 // Lightweight stand-ins so legacy editor/UI code that took an Oscillator&
@@ -60,6 +63,18 @@ public:
     void setVoiceCardIndex(int idx) noexcept { voiceCardIndex = idx; }
     void setVintageAmount(float a) noexcept  { vintageAmount = juce::jlimit(0.0f, 1.0f, a); }
     int  getVoiceCardIndex() const noexcept  { return voiceCardIndex; }
+
+    // ---- New hybrid-synth controls (unison/exciter/spread) ----
+    void setUnisonRender(int voices, float detune, float spread, float drift) noexcept
+    {
+        unisonRenderVoices = voices;
+        unisonRenderDetune = detune;
+        unisonRenderSpread = spread;
+        unisonRenderDrift  = drift;
+        unison.setConfig(voices, detune, spread, drift);
+    }
+    void setExciterAmount(float a) noexcept       { exciter.setAmount(a); }
+    void setStereoSpreadAmount(float a) noexcept  { spreader.setAmount(a); }
 
 
     // --- Crop / loop metadata (fractions of the buffer length, 0..1) ---
