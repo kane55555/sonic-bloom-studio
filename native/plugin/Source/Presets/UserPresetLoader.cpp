@@ -635,15 +635,15 @@ FxLimits fxLimitsFor(Family f)
     // Reasonable upper caps so e.g. piano presets can't ship at 80% reverb.
     switch (f) {
         case Family::PianoKeys: return { 0.18f, 0.16f, 0.32f, 0.12f };
-        case Family::Lead:      return { 0.35f, 0.45f, 0.50f, 0.45f };
-        case Family::Pad:       return { 0.45f, 0.40f, 0.55f, 0.25f };
-        case Family::ChoirVox:  return { 0.35f, 0.30f, 0.55f, 0.18f };
+        case Family::Lead:      return { 0.35f, 0.45f, 0.38f, 0.45f };
+        case Family::Pad:       return { 0.42f, 0.34f, 0.42f, 0.25f };
+        case Family::ChoirVox:  return { 0.32f, 0.26f, 0.42f, 0.18f };
         case Family::Brass:     return { 0.25f, 0.30f, 0.42f, 0.30f };
         case Family::Guitar:    return { 0.30f, 0.35f, 0.38f, 0.40f };
         case Family::Bell:      return { 0.30f, 0.35f, 0.48f, 0.18f };
         case Family::Pluck:     return { 0.30f, 0.35f, 0.35f, 0.18f };
         case Family::Bass808:   return { 0.12f, 0.18f, 0.18f, 0.35f };
-        case Family::FxRiser:   return { 0.60f, 0.70f, 0.70f, 0.60f };
+        case Family::FxRiser:   return { 0.50f, 0.55f, 0.48f, 0.50f };
         // Vintage synth strict caps (chorus/delay/reverb/sat) — matches the
         // "remove static, keep warm" spec. Saturation drive is also capped
         // hard at 0.16 to stop layer-bus tanh from overdriving the chain.
