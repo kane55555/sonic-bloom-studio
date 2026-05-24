@@ -191,6 +191,10 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
     ampEnv.noteOn();
     filterEnv.noteOn();
     modEnv.noteOn();
+
+    for (auto& slot : partials_)
+        if (slot.enabled && slot.engine)
+            slot.engine->noteOn(static_cast<int>(targetMidiNote), velocity);
 }
 
 void SynthVoice::stopNote(float, bool allowTailOff)
@@ -198,8 +202,11 @@ void SynthVoice::stopNote(float, bool allowTailOff)
     ampEnv.noteOff();
     filterEnv.noteOff();
     modEnv.noteOff();
+    for (auto& slot : partials_)
+        if (slot.enabled && slot.engine) slot.engine->noteOff();
     if (! allowTailOff) { clearCurrentNote(); reset(); }
 }
+
 
 void SynthVoice::pitchWheelMoved(int) {}
 void SynthVoice::controllerMoved(int, int) {}
