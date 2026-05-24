@@ -545,8 +545,15 @@ void applyLayerBusCharacter(juce::AudioProcessor& proc, const UserPreset& p, Fam
     const float movement = juce::jlimit(0.0f, 1.0f, p.macros.movement);
 
     bus.setEnabled(true);
-    bus.setSaturationDrive(0.08f + warmth * 0.30f);   // subtle analog glue
-    bus.setSaturationMix  (0.10f + warmth * 0.35f);
+    // Synth family gets much gentler glue so the shared tanh doesn't pile on
+    // top of per-voice saturation. Other families keep their original curve.
+    const bool synthFam = (fam == Family::Synth);
+    const float satDriveMax = synthFam ? 0.16f : 0.38f;
+    const float satMixMax   = synthFam ? 0.14f : 0.45f;
+    const float satDriveBase = synthFam ? 0.04f : 0.08f;
+    const float satMixBase   = synthFam ? 0.06f : 0.10f;
+    bus.setSaturationDrive(juce::jmin(satDriveMax, satDriveBase + warmth * (satDriveMax - satDriveBase)));
+    bus.setSaturationMix  (juce::jmin(satMixMax,   satMixBase   + warmth * (satMixMax   - satMixBase)));
 
     // Per-family width baseline (then macro nudges it).
     float baseWidth = 0.85f;
@@ -558,6 +565,7 @@ void applyLayerBusCharacter(juce::AudioProcessor& proc, const UserPreset& p, Fam
         case Family::Brass:     baseWidth = 0.80f; break;
         case Family::Guitar:    baseWidth = 0.78f; break;
         case Family::Bass808:   baseWidth = 0.35f; break; // narrow low end
+        case Family::Synth:     baseWidth = 0.80f; break;
         default: break;
     }
     bus.setWidth(juce::jlimit(0.0f, 1.4f, baseWidth * (0.6f + width * 0.8f)));
