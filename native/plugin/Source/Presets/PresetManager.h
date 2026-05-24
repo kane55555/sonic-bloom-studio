@@ -136,6 +136,7 @@ private:
     void loadUserPresets();
     void loadDroppedSamples();
     void loadDiapresetFiles();
+    void autoIndexUserInstrumentFolders();
     void seedGuitarPresetBankIfMissing();
     void seedVintageSynthBankIfMissing();
 };
