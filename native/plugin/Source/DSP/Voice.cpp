@@ -89,6 +89,8 @@ void SynthVoice::reset() noexcept
     loFinished = hiFinished = true;
     isActive = false;
     oscBPhase = subPhase = fmModPhase = sineFallbackPhase = 0.0;
+    fmOp3Phase = fmOp4Phase = 0.0;
+    fmFeedbackZ = 0.0f;
     pinkB0 = pinkB1 = pinkB2 = 0.0f;
     filter.reset();
     for (auto& slot : partials_)
