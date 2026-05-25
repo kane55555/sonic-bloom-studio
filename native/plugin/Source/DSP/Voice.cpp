@@ -187,10 +187,27 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
     oscBPhase = phaseJ(noiseRng);
     subPhase  = phaseJ(noiseRng) * 0.5;
 
-    noiseHpL.reset(); noiseHpR.reset();
-    subLp.reset(); oscBHp.reset();
+    noiseCarverL.reset(); noiseCarverR.reset();
+    subCarver.reset(); oscBCarver.reset();
+
+    // ---- followMainEnvelope fade-in init ----
+    // Each layer fades in over its configured fadeMs window so reinforcement
+    // sine/triangle/noise/sub layers ease in beneath the main sample attack
+    // instead of beeping out in front. Also enforces minimum 8 ms so even
+    // an attack of 0 cannot produce a click.
+    auto initFade = [this](bool follow, float ms, int& remaining, int& total)
+    {
+        if (! follow) { remaining = total = 0; return; }
+        const int samples = (int) std::ceil((double) juce::jmax(8.0f, ms) * 0.001 * sampleRate);
+        total = samples; remaining = samples;
+    };
+    initFade(oscBFollowMain,  oscBFollowFadeMs,  oscBFadeSamplesRemaining,  oscBFadeSamplesTotal);
+    initFade(noiseFollowMain, noiseFollowFadeMs, noiseFadeSamplesRemaining, noiseFadeSamplesTotal);
+    initFade(subFollowMain,   subFollowFadeMs,   subFadeSamplesRemaining,   subFadeSamplesTotal);
+
     // Per-note phase scramble for the unison stack — anti-machine-gun.
     unison.randomizePhasesAndDrift();
+
 
 
     ampEnv.noteOn();
