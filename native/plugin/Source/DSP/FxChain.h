@@ -235,8 +235,31 @@ private:
         }
     }
 
+    // Per-block peak capture for the debug quality reporter.
+    static void captureRecentPeak(const juce::AudioBuffer<float>& buf,
+                                  std::atomic<float>& slot) noexcept
+    {
+        float p = 0.0f;
+        const int n = buf.getNumSamples();
+        for (int ch = 0; ch < buf.getNumChannels(); ++ch)
+        {
+            const auto* d = buf.getReadPointer(ch);
+            for (int i = 0; i < n; ++i) { const float a = std::fabs(d[i]); if (a > p) p = a; }
+        }
+        slot.store(p, std::memory_order_relaxed);
+    }
+
+    static float toDb(float lin) noexcept
+    {
+        return lin > 1.0e-6f ? juce::Decibels::gainToDecibels(lin) : -120.0f;
+    }
+
     int clipFramesSinceLog = 100000;
     float fxInPeak = 0.0f;  int fxInFrames = 0;
+    std::atomic<float> fxInRecent  { 0.0f };
+    std::atomic<float> fxOutRecent { 0.0f };
+    std::atomic<float> finalRecent { 0.0f };
+
 
     Saturation       sat;
 
