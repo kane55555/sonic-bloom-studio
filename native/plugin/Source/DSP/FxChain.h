@@ -49,6 +49,9 @@ public:
         //    signal so the cause is visible in logs before the limiter kicks.
         meterStage(buffer, "fx-in", fxInPeak, fxInFrames);
 
+        // Capture pre-FX peak for the quality reporter.
+        captureRecentPeak(buffer, fxInRecent);
+
         // 1) Saturation
         if (saturationActive)
         {
