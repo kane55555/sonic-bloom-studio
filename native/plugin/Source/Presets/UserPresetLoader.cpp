@@ -641,23 +641,22 @@ struct FxLimits { float chorusMax, delayMax, reverbMax, satMax; };
 FxLimits fxLimitsFor(Family f)
 {
     // Reasonable upper caps so e.g. piano presets can't ship at 80% reverb.
+    // Aligned with the v2.1 category FX safety spec (May 2026 tuning pass).
     switch (f) {
-        case Family::PianoKeys: return { 0.18f, 0.16f, 0.22f, 0.12f };
-        case Family::Lead:      return { 0.35f, 0.45f, 0.32f, 0.45f };
-        case Family::Pad:       return { 0.42f, 0.34f, 0.45f, 0.25f };
-        case Family::ChoirVox:  return { 0.32f, 0.26f, 0.42f, 0.18f };
-        case Family::Brass:     return { 0.22f, 0.25f, 0.20f, 0.30f };
-        case Family::Guitar:    return { 0.30f, 0.35f, 0.28f, 0.40f };
-        case Family::Bell:      return { 0.30f, 0.35f, 0.48f, 0.18f };
-        case Family::Pluck:     return { 0.30f, 0.35f, 0.35f, 0.18f };
-        case Family::Bass808:   return { 0.12f, 0.18f, 0.18f, 0.35f };
+        case Family::PianoKeys: return { 0.18f, 0.14f, 0.34f, 0.12f };
+        case Family::Lead:      return { 0.40f, 0.45f, 0.35f, 0.40f };
+        case Family::Pad:       return { 0.42f, 0.34f, 0.50f, 0.25f };
+        case Family::ChoirVox:  return { 0.32f, 0.26f, 0.46f, 0.18f };
+        case Family::Brass:     return { 0.20f, 0.12f, 0.28f, 0.28f };
+        case Family::Guitar:    return { 0.34f, 0.35f, 0.42f, 0.24f };
+        case Family::Bell:      return { 0.30f, 0.30f, 0.46f, 0.18f };
+        case Family::Pluck:     return { 0.30f, 0.32f, 0.38f, 0.18f };
+        case Family::Bass808:   return { 0.10f, 0.14f, 0.16f, 0.32f };
         case Family::FxRiser:   return { 0.50f, 0.55f, 0.48f, 0.50f };
-        // Vintage synth strict caps (chorus/delay/reverb/sat) — matches the
-        // "remove static, keep warm" spec. Saturation drive is also capped
-        // hard at 0.16 to stop layer-bus tanh from overdriving the chain.
         case Family::Synth:     return { 0.18f, 0.10f, 0.18f, 0.16f };
-        default:                return { 0.50f, 0.50f, 0.50f, 0.40f };
+        default:                return { 0.45f, 0.40f, 0.45f, 0.38f };
     }
+
 }
 
 void applyLayerBusCharacter(juce::AudioProcessor& proc, const UserPreset& p, Family fam)
