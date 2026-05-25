@@ -714,24 +714,57 @@ void PresetManager::loadPreset(int index)
 
         didaPresetManagerLog("loading diapreset: " + up.presetName);
 
-        const auto effectiveCategory = info.category.isNotEmpty()
+        const auto effectiveCategoryRaw = info.category.isNotEmpty()
             ? info.category
             : (up.category.isNotEmpty() ? up.category : juce::String("User"));
+        const auto effectiveCategory = normalizeCategoryAlias(effectiveCategoryRaw);
         const auto sourceLeaf = juce::File(up.source.path.replaceCharacter('\\', '/')).getFileName();
 
-        auto resolved = findCategorySourceFolder(getUserPresetDirectory(), effectiveCategory, sourceLeaf, file);
-        if (resolved.isDirectory())
-            didaPresetManagerLog("diapreset routed within folder category=" + effectiveCategory
-                + " folder=" + resolved.getFullPathName());
+        const auto rawSourcePath = up.source.path.trim();
+        const auto rawNormSlash  = rawSourcePath.replaceCharacter('\\', '/');
+        const bool rawIsAbsolute = rawSourcePath.isNotEmpty()
+                                && juce::File::isAbsolutePath(rawNormSlash);
+        const bool rawIsInsidePresetsUser = rawNormSlash.containsIgnoreCase("/Samples/Presets/User/");
 
+        // STEP 1 — Honour an absolute sourceInstrument.path exactly. The
+        // .diapreset is the source of truth: do NOT rewrite Samples/Pianos/...
+        // under Samples/Presets/User/.
+        juce::File resolved;
+        juce::String resolvedFrom;
+        if (rawIsAbsolute)
+        {
+            auto abs = dida::userpreset::resolveSourcePath(rawSourcePath);
+            if (abs.isDirectory())
+            {
+                resolved = abs;
+                resolvedFrom = "absoluteSourceInstrumentPath";
+                didaPresetManagerLog("diapreset using absolute source path=" + resolved.getFullPathName());
+            }
+        }
+
+        // STEP 2 — Fallback only when no absolute resolution worked: search
+        // the user category folder (legacy behaviour for old presets that
+        // only stored a relative leaf name).
         if (! resolved.isDirectory())
         {
-            resolved = dida::userpreset::resolveSourcePath(up.source.path);
-            if (resolved.isDirectory() && ! pathLivesInCategory(resolved, effectiveCategory))
+            auto catResolved = findCategorySourceFolder(getUserPresetDirectory(), effectiveCategory, sourceLeaf, file);
+            if (catResolved.isDirectory())
             {
-                didaPresetManagerLog("diapreset source outside folder category ignored path="
-                    + resolved.getFullPathName() + " category=" + effectiveCategory);
-                resolved = {};
+                resolved = catResolved;
+                resolvedFrom = "fallbackSearch";
+                didaPresetManagerLog("diapreset routed within folder category=" + effectiveCategory
+                    + " folder=" + resolved.getFullPathName());
+            }
+        }
+
+        // STEP 3 — Last-chance discovery via name/category search.
+        if (! resolved.isDirectory() && rawSourcePath.isNotEmpty())
+        {
+            auto discovered = dida::userpreset::resolveSourcePath(rawSourcePath);
+            if (discovered.isDirectory())
+            {
+                resolved = discovered;
+                if (resolvedFrom.isEmpty()) resolvedFrom = "fallbackSearch";
             }
         }
 
