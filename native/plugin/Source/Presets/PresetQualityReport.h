@@ -61,6 +61,27 @@ inline CapsForCategory capsForCategory(const juce::String& catIn)
     return { 0.45f, 0.40f, 0.45f, 0.38f };
 }
 
+// Per-category target peak window (dBFS) for active notes/chords.
+struct LoudnessTarget { float minDb, maxDb; };
+
+inline LoudnessTarget loudnessTargetForCategory(const juce::String& catIn)
+{
+    const auto c = normalizeCategory(catIn).toLowerCase();
+    if (c.contains("piano") || c.contains("rhodes") || c.contains("keys"))
+        return { -18.0f, -10.0f };
+    if (c.contains("brass") || c.contains("trumpet") || c.contains("horn")
+        || c.contains("sax")  || c.contains("guitar"))
+        return { -16.0f,  -8.0f };
+    if (c.contains("string") || c.contains("choir") || c.contains("vox")
+        || c.contains("vocal") || c.contains("pad"))
+        return { -20.0f, -10.0f };
+    if (c.contains("808") || c.contains("bass") || c.contains("sub"))
+        return { -12.0f,  -6.0f };
+    if (c.contains("lead") || c.contains("vintage") || c.contains("synth"))
+        return { -14.0f,  -6.0f };
+    return { -18.0f, -8.0f };
+}
+
 // engineType-aware: pure synth engines do NOT need sourceInstrument.path.
 // Layered engines need a source only if any enabled partial is "pcm".
 inline bool engineRequiresSource(const dida::userpreset::UserPreset& up)
@@ -182,10 +203,28 @@ inline void report(DiditagainProcessor& proc,
     if (lowEndCat && (reverbMix > 0.10f || delayMix > 0.12f))
         warnings.add("TOO_MUCH_LOW_END");
 
-    // TOO_QUIET — only meaningful when notes are actively playing. Treat a
-    // final peak below -100dB as "silent / no notes" and skip the warning.
-    if (finalDb > -100.0f && finalDb < -36.0f)
-        warnings.add("TOO_QUIET");
+    // --- Loudness calibration (suggestion-only) ---------------------------
+    const auto target = loudnessTargetForCategory(effectiveCategory);
+    const float targetCenterDb = 0.5f * (target.minDb + target.maxDb);
+    const bool notesPlaying = finalDb > -100.0f;
+    float suggestedGainDb = 0.0f;
+    if (notesPlaying)
+    {
+        suggestedGainDb = targetCenterDb - finalDb;
+        // Clamp suggestion to a sensible range so a one-off silent frame
+        // doesn't recommend +60dB.
+        suggestedGainDb = juce::jlimit(-24.0f, 24.0f, suggestedGainDb);
+
+        if (finalDb < target.minDb)
+        {
+            // Replace any prior generic TOO_QUIET so we don't double-warn.
+            warnings.removeString("TOO_QUIET");
+            warnings.add("TOO_QUIET");
+        }
+        if (finalDb > target.maxDb && finalDb <= -1.0f)
+            warnings.add("LOW_HEADROOM");
+    }
+
 
     // POSSIBLE_BEEP_LAYER: reinforcement-style layer that is loud enough to
     // poke through as a tone on top of the sampled instrument.
@@ -236,6 +275,9 @@ inline void report(DiditagainProcessor& proc,
         << " followMainEnvelope=" << (up.layer2.followMainEnvelope ? "true" : "false")
         << " polyphony=" << polyphony
         << " estimatedHeadroomDb=" << juce::String(headroomDb, 2)
+        << " categoryTargetMinDb=" << juce::String(target.minDb, 2)
+        << " categoryTargetMaxDb=" << juce::String(target.maxDb, 2)
+        << " suggestedGainAdjustmentDb=" << (notesPlaying ? juce::String(suggestedGainDb, 2) : juce::String("n/a"))
         << " warnings=" << (warnings.isEmpty() ? juce::String("none")
                                                : warnings.joinIntoString(","));
     juce::Logger::writeToLog(out);
@@ -271,6 +313,12 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("estimatedHeadroomDb",    headroomDb);
     juce::Array<juce::var> warnVar;
     for (auto& w : warnings) warnVar.add(w);
+    j->setProperty("categoryTargetMinDb",    target.minDb);
+    j->setProperty("categoryTargetMaxDb",    target.maxDb);
+    if (notesPlaying)
+        j->setProperty("suggestedGainAdjustmentDb", suggestedGainDb);
+    else
+        j->setProperty("suggestedGainAdjustmentDb", juce::var());
     j->setProperty("warnings",               warnVar);
     j->setProperty("timestamp",              juce::Time::getCurrentTime().toISO8601(true));
 
