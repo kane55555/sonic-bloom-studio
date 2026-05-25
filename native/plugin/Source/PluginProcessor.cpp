@@ -15,6 +15,12 @@ DiditagainProcessor::DiditagainProcessor()
       presetManager(*this),
       licenseClient()
 {
+    {
+        const bool clearOnStartup =
+            apvts.state.getProperty("clearPresetLogOnStartup", false);
+        dida::presetreport::initSession(clearOnStartup);
+    }
+
     presetManager.onPresetLoaded = [this]()
     {
         presetLoadRequested.store(true, std::memory_order_release);
