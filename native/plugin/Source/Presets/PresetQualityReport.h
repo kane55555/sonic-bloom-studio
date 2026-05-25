@@ -420,20 +420,38 @@ inline void report(DiditagainProcessor& proc,
     const juce::String jsonLine   = juce::JSON::toString(juce::var(j.get()), true);
     const juce::String jsonPretty = juce::JSON::toString(juce::var(j.get()), false);
 
+    // Robust append: FileOutputStream in append mode with explicit flush so
+    // every preset load is durably written to the session logs even if the
+    // host crashes shortly after. juce::File::appendText() has been observed
+    // to silently no-op on Windows when another process holds a read lock.
+    auto appendUtf8 = [](const juce::File& f, const juce::String& text)
+    {
+        auto dir = f.getParentDirectory();
+        if (! dir.isDirectory()) dir.createDirectory();
+        if (! f.existsAsFile()) f.create();
+        juce::FileOutputStream os (f);
+        if (! os.openedOk())
+        {
+            DBG("[DIDITAGAIN preset-quality] append FAILED file=" << f.getFullPathName());
+            return;
+        }
+        os.setPosition(os.getFile().getSize());
+        auto utf8 = text.toRawUTF8();
+        os.write(utf8, std::strlen(utf8));
+        os.flush();
+    };
+
     // 1) latest_preset_quality.json — overwrite with most recent only.
     {
         auto f = latestJsonFile();
         auto dir = f.getParentDirectory();
-        if (! dir.exists()) dir.createDirectory();
-        f.replaceWithText(jsonPretty);
+        if (! dir.isDirectory()) dir.createDirectory();
+        if (! f.replaceWithText(jsonPretty))
+            DBG("[DIDITAGAIN preset-quality] latest write FAILED file=" << f.getFullPathName());
     }
 
     // 2) preset_quality_session.jsonl — append one line per load.
-    {
-        auto f = sessionJsonlFile();
-        if (! f.getParentDirectory().exists()) f.getParentDirectory().createDirectory();
-        f.appendText(jsonLine + "\n");
-    }
+    appendUtf8(sessionJsonlFile(), jsonLine + "\n");
 
     // 3) preset_quality_session.txt — append human-readable block.
     {
@@ -464,10 +482,12 @@ inline void report(DiditagainProcessor& proc,
               << "warnings: "                  << (warnings.isEmpty() ? juce::String("none") : warnings.joinIntoString(",")) << "\n"
               << "timestamp: "                 << timestamp            << "\n"
               << "==================================================\n";
-        auto f = sessionTextFile();
-        if (! f.getParentDirectory().exists()) f.getParentDirectory().createDirectory();
-        f.appendText(block);
+        appendUtf8(sessionTextFile(), block);
     }
+
+    DBG("[DIDITAGAIN preset-quality] appended idx=" << loadIndex
+        << " preset=" << up.presetName
+        << " jsonl=" << sessionJsonlFile().getFullPathName());
 }
 
 }} // namespace dida::presetreport
