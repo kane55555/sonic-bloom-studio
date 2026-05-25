@@ -866,19 +866,28 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
         if (auto* dp = dynamic_cast<DiditagainProcessor*>(&proc))
         {
             const juce::String r2 = role2;
-            dp->getSynthEngine().forEachSynthVoice([&r2](SynthVoice& v)
+            // PCM/sample families default followMainEnvelope=true so
+            // reinforcement layers always ease in under the main attack.
+            const bool followFromPreset = p.layer2.followMainEnvelope;
+            const bool followEffective  = isPcmFamily ? true : followFromPreset;
+            const float mainAttackMs    = p.amp.attackMs;
+            dp->getSynthEngine().forEachSynthVoice([&r2, followEffective, mainAttackMs](SynthVoice& v)
             {
                 v.setLayer2EqRole(r2);
-                // Layers 3/4 inherit complementary roles so the noise/sub
-                // carvers also park in their own bands. We don't have a
-                // dedicated LayerBlock for them yet — use sensible siblings.
-                v.setLayer3EqRole(r2 == "air" || r2 == "texture" ? r2 : juce::String());
+                // Layers 3/4 inherit complementary roles so noise/sub carvers
+                // also park in their own bands. We don't have dedicated
+                // LayerBlocks for them yet — use sensible siblings.
+                v.setLayer3EqRole(r2 == "air" || r2 == "texture" ? r2 : juce::String("air"));
                 v.setLayer4EqRole(r2 == "sub" ? juce::String("sub")
                                   : r2 == "warmth" ? juce::String("warmth")
-                                                   : juce::String());
+                                                   : juce::String("sub"));
+                v.setLayer2FollowMain(followEffective, mainAttackMs);
+                v.setLayer3FollowMain(followEffective, mainAttackMs);
+                v.setLayer4FollowMain(followEffective, mainAttackMs);
             });
         }
     }
+
 
 
     // Sample is the only sound source — make sure Osc A pass-through is on,
