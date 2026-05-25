@@ -96,10 +96,19 @@ public:
             meterPeak = 0.0f;
             meterFrames = 0;
         }
+        recentPeak.store(peak, std::memory_order_relaxed);
+    }
+
+    // Last-block peak in dBFS (debug/reporting only). -inf if silent.
+    float getRecentPeakDb() const noexcept
+    {
+        const float p = recentPeak.load(std::memory_order_relaxed);
+        return p > 1.0e-6f ? juce::Decibels::gainToDecibels(p) : -120.0f;
     }
 
 
 private:
+    std::atomic<float> recentPeak { 0.0f };
     double sampleRate = 44100.0;
     bool   enabled = true;
 
