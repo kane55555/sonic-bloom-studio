@@ -40,19 +40,38 @@ static CategoryDsp dspForCategory(const juce::String& categoryIn) noexcept
     return d;
 }
 
-static void applyCategoryDsp(juce::AudioProcessor& proc, const juce::String& category)
+static void applyCategoryDsp(juce::AudioProcessor& proc, const juce::String& category, float mainAttackMs)
 {
     if (auto* dp = dynamic_cast<DiditagainProcessor*>(&proc))
     {
         const auto d = dspForCategory(category);
-        dp->getSynthEngine().forEachSynthVoice([d](SynthVoice& v)
+        const auto c = category.toLowerCase();
+        // Resolve a sensible eqRole baseline per category so V2 presets get
+        // the same role-aware HP+LP+trim carving as V1 .diapreset.
+        juce::String role2 = "warmth";
+        if      (c.contains("piano") || c.contains("keys"))   role2 = "air";
+        else if (c.contains("choir") || c.contains("vox"))    role2 = "air";
+        else if (c.contains("pad")   || c.contains("texture")) role2 = "air";
+        else if (c.contains("guitar"))                        role2 = "texture";
+        else if (c.contains("brass") || c.contains("trumpet")) role2 = "warmth";
+        else if (c.contains("808")   || c.contains("sub"))    role2 = "sub";
+        else if (c.contains("lead"))                          role2 = "lead";
+
+        dp->getSynthEngine().forEachSynthVoice([d, role2, mainAttackMs](SynthVoice& v)
         {
             v.setUnisonRender(d.unisonVoices, d.unisonDetune, d.stereoSpread, d.drift);
             v.setExciterAmount(d.exciter);
             v.setStereoSpreadAmount(d.stereoSpread);
+            v.setLayer2EqRole(role2);
+            v.setLayer3EqRole(role2 == "air" || role2 == "texture" ? role2 : juce::String("air"));
+            v.setLayer4EqRole(role2 == "sub" ? juce::String("sub") : juce::String("sub"));
+            v.setLayer2FollowMain(true, mainAttackMs);
+            v.setLayer3FollowMain(true, mainAttackMs);
+            v.setLayer4FollowMain(true, mainAttackMs);
         });
     }
 }
+
 
 
 
