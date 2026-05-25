@@ -19,6 +19,65 @@ namespace dida { namespace presetreport {
 
 struct CapsForCategory { float chorus, delay, reverb, sat; };
 
+// --- Session-scoped state (one plugin instance / process lifetime) --------
+struct SessionState
+{
+    juce::String sessionId;
+    int          loadIndex = 0;
+    juce::String lastPresetKey;
+    juce::int64  lastLoadMs = 0;
+};
+
+inline SessionState& sessionState()
+{
+    static SessionState s;
+    if (s.sessionId.isEmpty())
+        s.sessionId = juce::Uuid().toDashedString();
+    return s;
+}
+
+inline juce::File logsDir()
+{
+   #if JUCE_WINDOWS
+    juce::File win ("C:/Users/kaini/Documents/DIDITAGAIN STUDIO/Logs");
+    if (win.getParentDirectory().isDirectory())
+    {
+        if (! win.isDirectory()) win.createDirectory();
+        return win;
+    }
+   #endif
+    auto d = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+                 .getChildFile("DIDITAGAIN STUDIO").getChildFile("Logs");
+    if (! d.isDirectory()) d.createDirectory();
+    return d;
+}
+
+inline juce::File sessionJsonlFile() { return logsDir().getChildFile("preset_quality_session.jsonl"); }
+inline juce::File sessionTextFile()  { return logsDir().getChildFile("preset_quality_session.txt"); }
+inline juce::File latestJsonFile()   { return logsDir().getChildFile("latest_preset_quality.json"); }
+
+inline void ensureSessionFiles()
+{
+    auto jl = sessionJsonlFile();
+    auto tx = sessionTextFile();
+    if (! jl.existsAsFile()) jl.create();
+    if (! tx.existsAsFile()) tx.create();
+}
+
+inline void clearSessionLog()
+{
+    sessionJsonlFile().replaceWithText({});
+    sessionTextFile().replaceWithText({});
+}
+
+// Call once on plugin startup. Honors clearPresetLogOnStartup user prop.
+inline void initSession(bool clearOnStartup = false)
+{
+    (void) sessionState();
+    ensureSessionFiles();
+    if (clearOnStartup) clearSessionLog();
+}
+
 // Normalise a category string for caps lookup: collapse typos
 // (Saxaphone -> Saxophone), camelCase aliases (VintageSynth -> Vintage Synths),
 // and stylistic prefixes (Trap Saxophone -> Saxophone).
