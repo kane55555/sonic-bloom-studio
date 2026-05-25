@@ -19,9 +19,28 @@ namespace dida { namespace presetreport {
 
 struct CapsForCategory { float chorus, delay, reverb, sat; };
 
-inline CapsForCategory capsForCategory(const juce::String& cat)
+// Normalise a category string for caps lookup: collapse typos
+// (Saxaphone -> Saxophone), camelCase aliases (VintageSynth -> Vintage Synths),
+// and stylistic prefixes (Trap Saxophone -> Saxophone).
+inline juce::String normalizeCategory(const juce::String& in)
 {
-    const auto c = cat.toLowerCase();
+    auto s = in.trim();
+    if (s.isEmpty()) return s;
+    s = s.replace("Saxaphone", "Saxophone", true);
+    s = s.replace("saxaphone", "saxophone", true);
+    if (s.equalsIgnoreCase("VintageSynth") || s.equalsIgnoreCase("VintageSynths"))
+        s = "Vintage Synths";
+    for (auto* pfx : { "Trap ", "Lo-Fi ", "Lofi ", "Vintage " })
+    {
+        const juce::String p (pfx);
+        if (s.startsWithIgnoreCase(p)) { s = s.substring(p.length()).trim(); break; }
+    }
+    return s;
+}
+
+inline CapsForCategory capsForCategory(const juce::String& catIn)
+{
+    const auto c = normalizeCategory(catIn).toLowerCase();
     // Aligned with UserPresetLoader::fxLimitsFor.
     if (c.contains("piano") || c.contains("keys") || c.contains("rhodes"))
         return { 0.18f, 0.14f, 0.34f, 0.12f };
@@ -40,6 +59,24 @@ inline CapsForCategory capsForCategory(const juce::String& cat)
                                         return { 0.50f, 0.55f, 0.48f, 0.50f };
     if (c.contains("synth"))            return { 0.18f, 0.10f, 0.18f, 0.16f };
     return { 0.45f, 0.40f, 0.45f, 0.38f };
+}
+
+// engineType-aware: pure synth engines do NOT need sourceInstrument.path.
+// Layered engines need a source only if any enabled partial is "pcm".
+inline bool engineRequiresSource(const dida::userpreset::UserPreset& up)
+{
+    auto needsPcm = [](const juce::String& e) {
+        const auto x = e.trim().toLowerCase();
+        return x.isEmpty() || x == "pcm" || x == "sample" || x == "multisample";
+    };
+    if (up.partials.size() == 0) return needsPcm(up.engineType);
+    if (up.engineType.equalsIgnoreCase("layered") || up.engineType.isEmpty())
+    {
+        for (auto& p : up.partials)
+            if (p.enabled && needsPcm(p.engineType)) return true;
+        return false;
+    }
+    return needsPcm(up.engineType);
 }
 
 inline float paramValue(juce::AudioProcessor& proc, const char* id)
