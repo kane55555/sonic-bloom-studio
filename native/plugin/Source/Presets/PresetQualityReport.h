@@ -313,6 +313,13 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("estimatedHeadroomDb",    headroomDb);
     juce::Array<juce::var> warnVar;
     for (auto& w : warnings) warnVar.add(w);
+    j->setProperty("categoryTargetMinDb",    target.minDb);
+    j->setProperty("categoryTargetMaxDb",    target.maxDb);
+    if (notesPlaying)
+        j->setProperty("suggestedGainAdjustmentDb", suggestedGainDb);
+    else
+        j->setProperty("suggestedGainAdjustmentDb", juce::var());
+    j->setProperty("estimatedHeadroomDb",    headroomDb);
     j->setProperty("warnings",               warnVar);
     j->setProperty("timestamp",              juce::Time::getCurrentTime().toISO8601(true));
 
