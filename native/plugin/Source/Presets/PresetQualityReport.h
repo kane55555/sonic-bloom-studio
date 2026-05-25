@@ -203,10 +203,28 @@ inline void report(DiditagainProcessor& proc,
     if (lowEndCat && (reverbMix > 0.10f || delayMix > 0.12f))
         warnings.add("TOO_MUCH_LOW_END");
 
-    // TOO_QUIET — only meaningful when notes are actively playing. Treat a
-    // final peak below -100dB as "silent / no notes" and skip the warning.
-    if (finalDb > -100.0f && finalDb < -36.0f)
-        warnings.add("TOO_QUIET");
+    // --- Loudness calibration (suggestion-only) ---------------------------
+    const auto target = loudnessTargetForCategory(effectiveCategory);
+    const float targetCenterDb = 0.5f * (target.minDb + target.maxDb);
+    const bool notesPlaying = finalDb > -100.0f;
+    float suggestedGainDb = 0.0f;
+    if (notesPlaying)
+    {
+        suggestedGainDb = targetCenterDb - finalDb;
+        // Clamp suggestion to a sensible range so a one-off silent frame
+        // doesn't recommend +60dB.
+        suggestedGainDb = juce::jlimit(-24.0f, 24.0f, suggestedGainDb);
+
+        if (finalDb < target.minDb)
+        {
+            // Replace any prior generic TOO_QUIET so we don't double-warn.
+            warnings.removeString("TOO_QUIET");
+            warnings.add("TOO_QUIET");
+        }
+        if (finalDb > target.maxDb && finalDb <= -1.0f)
+            warnings.add("LOW_HEADROOM");
+    }
+
 
     // POSSIBLE_BEEP_LAYER: reinforcement-style layer that is loud enough to
     // poke through as a tone on top of the sampled instrument.
