@@ -107,4 +107,9 @@ private:
     LayerGlueCompressor   glue;
     LayerStereoProcessor  widener;
     SharedLFO             drift;
+
+    // Bus-stage peak meter (logged ~1 Hz when crossing -1 dBFS).
+    float meterPeak   = 0.0f;
+    int   meterFrames = 0;
 };
+
