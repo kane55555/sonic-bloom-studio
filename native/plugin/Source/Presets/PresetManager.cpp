@@ -4,6 +4,7 @@
 #include "HybridPresetV2.h"
 #include "PresetMigration.h"
 #include "HybridPresetApplier.h"
+#include "PresetQualityReport.h"
 #include "UserPresetLoader.h"
 #include "UserPresetFormat.h"
 #include "GuitarPresetBank.h"
