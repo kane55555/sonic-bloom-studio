@@ -250,18 +250,20 @@ private:
     std::mt19937 noiseRng { 0x1234abcd };
     float pinkB0 = 0.0f, pinkB1 = 0.0f, pinkB2 = 0.0f;
 
-    // ---- Per-layer "carving" filters: keep each layer in its own band
-    //      so they stop fighting and start sounding like one instrument. ----
-    OnePoleCarver noiseHpL, noiseHpR;   // HP ~2 kHz on noise/air
-    OnePoleCarver subLp;                // LP ~250 Hz on sub
-    OnePoleCarver oscBHp;               // gentle HP on Osc B to clear sample low end
+    // ---- Per-layer "carving" filters (role-aware HP+LP+trim) ----
+    LayerRoleCarver noiseCarverL, noiseCarverR;
+    LayerRoleCarver subCarver;
+    LayerRoleCarver oscBCarver;
 
-    // Micro-timing offsets (samples) per layer — tiny random delays
-    // (0.5-8 ms) reduce the "stacked WAV" feeling and add ensemble realism.
-    int   oscBStartOffsetSamples = 0;
-    int   subStartOffsetSamples  = 0;
-    int   noiseStartOffsetSamples = 0;
-    int   sampleTickCounter = 0;
+    // followMainEnvelope: per-layer soft fade-in ramps so reinforcement
+    // sine/triangle layers ease in instead of beeping ahead of the main
+    // sample attack. fadeMs is set per-preset; samplesRemaining decrements
+    // each tick and the resulting (1.0 - remain/total) gain is applied.
+    bool  oscBFollowMain   = true,  noiseFollowMain   = true,  subFollowMain   = true;
+    float oscBFollowFadeMs = 12.0f, noiseFollowFadeMs = 18.0f, subFollowFadeMs = 12.0f;
+    int   oscBFadeSamplesRemaining = 0, noiseFadeSamplesRemaining = 0, subFadeSamplesRemaining = 0;
+    int   oscBFadeSamplesTotal     = 0, noiseFadeSamplesTotal     = 0, subFadeSamplesTotal     = 0;
+
 
     // ---- Filter modulation ----
     float filterEnvAmount = 0.0f;
