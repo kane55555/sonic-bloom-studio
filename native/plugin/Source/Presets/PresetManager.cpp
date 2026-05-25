@@ -161,13 +161,45 @@ static juce::File chooseRepresentativeMappedWav(const juce::Array<juce::File>& f
     return chosen;
 }
 
+// Normalise a category string: collapse common typos / camelCase aliases.
+// Used for caps lookup, folder-grouping, debug reports and validation. Does
+// NOT rename anything on disk — purely an in-memory canonicalisation.
+static juce::String normalizeCategoryAlias(const juce::String& in)
+{
+    auto s = in.trim();
+    if (s.isEmpty()) return s;
+    s = s.replace("Saxaphone", "Saxophone", true);  // common typo
+    s = s.replace("saxaphone", "saxophone", true);
+    if (s.equalsIgnoreCase("VintageSynth") || s.equalsIgnoreCase("VintageSynths"))
+        return "Vintage Synths";
+    return s;
+}
+
+// Strip recognised qualifier prefixes ("Trap Saxophone" -> "Saxophone")
+// so categories with stylistic qualifiers still map back to their base
+// instrument for caps/blend-mode lookup.
+static juce::String stripCategoryQualifier(juce::String s)
+{
+    for (auto* pfx : { "Trap ", "Lo-Fi ", "Lofi ", "Vintage " })
+    {
+        const juce::String p (pfx);
+        if (s.startsWithIgnoreCase(p)) { s = s.substring(p.length()).trim(); break; }
+    }
+    return s;
+}
+
 static bool categoryNamesMatch(const juce::String& a, const juce::String& b)
 {
-    const auto aa = a.trim();
-    const auto bb = b.trim();
+    const auto aa = normalizeCategoryAlias(a).trim();
+    const auto bb = normalizeCategoryAlias(b).trim();
     if (aa.equalsIgnoreCase(bb)) return true;
     if (aa.endsWithIgnoreCase("s") && aa.dropLastCharacters(1).equalsIgnoreCase(bb)) return true;
     if (bb.endsWithIgnoreCase("s") && bb.dropLastCharacters(1).equalsIgnoreCase(aa)) return true;
+    const auto sa = stripCategoryQualifier(aa);
+    const auto sb = stripCategoryQualifier(bb);
+    if (sa.equalsIgnoreCase(sb)) return true;
+    if (sa.endsWithIgnoreCase("s") && sa.dropLastCharacters(1).equalsIgnoreCase(sb)) return true;
+    if (sb.endsWithIgnoreCase("s") && sb.dropLastCharacters(1).equalsIgnoreCase(sa)) return true;
     return false;
 }
 
@@ -615,7 +647,10 @@ void PresetManager::applyPendingUserDiapresetAfterSampleLoad()
     if (auto* dp = dynamic_cast<DiditagainProcessor*>(&processor))
         dida::presetreport::report(*dp, pendingUserDiapreset, requestedCategory,
                                    requestedSampleFolderPath,
-                                   requestedSampleSources.size());
+                                   requestedSampleSources.size(),
+                                   requestedSampleRawPath,
+                                   requestedSampleResolvedFrom,
+                                   requestedSampleRawInsidePresetsUser);
 }
 
 static void applyOscBlock(juce::AudioProcessor& proc, const juce::var& obj,
@@ -682,24 +717,57 @@ void PresetManager::loadPreset(int index)
 
         didaPresetManagerLog("loading diapreset: " + up.presetName);
 
-        const auto effectiveCategory = info.category.isNotEmpty()
+        const auto effectiveCategoryRaw = info.category.isNotEmpty()
             ? info.category
             : (up.category.isNotEmpty() ? up.category : juce::String("User"));
+        const auto effectiveCategory = normalizeCategoryAlias(effectiveCategoryRaw);
         const auto sourceLeaf = juce::File(up.source.path.replaceCharacter('\\', '/')).getFileName();
 
-        auto resolved = findCategorySourceFolder(getUserPresetDirectory(), effectiveCategory, sourceLeaf, file);
-        if (resolved.isDirectory())
-            didaPresetManagerLog("diapreset routed within folder category=" + effectiveCategory
-                + " folder=" + resolved.getFullPathName());
+        const auto rawSourcePath = up.source.path.trim();
+        const auto rawNormSlash  = rawSourcePath.replaceCharacter('\\', '/');
+        const bool rawIsAbsolute = rawSourcePath.isNotEmpty()
+                                && juce::File::isAbsolutePath(rawNormSlash);
+        const bool rawIsInsidePresetsUser = rawNormSlash.containsIgnoreCase("/Samples/Presets/User/");
 
+        // STEP 1 — Honour an absolute sourceInstrument.path exactly. The
+        // .diapreset is the source of truth: do NOT rewrite Samples/Pianos/...
+        // under Samples/Presets/User/.
+        juce::File resolved;
+        juce::String resolvedFrom;
+        if (rawIsAbsolute)
+        {
+            auto abs = dida::userpreset::resolveSourcePath(rawSourcePath);
+            if (abs.isDirectory())
+            {
+                resolved = abs;
+                resolvedFrom = "absoluteSourceInstrumentPath";
+                didaPresetManagerLog("diapreset using absolute source path=" + resolved.getFullPathName());
+            }
+        }
+
+        // STEP 2 — Fallback only when no absolute resolution worked: search
+        // the user category folder (legacy behaviour for old presets that
+        // only stored a relative leaf name).
         if (! resolved.isDirectory())
         {
-            resolved = dida::userpreset::resolveSourcePath(up.source.path);
-            if (resolved.isDirectory() && ! pathLivesInCategory(resolved, effectiveCategory))
+            auto catResolved = findCategorySourceFolder(getUserPresetDirectory(), effectiveCategory, sourceLeaf, file);
+            if (catResolved.isDirectory())
             {
-                didaPresetManagerLog("diapreset source outside folder category ignored path="
-                    + resolved.getFullPathName() + " category=" + effectiveCategory);
-                resolved = {};
+                resolved = catResolved;
+                resolvedFrom = "fallbackSearch";
+                didaPresetManagerLog("diapreset routed within folder category=" + effectiveCategory
+                    + " folder=" + resolved.getFullPathName());
+            }
+        }
+
+        // STEP 3 — Last-chance discovery via name/category search.
+        if (! resolved.isDirectory() && rawSourcePath.isNotEmpty())
+        {
+            auto discovered = dida::userpreset::resolveSourcePath(rawSourcePath);
+            if (discovered.isDirectory())
+            {
+                resolved = discovered;
+                if (resolvedFrom.isEmpty()) resolvedFrom = "fallbackSearch";
             }
         }
 
@@ -718,6 +786,9 @@ void PresetManager::loadPreset(int index)
         requestedSampleRootMidi    = 60;
         requestedSampleLooping     = isSustainedSampleCategory(effectiveCategory);
         requestedCategory          = effectiveCategory;
+        requestedSampleRawPath     = rawSourcePath;
+        requestedSampleResolvedFrom = resolvedFrom;
+        requestedSampleRawInsidePresetsUser = rawIsInsidePresetsUser;
         macroMapper.clear();
         requestedPresetIsUserDiapreset = true;
         pendingUserDiapreset = up;

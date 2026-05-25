@@ -123,6 +123,10 @@ private:
     int requestedSampleRootMidi = 60;
     bool requestedSampleLooping = false;
     juce::String requestedCategory;
+    // Debug/quality-report context for the most recently routed .diapreset.
+    juce::String requestedSampleRawPath;       // sourceInstrument.path as written
+    juce::String requestedSampleResolvedFrom;  // "absoluteSourceInstrumentPath" | "fallbackSearch" | "notRequiredForEngine" | ""
+    bool         requestedSampleRawInsidePresetsUser = false;
     dida::preset::MacroMapper macroMapper;
     bool requestedPresetIsUserDiapreset = false;
     bool pendingUserDiapresetApply = false;

@@ -405,7 +405,15 @@ juce::File resolveSourcePath(const juce::String& rawPath)
     expanded = expanded.replace("{Samples}",  samplesRoot.getFullPathName().replaceCharacter('\\', '/'), true);
 
     if (juce::File::isAbsolutePath(expanded))
-        addCandidate(candidates, juce::File(expanded));
+    {
+        juce::File absFile (expanded);
+        // Honour an absolute sourceInstrument.path EXACTLY when it resolves
+        // to a real directory. Do not reinterpret it under Presets/User —
+        // base instrument samples live in Samples/<Category>/<Instrument>/.
+        if (absFile.isDirectory())
+            return absFile;
+        addCandidate(candidates, absFile);
+    }
 
     if (expanded.startsWithIgnoreCase("Samples/"))
         addCandidate(candidates, samplesRoot.getChildFile(expanded.substring(8)));
