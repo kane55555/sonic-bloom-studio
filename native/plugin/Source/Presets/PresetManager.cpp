@@ -4,6 +4,7 @@
 #include "HybridPresetV2.h"
 #include "PresetMigration.h"
 #include "HybridPresetApplier.h"
+#include "PresetQualityReport.h"
 #include "UserPresetLoader.h"
 #include "UserPresetFormat.h"
 #include "GuitarPresetBank.h"
@@ -609,6 +610,12 @@ void PresetManager::applyPendingUserDiapresetAfterSampleLoad()
         { pfx.setReverbCharacter(ReverbBlock::Character::Studio); }
     }
     logFinalActivePresetParams(processor, pendingUserDiapreset.presetName);
+
+    // Debug: emit one structured preset-quality block per .diapreset load.
+    if (auto* dp = dynamic_cast<DiditagainProcessor*>(&processor))
+        dida::presetreport::report(*dp, pendingUserDiapreset, requestedCategory,
+                                   requestedSampleFolderPath,
+                                   requestedSampleSources.size());
 }
 
 static void applyOscBlock(juce::AudioProcessor& proc, const juce::var& obj,
