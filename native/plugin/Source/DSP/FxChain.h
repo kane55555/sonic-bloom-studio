@@ -45,6 +45,10 @@ public:
 
     void process(juce::AudioBuffer<float>& buffer)
     {
+        // 0) FX input metering — catches presets that hand the chain a hot
+        //    signal so the cause is visible in logs before the limiter kicks.
+        meterStage(buffer, "fx-in", fxInPeak, fxInFrames);
+
         // 1) Saturation
         if (saturationActive)
         {
@@ -55,6 +59,7 @@ public:
                 for (int i = 0; i < n; ++i) d[i] = sat.processSample(d[i]);
             }
         }
+
 
         // 2) Chorus
         chorus.process(buffer);
