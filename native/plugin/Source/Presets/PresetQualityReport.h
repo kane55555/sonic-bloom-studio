@@ -102,13 +102,18 @@ inline juce::String dbStr(float linear)
 
 inline void report(DiditagainProcessor& proc,
                    const dida::userpreset::UserPreset& up,
-                   const juce::String& effectiveCategory,
+                   const juce::String& effectiveCategoryIn,
                    const juce::String& resolvedFolderPath,
-                   int wavZones)
+                   int wavZones,
+                   const juce::String& sourceInstrumentPathRaw = {},
+                   const juce::String& resolvedFromIn          = {},
+                   bool rawPathInsidePresetsUser               = false)
 {
     auto& engine = proc.getSynthEngine();
     auto& bus    = engine.getLayerBus();
     auto& fx     = engine.getFx();
+
+    const juce::String effectiveCategory = normalizeCategory(effectiveCategoryIn);
 
     // --- Layer / partial counts -------------------------------------------
     int activeLayers = (up.main.enabled ? 1 : 0) + (up.layer2.enabled ? 1 : 0);
@@ -116,7 +121,10 @@ inline void report(DiditagainProcessor& proc,
     for (auto& p : up.partials) if (p.enabled) ++activePartials;
 
     const juce::String engineType = up.engineType.isNotEmpty() ? up.engineType
-                                  : (up.partials.size() > 0 ? juce::String("multi") : juce::String("pcm"));
+                                  : (up.partials.size() > 0 ? juce::String("layered") : juce::String("pcm"));
+
+    const bool needsSource = engineRequiresSource(up);
+    const bool oscillatorEngineActive = ! needsSource;
 
     // --- FX mixes (read live from APVTS) ----------------------------------
     const float chorusMix = paramValue(proc, "fxChorusMix");
@@ -132,6 +140,15 @@ inline void report(DiditagainProcessor& proc,
     const float finalDb     = fx.getFinalPeakDb();
     const float headroomDb  = juce::jmax(-60.0f, -finalDb);
 
+    // resolvedFrom — explicit caller value wins; otherwise infer from state.
+    juce::String resolvedFrom = resolvedFromIn;
+    if (resolvedFrom.isEmpty())
+    {
+        if (! needsSource)                        resolvedFrom = "notRequiredForEngine";
+        else if (resolvedFolderPath.isNotEmpty()) resolvedFrom = "fallbackSearch";
+        else                                       resolvedFrom = "unresolved";
+    }
+
     // --- Warnings ---------------------------------------------------------
     juce::StringArray warnings;
     if (finalDb > -1.0f)                            warnings.add("TOO_HOT");
@@ -144,16 +161,31 @@ inline void report(DiditagainProcessor& proc,
     const auto resolved = juce::File(resolvedFolderPath);
     const bool wantsFolder = up.source.type.isEmpty()
                           || up.source.type.equalsIgnoreCase("multisampleFolder");
-    if (wantsFolder && up.source.path.isNotEmpty()
+
+    // SOURCE_MISSING is only a problem when the active engine actually needs
+    // a sample folder. Pure synth presets (analog/supersaw/fm*/wavetable)
+    // legitimately have no sourceInstrument.
+    if (needsSource && wantsFolder && up.source.path.isNotEmpty()
         && (resolvedFolderPath.isEmpty() || ! resolved.isDirectory()))
         warnings.add("SOURCE_MISSING");
-    if (wantsFolder && resolved.isDirectory() && wavZones == 0)
+    if (needsSource && wantsFolder && resolved.isDirectory() && wavZones == 0)
         warnings.add("NO_ZONES");
+
+    // Base instrument samples must NOT live under Samples/Presets/User/.
+    if (rawPathInsidePresetsUser
+        || sourceInstrumentPathRaw.replaceCharacter('\\', '/')
+              .containsIgnoreCase("/Samples/Presets/User/"))
+        warnings.add("SOURCE_PATH_INSIDE_PRESET_FOLDER");
 
     const auto cLow = effectiveCategory.toLowerCase();
     const bool lowEndCat = cLow.contains("808") || cLow.contains("bass") || cLow.contains("sub");
     if (lowEndCat && (reverbMix > 0.10f || delayMix > 0.12f))
         warnings.add("TOO_MUCH_LOW_END");
+
+    // TOO_QUIET — only meaningful when notes are actively playing. Treat a
+    // final peak below -100dB as "silent / no notes" and skip the warning.
+    if (finalDb > -100.0f && finalDb < -36.0f)
+        warnings.add("TOO_QUIET");
 
     // POSSIBLE_BEEP_LAYER: reinforcement-style layer that is loud enough to
     // poke through as a tone on top of the sampled instrument.
@@ -173,13 +205,19 @@ inline void report(DiditagainProcessor& proc,
         }
     if (beep) warnings.add("POSSIBLE_BEEP_LAYER");
 
+    const juce::String rawPath = sourceInstrumentPathRaw.isNotEmpty()
+                               ? sourceInstrumentPathRaw : up.source.path;
+
     // --- Emit -------------------------------------------------------------
     juce::String out;
     out << "[DIDITAGAIN preset-quality]"
         << " presetName=" << up.presetName
         << " category=" << effectiveCategory
         << " engineType=" << engineType
-        << " sourceInstrument=" << up.source.path
+        << " sourceInstrumentPathRaw=" << rawPath
+        << " resolvedFolder=" << resolvedFolderPath
+        << " resolvedFrom=" << resolvedFrom
+        << " oscillatorEngineActive=" << (oscillatorEngineActive ? "true" : "false")
         << " wavZones=" << wavZones
         << " activeLayers=" << activeLayers
         << " activePartials=" << activePartials
@@ -204,33 +242,37 @@ inline void report(DiditagainProcessor& proc,
 
     // --- Also persist latest JSON report for external tooling -------------
     juce::DynamicObject::Ptr j = new juce::DynamicObject();
-    j->setProperty("presetName",         up.presetName);
-    j->setProperty("category",           effectiveCategory);
-    j->setProperty("engineType",         engineType);
-    j->setProperty("sourceInstrument",   up.source.path);
-    j->setProperty("resolvedFolder",     resolvedFolderPath);
-    j->setProperty("wavZones",           wavZones);
-    j->setProperty("activeLayers",       activeLayers);
-    j->setProperty("activePartials",     activePartials);
-    j->setProperty("layerBusPeakDb",     busPeakDb);
-    j->setProperty("fxInputPeakDb",      fxInDb);
-    j->setProperty("fxOutputPeakDb",     fxOutDb);
-    j->setProperty("finalPeakDb",        finalDb);
-    j->setProperty("clampedFields",      "n/a");
-    j->setProperty("reverbMix",          reverbMix);
-    j->setProperty("delayMix",           delayMix);
-    j->setProperty("chorusMix",          chorusMix);
-    j->setProperty("saturationMix",      satMix);
-    j->setProperty("layer2GainDb",       up.layer2.gainDb);
-    j->setProperty("layer2BlendMode",    up.layer2.blendMode.isNotEmpty() ? up.layer2.blendMode : juce::String("auto"));
-    j->setProperty("layer2EqRole",       up.layer2.eqRole.isNotEmpty() ? up.layer2.eqRole : juce::String("auto"));
-    j->setProperty("followMainEnvelope", up.layer2.followMainEnvelope);
-    j->setProperty("polyphony",          polyphony);
-    j->setProperty("estimatedHeadroomDb", headroomDb);
+    j->setProperty("presetName",             up.presetName);
+    j->setProperty("category",               effectiveCategory);
+    j->setProperty("categoryRaw",            effectiveCategoryIn);
+    j->setProperty("engineType",             engineType);
+    j->setProperty("oscillatorEngineActive", oscillatorEngineActive);
+    j->setProperty("sourceInstrument",       rawPath);
+    j->setProperty("sourceInstrumentPathRaw", rawPath);
+    j->setProperty("resolvedFolder",         resolvedFolderPath);
+    j->setProperty("resolvedFrom",           resolvedFrom);
+    j->setProperty("wavZones",               wavZones);
+    j->setProperty("activeLayers",           activeLayers);
+    j->setProperty("activePartials",         activePartials);
+    j->setProperty("layerBusPeakDb",         busPeakDb);
+    j->setProperty("fxInputPeakDb",          fxInDb);
+    j->setProperty("fxOutputPeakDb",         fxOutDb);
+    j->setProperty("finalPeakDb",            finalDb);
+    j->setProperty("clampedFields",          "n/a");
+    j->setProperty("reverbMix",              reverbMix);
+    j->setProperty("delayMix",               delayMix);
+    j->setProperty("chorusMix",              chorusMix);
+    j->setProperty("saturationMix",          satMix);
+    j->setProperty("layer2GainDb",           up.layer2.gainDb);
+    j->setProperty("layer2BlendMode",        up.layer2.blendMode.isNotEmpty() ? up.layer2.blendMode : juce::String("auto"));
+    j->setProperty("layer2EqRole",           up.layer2.eqRole.isNotEmpty() ? up.layer2.eqRole : juce::String("auto"));
+    j->setProperty("followMainEnvelope",     up.layer2.followMainEnvelope);
+    j->setProperty("polyphony",              polyphony);
+    j->setProperty("estimatedHeadroomDb",    headroomDb);
     juce::Array<juce::var> warnVar;
     for (auto& w : warnings) warnVar.add(w);
-    j->setProperty("warnings",           warnVar);
-    j->setProperty("timestamp",          juce::Time::getCurrentTime().toISO8601(true));
+    j->setProperty("warnings",               warnVar);
+    j->setProperty("timestamp",              juce::Time::getCurrentTime().toISO8601(true));
 
     const juce::String json = juce::JSON::toString(juce::var(j.get()), false);
 
