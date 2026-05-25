@@ -27,12 +27,13 @@ void SynthVoice::prepare(double sr, int blockSize)
     filterEnv.prepare(sr);
     modEnv.prepare(sr);
 
-    // Per-layer carving filters — frequency lanes so layers stop clashing.
-    noiseHpL.prepare(sr); noiseHpR.prepare(sr);
-    noiseHpL.setMode(OnePoleCarver::Mode::HighPass); noiseHpL.setCutoff(2200.0f);
-    noiseHpR.setMode(OnePoleCarver::Mode::HighPass); noiseHpR.setCutoff(2200.0f);
-    subLp.prepare(sr);  subLp.setMode (OnePoleCarver::Mode::LowPass);  subLp.setCutoff(260.0f);
-    oscBHp.prepare(sr); oscBHp.setMode(OnePoleCarver::Mode::HighPass); oscBHp.setCutoff(110.0f);
+    // Per-layer role-aware carving (HP+LP+trim) — picks the right band per
+    // role so layers stop fighting and start sounding like one instrument.
+    noiseCarverL.prepare(sr); noiseCarverR.prepare(sr);
+    noiseCarverL.setRole("air"); noiseCarverR.setRole("air");
+    subCarver.prepare(sr);  subCarver.setRole("sub");
+    oscBCarver.prepare(sr); oscBCarver.setRole("warmth");
+
 
     unison.prepare(sr);
     unison.setConfig(unisonRenderVoices, unisonRenderDetune, unisonRenderSpread, unisonRenderDrift);
@@ -186,10 +187,27 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
     oscBPhase = phaseJ(noiseRng);
     subPhase  = phaseJ(noiseRng) * 0.5;
 
-    noiseHpL.reset(); noiseHpR.reset();
-    subLp.reset(); oscBHp.reset();
+    noiseCarverL.reset(); noiseCarverR.reset();
+    subCarver.reset(); oscBCarver.reset();
+
+    // ---- followMainEnvelope fade-in init ----
+    // Each layer fades in over its configured fadeMs window so reinforcement
+    // sine/triangle/noise/sub layers ease in beneath the main sample attack
+    // instead of beeping out in front. Also enforces minimum 8 ms so even
+    // an attack of 0 cannot produce a click.
+    auto initFade = [this](bool follow, float ms, int& remaining, int& total)
+    {
+        if (! follow) { remaining = total = 0; return; }
+        const int samples = (int) std::ceil((double) juce::jmax(8.0f, ms) * 0.001 * sampleRate);
+        total = samples; remaining = samples;
+    };
+    initFade(oscBFollowMain,  oscBFollowFadeMs,  oscBFadeSamplesRemaining,  oscBFadeSamplesTotal);
+    initFade(noiseFollowMain, noiseFollowFadeMs, noiseFadeSamplesRemaining, noiseFadeSamplesTotal);
+    initFade(subFollowMain,   subFollowFadeMs,   subFadeSamplesRemaining,   subFadeSamplesTotal);
+
     // Per-note phase scramble for the unison stack — anti-machine-gun.
     unison.randomizePhasesAndDrift();
+
 
 
     ampEnv.noteOn();
@@ -661,8 +679,15 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             if (oscBPhase > 1.0) oscBPhase -= 1.0;
             const float ph = (float) oscBPhase + fmOffset;
             oscBOut = renderOscShapeAA(oscBWave, ph - std::floor(ph), oscBPulseWidth, bDt) * oscBLevel;
-            // Gentle HP carve so Osc B body does not muddy the sample low end.
-            oscBOut = oscBHp.process(oscBOut);
+            // Role-aware HP+LP+trim carve so Osc B parks in its assigned band.
+            oscBOut = oscBCarver.process(oscBOut);
+            // followMainEnvelope fade-in (equal-power ramp 0..1).
+            if (oscBFadeSamplesRemaining > 0 && oscBFadeSamplesTotal > 0)
+            {
+                const float t = 1.0f - (float) oscBFadeSamplesRemaining / (float) oscBFadeSamplesTotal;
+                oscBOut *= std::sin(t * juce::MathConstants<float>::halfPi);
+                --oscBFadeSamplesRemaining;
+            }
         }
 
         // ---- Layer 3: Sub (one octave below current note, sine) ----
@@ -673,19 +698,30 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             subPhase += subHz / sampleRate;
             if (subPhase > 1.0) subPhase -= 1.0;
             subOut = std::sin((float) subPhase * juce::MathConstants<float>::twoPi) * subLevel;
-            // Sub stays in its lane (<~260 Hz) — keeps the low end mono-tight.
-            subOut = subLp.process(subOut);
+            subOut = subCarver.process(subOut);
+            if (subFadeSamplesRemaining > 0 && subFadeSamplesTotal > 0)
+            {
+                const float t = 1.0f - (float) subFadeSamplesRemaining / (float) subFadeSamplesTotal;
+                subOut *= std::sin(t * juce::MathConstants<float>::halfPi);
+                --subFadeSamplesRemaining;
+            }
         }
 
-        // ---- Layer 4: Noise / Air (stereo decorrelated, HP-carved) ----
+        // ---- Layer 4: Noise / Air (stereo decorrelated, role-carved) ----
         float noiseOutL = 0.0f, noiseOutR = 0.0f;
         if (noiseLevel > 0.0001f && sampleTickCounter >= noiseStartOffsetSamples)
         {
-            // Decorrelate L/R so air sits wide; HP at ~2.2k keeps it above
-            // the body of brass / guitars / pianos.
-            noiseOutL = noiseHpL.process(nextNoiseSample()) * noiseLevel;
-            noiseOutR = noiseHpR.process(nextNoiseSample()) * noiseLevel;
+            noiseOutL = noiseCarverL.process(nextNoiseSample()) * noiseLevel;
+            noiseOutR = noiseCarverR.process(nextNoiseSample()) * noiseLevel;
+            if (noiseFadeSamplesRemaining > 0 && noiseFadeSamplesTotal > 0)
+            {
+                const float t = 1.0f - (float) noiseFadeSamplesRemaining / (float) noiseFadeSamplesTotal;
+                const float g = std::sin(t * juce::MathConstants<float>::halfPi);
+                noiseOutL *= g; noiseOutR *= g;
+                --noiseFadeSamplesRemaining;
+            }
         }
+
 
         ++sampleTickCounter;
 

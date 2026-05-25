@@ -57,6 +57,7 @@ public:
         auto* L = buffer.getWritePointer(0);
         auto* R = buffer.getNumChannels() > 1 ? buffer.getWritePointer(1) : L;
 
+        float peak = 0.0f;
         for (int i = 0; i < n; ++i)
         {
             float l = L[i];
@@ -64,7 +65,6 @@ public:
 
             // 1) Shared subtle stereo drift — moves layers TOGETHER
             const float driftMod = drift.tick();
-            // apply as opposite-sign micro gain to L/R (very small)
             l *= (1.0f + driftMod);
             r *= (1.0f - driftMod);
 
@@ -80,8 +80,24 @@ public:
 
             L[i] = l;
             if (R != L) R[i] = r;
+            const float a = juce::jmax(std::fabs(l), std::fabs(r));
+            if (a > peak) peak = a;
+        }
+
+        // Peak meter: log if a block crosses -1 dBFS, throttled to ~1 Hz.
+        meterFrames += n;
+        if (peak > meterPeak) meterPeak = peak;
+        if (meterFrames >= (int) sampleRate)
+        {
+            const float dB = 20.0f * std::log10(juce::jmax(1.0e-9f, meterPeak));
+            if (meterPeak > 0.891251f) // -1 dBFS
+                juce::Logger::writeToLog("[DIDITAGAIN bus-peak] WARNING layerBus peak="
+                    + juce::String(dB, 2) + " dBFS — reduce reinforcement layer gain");
+            meterPeak = 0.0f;
+            meterFrames = 0;
         }
     }
+
 
 private:
     double sampleRate = 44100.0;
@@ -91,4 +107,9 @@ private:
     LayerGlueCompressor   glue;
     LayerStereoProcessor  widener;
     SharedLFO             drift;
+
+    // Bus-stage peak meter (logged ~1 Hz when crossing -1 dBFS).
+    float meterPeak   = 0.0f;
+    int   meterFrames = 0;
 };
+

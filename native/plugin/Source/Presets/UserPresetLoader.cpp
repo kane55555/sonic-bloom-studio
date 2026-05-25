@@ -641,23 +641,22 @@ struct FxLimits { float chorusMax, delayMax, reverbMax, satMax; };
 FxLimits fxLimitsFor(Family f)
 {
     // Reasonable upper caps so e.g. piano presets can't ship at 80% reverb.
+    // Aligned with the v2.1 category FX safety spec (May 2026 tuning pass).
     switch (f) {
-        case Family::PianoKeys: return { 0.18f, 0.16f, 0.22f, 0.12f };
-        case Family::Lead:      return { 0.35f, 0.45f, 0.32f, 0.45f };
-        case Family::Pad:       return { 0.42f, 0.34f, 0.45f, 0.25f };
-        case Family::ChoirVox:  return { 0.32f, 0.26f, 0.42f, 0.18f };
-        case Family::Brass:     return { 0.22f, 0.25f, 0.20f, 0.30f };
-        case Family::Guitar:    return { 0.30f, 0.35f, 0.28f, 0.40f };
-        case Family::Bell:      return { 0.30f, 0.35f, 0.48f, 0.18f };
-        case Family::Pluck:     return { 0.30f, 0.35f, 0.35f, 0.18f };
-        case Family::Bass808:   return { 0.12f, 0.18f, 0.18f, 0.35f };
+        case Family::PianoKeys: return { 0.18f, 0.14f, 0.34f, 0.12f };
+        case Family::Lead:      return { 0.40f, 0.45f, 0.35f, 0.40f };
+        case Family::Pad:       return { 0.42f, 0.34f, 0.50f, 0.25f };
+        case Family::ChoirVox:  return { 0.32f, 0.26f, 0.46f, 0.18f };
+        case Family::Brass:     return { 0.20f, 0.12f, 0.28f, 0.28f };
+        case Family::Guitar:    return { 0.34f, 0.35f, 0.42f, 0.24f };
+        case Family::Bell:      return { 0.30f, 0.30f, 0.46f, 0.18f };
+        case Family::Pluck:     return { 0.30f, 0.32f, 0.38f, 0.18f };
+        case Family::Bass808:   return { 0.10f, 0.14f, 0.16f, 0.32f };
         case Family::FxRiser:   return { 0.50f, 0.55f, 0.48f, 0.50f };
-        // Vintage synth strict caps (chorus/delay/reverb/sat) — matches the
-        // "remove static, keep warm" spec. Saturation drive is also capped
-        // hard at 0.16 to stop layer-bus tanh from overdriving the chain.
         case Family::Synth:     return { 0.18f, 0.10f, 0.18f, 0.16f };
-        default:                return { 0.50f, 0.50f, 0.50f, 0.40f };
+        default:                return { 0.45f, 0.40f, 0.45f, 0.38f };
     }
+
 }
 
 void applyLayerBusCharacter(juce::AudioProcessor& proc, const UserPreset& p, Family fam)
@@ -866,19 +865,28 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
         if (auto* dp = dynamic_cast<DiditagainProcessor*>(&proc))
         {
             const juce::String r2 = role2;
-            dp->getSynthEngine().forEachSynthVoice([&r2](SynthVoice& v)
+            // PCM/sample families default followMainEnvelope=true so
+            // reinforcement layers always ease in under the main attack.
+            const bool followFromPreset = p.layer2.followMainEnvelope;
+            const bool followEffective  = isPcmFamily ? true : followFromPreset;
+            const float mainAttackMs    = p.amp.attackMs;
+            dp->getSynthEngine().forEachSynthVoice([&r2, followEffective, mainAttackMs](SynthVoice& v)
             {
                 v.setLayer2EqRole(r2);
-                // Layers 3/4 inherit complementary roles so the noise/sub
-                // carvers also park in their own bands. We don't have a
-                // dedicated LayerBlock for them yet — use sensible siblings.
-                v.setLayer3EqRole(r2 == "air" || r2 == "texture" ? r2 : juce::String());
+                // Layers 3/4 inherit complementary roles so noise/sub carvers
+                // also park in their own bands. We don't have dedicated
+                // LayerBlocks for them yet — use sensible siblings.
+                v.setLayer3EqRole(r2 == "air" || r2 == "texture" ? r2 : juce::String("air"));
                 v.setLayer4EqRole(r2 == "sub" ? juce::String("sub")
                                   : r2 == "warmth" ? juce::String("warmth")
-                                                   : juce::String());
+                                                   : juce::String("sub"));
+                v.setLayer2FollowMain(followEffective, mainAttackMs);
+                v.setLayer3FollowMain(followEffective, mainAttackMs);
+                v.setLayer4FollowMain(followEffective, mainAttackMs);
             });
         }
     }
+
 
 
     // Sample is the only sound source — make sure Osc A pass-through is on,

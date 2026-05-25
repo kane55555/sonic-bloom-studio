@@ -136,55 +136,40 @@ public:
 
     // ---- Per-layer EQ role wiring (v2.1 blendMode contract) ----
     //
-    // Maps a preset's textual `eqRole` for layer 2 (Osc B) to the oscBHp
-    // carving filter cutoff so each role parks the layer in its own band:
-    //   body    -> 60 Hz   (let body through; minimal carve)
-    //   warmth  -> 150 Hz  (gentle low cut, mids intact)
-    //   air     -> 2500 Hz (only highs pass; layer becomes pure shimmer)
-    //   texture -> 450 Hz  (mids+highs)
-    //   sub     -> 40 Hz   (oscB barely touched; sub really lives on subOsc)
-    //   ""/auto -> 110 Hz  (default)
-    void setLayer2EqRole(const juce::String& role) noexcept
-    {
-        const auto r = role.trim().toLowerCase();
-        float hz = 110.0f;
-        if      (r == "body")    hz = 60.0f;
-        else if (r == "warmth")  hz = 150.0f;
-        else if (r == "air")     hz = 2500.0f;
-        else if (r == "texture") hz = 450.0f;
-        else if (r == "sub")     hz = 40.0f;
-        oscBHp.setCutoff(hz);
-    }
-
-    // Layer 3 (Noise/Air): HP cutoff for the noise carvers.
-    //   air     -> 4000 Hz (sparkle only)
-    //   texture -> 1500 Hz (broadband-ish noise body)
-    //   warmth  -> 600 Hz  (low rumble allowed)
-    //   ""/auto -> 2200 Hz (default)
+    // Full role table is encoded inside LayerRoleCarver — see that header.
+    // body / warmth / air / texture / sub / lead / full are all supported
+    // and apply HP+LP+trim as one operation per layer.
+    void setLayer2EqRole(const juce::String& role) noexcept { oscBCarver.setRole(role); }
     void setLayer3EqRole(const juce::String& role) noexcept
     {
+        // Air/texture/warmth roles are meaningful for noise; everything else
+        // falls back to "air" so the noise layer always lives above the body.
         const auto r = role.trim().toLowerCase();
-        float hz = 2200.0f;
-        if      (r == "air")     hz = 4000.0f;
-        else if (r == "texture") hz = 1500.0f;
-        else if (r == "warmth")  hz = 600.0f;
-        noiseHpL.setCutoff(hz);
-        noiseHpR.setCutoff(hz);
+        const juce::String use = (r == "air" || r == "texture" || r == "warmth") ? r : juce::String("air");
+        noiseCarverL.setRole(use);
+        noiseCarverR.setRole(use);
     }
-
-    // Layer 4 (Sub): LP cutoff for the sub carver.
-    //   sub     -> 120 Hz  (true sub)
-    //   body    -> 260 Hz  (default; round low end)
-    //   warmth  -> 400 Hz  (low-mids warmth)
     void setLayer4EqRole(const juce::String& role) noexcept
     {
+        // Sub layer: prefer sub/warmth/body — anything else collapses to sub.
         const auto r = role.trim().toLowerCase();
-        float hz = 260.0f;
-        if      (r == "sub")    hz = 120.0f;
-        else if (r == "warmth") hz = 400.0f;
-        else if (r == "body")   hz = 260.0f;
-        subLp.setCutoff(hz);
+        const juce::String use = (r == "sub" || r == "warmth" || r == "body") ? r : juce::String("sub");
+        subCarver.setRole(use);
     }
+
+    // ---- followMainEnvelope wiring ----
+    //
+    // When enabled, a soft fade-in is applied to the layer so reinforcement
+    // sine/triangle layers can't enter as a click ahead of the main sample,
+    // and the layer release will not finish before the main amp env. The
+    // fade duration is max(minFadeMs, mainAttackMs * 0.5).
+    void setLayer2FollowMain(bool follow, float mainAttackMs) noexcept
+    { oscBFollowMain = follow; oscBFollowFadeMs = juce::jmax(8.0f, 0.5f * mainAttackMs); }
+    void setLayer3FollowMain(bool follow, float mainAttackMs) noexcept
+    { noiseFollowMain = follow; noiseFollowFadeMs = juce::jmax(12.0f, 0.5f * mainAttackMs); }
+    void setLayer4FollowMain(bool follow, float mainAttackMs) noexcept
+    { subFollowMain = follow; subFollowFadeMs = juce::jmax(10.0f, 0.5f * mainAttackMs); }
+
 
     LegacyOscillatorStub& getOscA()      noexcept { return oscAStub; }
     LegacyOscillatorStub& getOscB()      noexcept { return oscBStub; }
@@ -265,11 +250,19 @@ private:
     std::mt19937 noiseRng { 0x1234abcd };
     float pinkB0 = 0.0f, pinkB1 = 0.0f, pinkB2 = 0.0f;
 
-    // ---- Per-layer "carving" filters: keep each layer in its own band
-    //      so they stop fighting and start sounding like one instrument. ----
-    OnePoleCarver noiseHpL, noiseHpR;   // HP ~2 kHz on noise/air
-    OnePoleCarver subLp;                // LP ~250 Hz on sub
-    OnePoleCarver oscBHp;               // gentle HP on Osc B to clear sample low end
+    // ---- Per-layer "carving" filters (role-aware HP+LP+trim) ----
+    LayerRoleCarver noiseCarverL, noiseCarverR;
+    LayerRoleCarver subCarver;
+    LayerRoleCarver oscBCarver;
+
+    // followMainEnvelope: per-layer soft fade-in ramps so reinforcement
+    // sine/triangle layers ease in instead of beeping ahead of the main
+    // sample attack. fadeMs is set per-preset; samplesRemaining decrements
+    // each tick and the resulting (1.0 - remain/total) gain is applied.
+    bool  oscBFollowMain   = true,  noiseFollowMain   = true,  subFollowMain   = true;
+    float oscBFollowFadeMs = 12.0f, noiseFollowFadeMs = 18.0f, subFollowFadeMs = 12.0f;
+    int   oscBFadeSamplesRemaining = 0, noiseFadeSamplesRemaining = 0, subFadeSamplesRemaining = 0;
+    int   oscBFadeSamplesTotal     = 0, noiseFadeSamplesTotal     = 0, subFadeSamplesTotal     = 0;
 
     // Micro-timing offsets (samples) per layer — tiny random delays
     // (0.5-8 ms) reduce the "stacked WAV" feeling and add ensemble realism.
@@ -277,6 +270,9 @@ private:
     int   subStartOffsetSamples  = 0;
     int   noiseStartOffsetSamples = 0;
     int   sampleTickCounter = 0;
+
+
+
 
     // ---- Filter modulation ----
     float filterEnvAmount = 0.0f;

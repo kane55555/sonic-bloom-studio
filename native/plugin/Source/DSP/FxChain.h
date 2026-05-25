@@ -45,6 +45,10 @@ public:
 
     void process(juce::AudioBuffer<float>& buffer)
     {
+        // 0) FX input metering — catches presets that hand the chain a hot
+        //    signal so the cause is visible in logs before the limiter kicks.
+        meterStage(buffer, "fx-in", fxInPeak, fxInFrames);
+
         // 1) Saturation
         if (saturationActive)
         {
@@ -55,6 +59,7 @@ public:
                 for (int i = 0; i < n; ++i) d[i] = sat.processSample(d[i]);
             }
         }
+
 
         // 2) Chorus
         chorus.process(buffer);
@@ -193,9 +198,34 @@ private:
         }
     }
 
+    // Generic stage peak meter — logs at most ~1 Hz when stage exceeds -1 dBFS.
+    void meterStage(const juce::AudioBuffer<float>& buf, const char* stageName,
+                    float& peakAccum, int& framesAccum) noexcept
+    {
+        float p = 0.0f;
+        const int n = buf.getNumSamples();
+        for (int ch = 0; ch < buf.getNumChannels(); ++ch)
+        {
+            const auto* d = buf.getReadPointer(ch);
+            for (int i = 0; i < n; ++i) { const float a = std::fabs(d[i]); if (a > p) p = a; }
+        }
+        if (p > peakAccum) peakAccum = p;
+        framesAccum += n;
+        if (framesAccum >= 44100)
+        {
+            if (peakAccum > 0.891251f)
+                juce::Logger::writeToLog(juce::String("[DIDITAGAIN fx-peak] WARNING stage=")
+                    + stageName + " peak="
+                    + juce::String(juce::Decibels::gainToDecibels(peakAccum), 2) + " dBFS");
+            peakAccum = 0.0f; framesAccum = 0;
+        }
+    }
+
     int clipFramesSinceLog = 100000;
+    float fxInPeak = 0.0f;  int fxInFrames = 0;
 
     Saturation       sat;
+
     ChorusBlock      chorus;
     DelayBlock       delay;
     ReverbBlock      reverb;
