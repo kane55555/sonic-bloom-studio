@@ -362,8 +362,12 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
 
     // ---- Reverb character voiced per instrument family ----
     applyReverbCharacter(processor, p.category);
-    // Per-category hybrid-synth tuning (unison / spread / exciter / drift).
-    applyCategoryDsp(processor, p.category);
+    // Per-category hybrid-synth tuning (unison / spread / exciter / drift)
+    // plus role-aware EQ carving and followMainEnvelope fade-in.
+    const float mainAttackMs = (sampleLayer != nullptr)
+        ? juce::jmax(0.0f, sampleLayer->ampEnv.attack * 1000.0f) : 5.0f;
+    applyCategoryDsp(processor, p.category, mainAttackMs);
+
 
     return out;
 }
