@@ -275,6 +275,9 @@ inline void report(DiditagainProcessor& proc,
         << " followMainEnvelope=" << (up.layer2.followMainEnvelope ? "true" : "false")
         << " polyphony=" << polyphony
         << " estimatedHeadroomDb=" << juce::String(headroomDb, 2)
+        << " categoryTargetMinDb=" << juce::String(target.minDb, 2)
+        << " categoryTargetMaxDb=" << juce::String(target.maxDb, 2)
+        << " suggestedGainAdjustmentDb=" << (notesPlaying ? juce::String(suggestedGainDb, 2) : juce::String("n/a"))
         << " warnings=" << (warnings.isEmpty() ? juce::String("none")
                                                : warnings.joinIntoString(","));
     juce::Logger::writeToLog(out);
