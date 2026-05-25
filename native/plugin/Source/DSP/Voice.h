@@ -264,6 +264,15 @@ private:
     int   oscBFadeSamplesRemaining = 0, noiseFadeSamplesRemaining = 0, subFadeSamplesRemaining = 0;
     int   oscBFadeSamplesTotal     = 0, noiseFadeSamplesTotal     = 0, subFadeSamplesTotal     = 0;
 
+    // Micro-timing offsets (samples) per layer — tiny random delays
+    // (0.5-8 ms) reduce the "stacked WAV" feeling and add ensemble realism.
+    int   oscBStartOffsetSamples = 0;
+    int   subStartOffsetSamples  = 0;
+    int   noiseStartOffsetSamples = 0;
+    int   sampleTickCounter = 0;
+
+
+
 
     // ---- Filter modulation ----
     float filterEnvAmount = 0.0f;
