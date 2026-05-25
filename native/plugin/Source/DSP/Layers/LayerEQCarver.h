@@ -9,8 +9,10 @@
 //    - low-pass sub/body around 250-400 Hz
 //    - high-shelf for "shimmer" presence
 //==============================================================================
+#include <JuceHeader.h>
 #include <cmath>
 #include <algorithm>
+
 
 class OnePoleCarver
 {
