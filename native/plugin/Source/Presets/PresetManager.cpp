@@ -745,10 +745,13 @@ void PresetManager::loadPreset(int index)
             }
         }
 
-        // STEP 2 — Fallback only when no absolute resolution worked: search
-        // the user category folder (legacy behaviour for old presets that
-        // only stored a relative leaf name).
-        if (! resolved.isDirectory())
+        // STEP 2 — Fallback ONLY when raw was empty/relative/inside-Presets/User.
+        // Never silently rewrite an absolute Samples/Pianos/... path to
+        // Samples/Presets/User/Pianos/...
+        const bool allowPresetsUserFallback = rawSourcePath.isEmpty()
+                                           || ! rawIsAbsolute
+                                           || rawIsInsidePresetsUser;
+        if (! resolved.isDirectory() && allowPresetsUserFallback)
         {
             auto catResolved = findCategorySourceFolder(getUserPresetDirectory(), effectiveCategory, sourceLeaf, file);
             if (catResolved.isDirectory())
@@ -760,14 +763,26 @@ void PresetManager::loadPreset(int index)
             }
         }
 
-        // STEP 3 — Last-chance discovery via name/category search.
+        // STEP 3 — Last-chance discovery under Samples/ (resolveSourcePath
+        // already excludes Samples/Presets/). Also reject anything that lands
+        // inside Presets/User unless the raw path explicitly wanted it.
         if (! resolved.isDirectory() && rawSourcePath.isNotEmpty())
         {
             auto discovered = dida::userpreset::resolveSourcePath(rawSourcePath);
             if (discovered.isDirectory())
             {
-                resolved = discovered;
-                if (resolvedFrom.isEmpty()) resolvedFrom = "fallbackSearch";
+                const auto discNorm = discovered.getFullPathName().replaceCharacter('\\', '/');
+                const bool inPresetsUser = discNorm.containsIgnoreCase("/Samples/Presets/User/");
+                if (inPresetsUser && ! rawIsInsidePresetsUser)
+                {
+                    didaPresetManagerLog("SOURCE_PATH_INSIDE_PRESET_FOLDER rejecting raw=" + rawSourcePath
+                        + " discovered=" + discovered.getFullPathName());
+                }
+                else
+                {
+                    resolved = discovered;
+                    if (resolvedFrom.isEmpty()) resolvedFrom = "fallbackSearch";
+                }
             }
         }
 
