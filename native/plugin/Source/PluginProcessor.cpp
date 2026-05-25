@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "Presets/PresetQualityReport.h"
 
 static inline void didaPresetLog(const juce::String& message)
 {
