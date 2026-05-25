@@ -783,6 +783,9 @@ void PresetManager::loadPreset(int index)
         requestedSampleRootMidi    = 60;
         requestedSampleLooping     = isSustainedSampleCategory(effectiveCategory);
         requestedCategory          = effectiveCategory;
+        requestedSampleRawPath     = rawSourcePath;
+        requestedSampleResolvedFrom = resolvedFrom;
+        requestedSampleRawInsidePresetsUser = rawIsInsidePresetsUser;
         macroMapper.clear();
         requestedPresetIsUserDiapreset = true;
         pendingUserDiapreset = up;
