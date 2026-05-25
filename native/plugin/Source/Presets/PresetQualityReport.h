@@ -164,6 +164,57 @@ inline void report(DiditagainProcessor& proc,
         << " warnings=" << (warnings.isEmpty() ? juce::String("none")
                                                : warnings.joinIntoString(","));
     juce::Logger::writeToLog(out);
+
+    // --- Also persist latest JSON report for external tooling -------------
+    juce::DynamicObject::Ptr j = new juce::DynamicObject();
+    j->setProperty("presetName",         up.presetName);
+    j->setProperty("category",           effectiveCategory);
+    j->setProperty("engineType",         engineType);
+    j->setProperty("sourceInstrument",   up.source.path);
+    j->setProperty("resolvedFolder",     resolvedFolderPath);
+    j->setProperty("wavZones",           wavZones);
+    j->setProperty("activeLayers",       activeLayers);
+    j->setProperty("activePartials",     activePartials);
+    j->setProperty("layerBusPeakDb",     busPeakDb);
+    j->setProperty("fxInputPeakDb",      fxInDb);
+    j->setProperty("fxOutputPeakDb",     fxOutDb);
+    j->setProperty("finalPeakDb",        finalDb);
+    j->setProperty("clampedFields",      "n/a");
+    j->setProperty("reverbMix",          reverbMix);
+    j->setProperty("delayMix",           delayMix);
+    j->setProperty("chorusMix",          chorusMix);
+    j->setProperty("saturationMix",      satMix);
+    j->setProperty("layer2GainDb",       up.layer2.gainDb);
+    j->setProperty("layer2BlendMode",    up.layer2.blendMode.isNotEmpty() ? up.layer2.blendMode : juce::String("auto"));
+    j->setProperty("layer2EqRole",       up.layer2.eqRole.isNotEmpty() ? up.layer2.eqRole : juce::String("auto"));
+    j->setProperty("followMainEnvelope", up.layer2.followMainEnvelope);
+    j->setProperty("polyphony",          polyphony);
+    j->setProperty("estimatedHeadroomDb", headroomDb);
+    juce::Array<juce::var> warnVar;
+    for (auto& w : warnings) warnVar.add(w);
+    j->setProperty("warnings",           warnVar);
+    j->setProperty("timestamp",          juce::Time::getCurrentTime().toISO8601(true));
+
+    const juce::String json = juce::JSON::toString(juce::var(j.get()), false);
+
+    auto writeTo = [&](const juce::File& f)
+    {
+        auto dir = f.getParentDirectory();
+        if (! dir.exists()) dir.createDirectory();
+        f.replaceWithText(json);
+    };
+
+    // Windows user path (per spec) — only writes if the parent exists.
+   #if JUCE_WINDOWS
+    juce::File winPath ("C:/Users/kaini/Documents/DIDITAGAIN STUDIO/Logs/latest_preset_quality.json");
+    writeTo(winPath);
+   #endif
+
+    // Cross-platform fallback: <UserDocuments>/DIDITAGAIN STUDIO/Logs/...
+    auto docs = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+                    .getChildFile("DIDITAGAIN STUDIO").getChildFile("Logs")
+                    .getChildFile("latest_preset_quality.json");
+    writeTo(docs);
 }
 
 }} // namespace dida::presetreport
