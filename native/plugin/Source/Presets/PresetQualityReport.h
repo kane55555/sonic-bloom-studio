@@ -254,9 +254,12 @@ inline void report(DiditagainProcessor& proc,
         warnings.add("NO_ZONES");
 
     // Base instrument samples must NOT live under Samples/Presets/User/.
-    if (rawPathInsidePresetsUser
-        || sourceInstrumentPathRaw.replaceCharacter('\\', '/')
-              .containsIgnoreCase("/Samples/Presets/User/"))
+    const auto rawNorm      = sourceInstrumentPathRaw.replaceCharacter('\\', '/');
+    const auto resolvedNorm = resolvedFolderPath.replaceCharacter('\\', '/');
+    const bool rawInPresetsUser      = rawPathInsidePresetsUser
+                                    || rawNorm.containsIgnoreCase("/Samples/Presets/User/");
+    const bool resolvedInPresetsUser = resolvedNorm.containsIgnoreCase("/Samples/Presets/User/");
+    if (rawInPresetsUser || (resolvedInPresetsUser && ! rawInPresetsUser))
         warnings.add("SOURCE_PATH_INSIDE_PRESET_FOLDER");
 
     const auto cLow = effectiveCategory.toLowerCase();
