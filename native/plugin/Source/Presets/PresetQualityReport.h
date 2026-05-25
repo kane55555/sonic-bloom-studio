@@ -187,10 +187,13 @@ inline void report(DiditagainProcessor& proc,
                    int wavZones,
                    const juce::String& sourceInstrumentPathRaw = {},
                    const juce::String& resolvedFromIn          = {},
-                   bool rawPathInsidePresetsUser               = false)
+                   bool rawPathInsidePresetsUser               = false,
+                   const juce::String& browserPresetNameIn     = {},
+                   const juce::String& bankCategoryIn          = {})
 {
     auto& engine = proc.getSynthEngine();
     auto& bus    = engine.getLayerBus();
+    auto& fx     = engine.getFx();
     auto& fx     = engine.getFx();
 
     const juce::String effectiveCategory = normalizeCategory(effectiveCategoryIn);
