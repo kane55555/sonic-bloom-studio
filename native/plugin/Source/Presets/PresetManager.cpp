@@ -161,13 +161,45 @@ static juce::File chooseRepresentativeMappedWav(const juce::Array<juce::File>& f
     return chosen;
 }
 
+// Normalise a category string: collapse common typos / camelCase aliases.
+// Used for caps lookup, folder-grouping, debug reports and validation. Does
+// NOT rename anything on disk — purely an in-memory canonicalisation.
+static juce::String normalizeCategoryAlias(const juce::String& in)
+{
+    auto s = in.trim();
+    if (s.isEmpty()) return s;
+    s = s.replace("Saxaphone", "Saxophone", true);  // common typo
+    s = s.replace("saxaphone", "saxophone", true);
+    if (s.equalsIgnoreCase("VintageSynth") || s.equalsIgnoreCase("VintageSynths"))
+        return "Vintage Synths";
+    return s;
+}
+
+// Strip recognised qualifier prefixes ("Trap Saxophone" -> "Saxophone")
+// so categories with stylistic qualifiers still map back to their base
+// instrument for caps/blend-mode lookup.
+static juce::String stripCategoryQualifier(juce::String s)
+{
+    for (auto* pfx : { "Trap ", "Lo-Fi ", "Lofi ", "Vintage " })
+    {
+        const juce::String p (pfx);
+        if (s.startsWithIgnoreCase(p)) { s = s.substring(p.length()).trim(); break; }
+    }
+    return s;
+}
+
 static bool categoryNamesMatch(const juce::String& a, const juce::String& b)
 {
-    const auto aa = a.trim();
-    const auto bb = b.trim();
+    const auto aa = normalizeCategoryAlias(a).trim();
+    const auto bb = normalizeCategoryAlias(b).trim();
     if (aa.equalsIgnoreCase(bb)) return true;
     if (aa.endsWithIgnoreCase("s") && aa.dropLastCharacters(1).equalsIgnoreCase(bb)) return true;
     if (bb.endsWithIgnoreCase("s") && bb.dropLastCharacters(1).equalsIgnoreCase(aa)) return true;
+    const auto sa = stripCategoryQualifier(aa);
+    const auto sb = stripCategoryQualifier(bb);
+    if (sa.equalsIgnoreCase(sb)) return true;
+    if (sa.endsWithIgnoreCase("s") && sa.dropLastCharacters(1).equalsIgnoreCase(sb)) return true;
+    if (sb.endsWithIgnoreCase("s") && sb.dropLastCharacters(1).equalsIgnoreCase(sa)) return true;
     return false;
 }
 
