@@ -61,6 +61,27 @@ inline CapsForCategory capsForCategory(const juce::String& catIn)
     return { 0.45f, 0.40f, 0.45f, 0.38f };
 }
 
+// Per-category target peak window (dBFS) for active notes/chords.
+struct LoudnessTarget { float minDb, maxDb; };
+
+inline LoudnessTarget loudnessTargetForCategory(const juce::String& catIn)
+{
+    const auto c = normalizeCategory(catIn).toLowerCase();
+    if (c.contains("piano") || c.contains("rhodes") || c.contains("keys"))
+        return { -18.0f, -10.0f };
+    if (c.contains("brass") || c.contains("trumpet") || c.contains("horn")
+        || c.contains("sax")  || c.contains("guitar"))
+        return { -16.0f,  -8.0f };
+    if (c.contains("string") || c.contains("choir") || c.contains("vox")
+        || c.contains("vocal") || c.contains("pad"))
+        return { -20.0f, -10.0f };
+    if (c.contains("808") || c.contains("bass") || c.contains("sub"))
+        return { -12.0f,  -6.0f };
+    if (c.contains("lead") || c.contains("vintage") || c.contains("synth"))
+        return { -14.0f,  -6.0f };
+    return { -18.0f, -8.0f };
+}
+
 // engineType-aware: pure synth engines do NOT need sourceInstrument.path.
 // Layered engines need a source only if any enabled partial is "pcm".
 inline bool engineRequiresSource(const dida::userpreset::UserPreset& up)
