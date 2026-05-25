@@ -647,7 +647,10 @@ void PresetManager::applyPendingUserDiapresetAfterSampleLoad()
     if (auto* dp = dynamic_cast<DiditagainProcessor*>(&processor))
         dida::presetreport::report(*dp, pendingUserDiapreset, requestedCategory,
                                    requestedSampleFolderPath,
-                                   requestedSampleSources.size());
+                                   requestedSampleSources.size(),
+                                   requestedSampleRawPath,
+                                   requestedSampleResolvedFrom,
+                                   requestedSampleRawInsidePresetsUser);
 }
 
 static void applyOscBlock(juce::AudioProcessor& proc, const juce::var& obj,
