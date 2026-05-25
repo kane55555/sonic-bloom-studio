@@ -194,7 +194,6 @@ inline void report(DiditagainProcessor& proc,
     auto& engine = proc.getSynthEngine();
     auto& bus    = engine.getLayerBus();
     auto& fx     = engine.getFx();
-    auto& fx     = engine.getFx();
 
     const juce::String effectiveCategory = normalizeCategory(effectiveCategoryIn);
 
