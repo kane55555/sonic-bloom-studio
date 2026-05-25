@@ -308,11 +308,37 @@ inline void report(DiditagainProcessor& proc,
     const juce::String rawPath = sourceInstrumentPathRaw.isNotEmpty()
                                ? sourceInstrumentPathRaw : up.source.path;
 
+    // --- Dedupe: suppress identical reloads within 300ms ------------------
+    auto& sess = sessionState();
+    const juce::String dedupeKey = up.presetName + "|" + rawPath + "|" + effectiveCategory;
+    const juce::int64 nowMs = juce::Time::currentTimeMillis();
+    if (sess.lastPresetKey == dedupeKey && (nowMs - sess.lastLoadMs) < 300)
+        return;
+    sess.lastPresetKey = dedupeKey;
+    sess.lastLoadMs    = nowMs;
+    const int loadIndex = ++sess.loadIndex;
+
+    const juce::String timestamp = juce::Time::getCurrentTime().toISO8601(true);
+    const juce::String pluginVersion =
+       #ifdef JucePlugin_VersionString
+        JucePlugin_VersionString;
+       #else
+        "unknown";
+       #endif
+    const juce::String browserPresetName = browserPresetNameIn.isNotEmpty()
+                                           ? browserPresetNameIn : up.presetName;
+    const juce::String bankCategory = bankCategoryIn.isNotEmpty()
+                                      ? bankCategoryIn : effectiveCategory;
+
     // --- Emit -------------------------------------------------------------
     juce::String out;
     out << "[DIDITAGAIN preset-quality]"
+        << " sessionId=" << sess.sessionId
+        << " presetLoadIndex=" << loadIndex
         << " presetName=" << up.presetName
+        << " browserPresetName=" << browserPresetName
         << " category=" << effectiveCategory
+        << " bankCategory=" << bankCategory
         << " engineType=" << engineType
         << " sourceInstrumentPathRaw=" << rawPath
         << " resolvedFolder=" << resolvedFolderPath
@@ -339,14 +365,21 @@ inline void report(DiditagainProcessor& proc,
         << " categoryTargetMinDb=" << juce::String(target.minDb, 2)
         << " categoryTargetMaxDb=" << juce::String(target.maxDb, 2)
         << " suggestedGainAdjustmentDb=" << (notesPlaying ? juce::String(suggestedGainDb, 2) : juce::String("n/a"))
+        << " pluginVersion=" << pluginVersion
+        << " timestamp=" << timestamp
         << " warnings=" << (warnings.isEmpty() ? juce::String("none")
                                                : warnings.joinIntoString(","));
     juce::Logger::writeToLog(out);
 
-    // --- Also persist latest JSON report for external tooling -------------
+    // --- Build JSON object for latest + jsonl session log -----------------
     juce::DynamicObject::Ptr j = new juce::DynamicObject();
+    j->setProperty("sessionId",              sess.sessionId);
+    j->setProperty("presetLoadIndex",        loadIndex);
+    j->setProperty("pluginVersion",          pluginVersion);
     j->setProperty("presetName",             up.presetName);
+    j->setProperty("browserPresetName",      browserPresetName);
     j->setProperty("category",               effectiveCategory);
+    j->setProperty("bankCategory",           bankCategory);
     j->setProperty("categoryRaw",            effectiveCategoryIn);
     j->setProperty("engineType",             engineType);
     j->setProperty("oscillatorEngineActive", oscillatorEngineActive);
@@ -372,37 +405,69 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("followMainEnvelope",     up.layer2.followMainEnvelope);
     j->setProperty("polyphony",              polyphony);
     j->setProperty("estimatedHeadroomDb",    headroomDb);
-    juce::Array<juce::var> warnVar;
-    for (auto& w : warnings) warnVar.add(w);
     j->setProperty("categoryTargetMinDb",    target.minDb);
     j->setProperty("categoryTargetMaxDb",    target.maxDb);
     if (notesPlaying)
         j->setProperty("suggestedGainAdjustmentDb", suggestedGainDb);
     else
         j->setProperty("suggestedGainAdjustmentDb", juce::var());
+    juce::Array<juce::var> warnVar;
+    for (auto& w : warnings) warnVar.add(w);
     j->setProperty("warnings",               warnVar);
-    j->setProperty("timestamp",              juce::Time::getCurrentTime().toISO8601(true));
+    j->setProperty("timestamp",              timestamp);
 
-    const juce::String json = juce::JSON::toString(juce::var(j.get()), false);
+    // Single-line JSON for jsonl, pretty for the "latest" snapshot.
+    const juce::String jsonLine   = juce::JSON::toString(juce::var(j.get()), true);
+    const juce::String jsonPretty = juce::JSON::toString(juce::var(j.get()), false);
 
-    auto writeTo = [&](const juce::File& f)
+    // 1) latest_preset_quality.json — overwrite with most recent only.
     {
+        auto f = latestJsonFile();
         auto dir = f.getParentDirectory();
         if (! dir.exists()) dir.createDirectory();
-        f.replaceWithText(json);
-    };
+        f.replaceWithText(jsonPretty);
+    }
 
-    // Windows user path (per spec) — only writes if the parent exists.
-   #if JUCE_WINDOWS
-    juce::File winPath ("C:/Users/kaini/Documents/DIDITAGAIN STUDIO/Logs/latest_preset_quality.json");
-    writeTo(winPath);
-   #endif
+    // 2) preset_quality_session.jsonl — append one line per load.
+    {
+        auto f = sessionJsonlFile();
+        if (! f.getParentDirectory().exists()) f.getParentDirectory().createDirectory();
+        f.appendText(jsonLine + "\n");
+    }
 
-    // Cross-platform fallback: <UserDocuments>/DIDITAGAIN STUDIO/Logs/...
-    auto docs = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
-                    .getChildFile("DIDITAGAIN STUDIO").getChildFile("Logs")
-                    .getChildFile("latest_preset_quality.json");
-    writeTo(docs);
+    // 3) preset_quality_session.txt — append human-readable block.
+    {
+        juce::String block;
+        block << "==================================================\n"
+              << "[DIDITAGAIN preset-quality]\n"
+              << "sessionId: "                 << sess.sessionId       << "\n"
+              << "presetLoadIndex: "           << loadIndex            << "\n"
+              << "pluginVersion: "             << pluginVersion        << "\n"
+              << "presetName: "                << up.presetName        << "\n"
+              << "browserPresetName: "         << browserPresetName    << "\n"
+              << "category: "                  << effectiveCategory    << "\n"
+              << "bankCategory: "              << bankCategory         << "\n"
+              << "engineType: "                << engineType           << "\n"
+              << "sourceInstrumentPathRaw: "   << rawPath              << "\n"
+              << "resolvedFolder: "            << resolvedFolderPath   << "\n"
+              << "resolvedFrom: "              << resolvedFrom         << "\n"
+              << "wavZones: "                  << wavZones             << "\n"
+              << "activeLayers: "              << activeLayers         << "\n"
+              << "activePartials: "            << activePartials       << "\n"
+              << "layerBusPeakDb: "            << juce::String(busPeakDb, 2) << "\n"
+              << "fxInputPeakDb: "             << juce::String(fxInDb, 2)    << "\n"
+              << "fxOutputPeakDb: "            << juce::String(fxOutDb, 2)   << "\n"
+              << "finalPeakDb: "               << juce::String(finalDb, 2)   << "\n"
+              << "categoryTargetMinDb: "       << juce::String(target.minDb, 2) << "\n"
+              << "categoryTargetMaxDb: "       << juce::String(target.maxDb, 2) << "\n"
+              << "suggestedGainAdjustmentDb: " << (notesPlaying ? juce::String(suggestedGainDb, 2) : juce::String("n/a")) << "\n"
+              << "warnings: "                  << (warnings.isEmpty() ? juce::String("none") : warnings.joinIntoString(",")) << "\n"
+              << "timestamp: "                 << timestamp            << "\n"
+              << "==================================================\n";
+        auto f = sessionTextFile();
+        if (! f.getParentDirectory().exists()) f.getParentDirectory().createDirectory();
+        f.appendText(block);
+    }
 }
 
 }} // namespace dida::presetreport
