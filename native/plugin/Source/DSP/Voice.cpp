@@ -679,8 +679,15 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             if (oscBPhase > 1.0) oscBPhase -= 1.0;
             const float ph = (float) oscBPhase + fmOffset;
             oscBOut = renderOscShapeAA(oscBWave, ph - std::floor(ph), oscBPulseWidth, bDt) * oscBLevel;
-            // Gentle HP carve so Osc B body does not muddy the sample low end.
-            oscBOut = oscBHp.process(oscBOut);
+            // Role-aware HP+LP+trim carve so Osc B parks in its assigned band.
+            oscBOut = oscBCarver.process(oscBOut);
+            // followMainEnvelope fade-in (equal-power ramp 0..1).
+            if (oscBFadeSamplesRemaining > 0 && oscBFadeSamplesTotal > 0)
+            {
+                const float t = 1.0f - (float) oscBFadeSamplesRemaining / (float) oscBFadeSamplesTotal;
+                oscBOut *= std::sin(t * juce::MathConstants<float>::halfPi);
+                --oscBFadeSamplesRemaining;
+            }
         }
 
         // ---- Layer 3: Sub (one octave below current note, sine) ----
@@ -691,19 +698,30 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             subPhase += subHz / sampleRate;
             if (subPhase > 1.0) subPhase -= 1.0;
             subOut = std::sin((float) subPhase * juce::MathConstants<float>::twoPi) * subLevel;
-            // Sub stays in its lane (<~260 Hz) — keeps the low end mono-tight.
-            subOut = subLp.process(subOut);
+            subOut = subCarver.process(subOut);
+            if (subFadeSamplesRemaining > 0 && subFadeSamplesTotal > 0)
+            {
+                const float t = 1.0f - (float) subFadeSamplesRemaining / (float) subFadeSamplesTotal;
+                subOut *= std::sin(t * juce::MathConstants<float>::halfPi);
+                --subFadeSamplesRemaining;
+            }
         }
 
-        // ---- Layer 4: Noise / Air (stereo decorrelated, HP-carved) ----
+        // ---- Layer 4: Noise / Air (stereo decorrelated, role-carved) ----
         float noiseOutL = 0.0f, noiseOutR = 0.0f;
         if (noiseLevel > 0.0001f && sampleTickCounter >= noiseStartOffsetSamples)
         {
-            // Decorrelate L/R so air sits wide; HP at ~2.2k keeps it above
-            // the body of brass / guitars / pianos.
-            noiseOutL = noiseHpL.process(nextNoiseSample()) * noiseLevel;
-            noiseOutR = noiseHpR.process(nextNoiseSample()) * noiseLevel;
+            noiseOutL = noiseCarverL.process(nextNoiseSample()) * noiseLevel;
+            noiseOutR = noiseCarverR.process(nextNoiseSample()) * noiseLevel;
+            if (noiseFadeSamplesRemaining > 0 && noiseFadeSamplesTotal > 0)
+            {
+                const float t = 1.0f - (float) noiseFadeSamplesRemaining / (float) noiseFadeSamplesTotal;
+                const float g = std::sin(t * juce::MathConstants<float>::halfPi);
+                noiseOutL *= g; noiseOutR *= g;
+                --noiseFadeSamplesRemaining;
+            }
         }
+
 
         ++sampleTickCounter;
 
