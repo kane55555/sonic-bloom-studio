@@ -1368,6 +1368,11 @@ void PresetManager::seedVintageSynthBankIfMissing()
 //==============================================================================
 void PresetManager::autoIndexUserInstrumentFolders()
 {
+    // Disabled by design: subfolders under <Samples>/Presets/User/<Category>/
+    // are hidden source folders consumed by .diapreset routing only. They
+    // must NOT appear as their own browser entries.
+    if (! showSampleFoldersInBrowser) return;
+
     auto root = getUserPresetDirectory();
     if (! root.isDirectory()) return;
 
