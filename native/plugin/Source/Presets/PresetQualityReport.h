@@ -399,6 +399,7 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("sourceInstrumentPathRaw", rawPath);
     j->setProperty("resolvedFolder",         resolvedFolderPath);
     j->setProperty("resolvedFrom",           resolvedFrom);
+    j->setProperty("hiddenSourceFolder",     hiddenSourceFolder);
     j->setProperty("wavZones",               wavZones);
     j->setProperty("activeLayers",           activeLayers);
     j->setProperty("activePartials",         activePartials);
