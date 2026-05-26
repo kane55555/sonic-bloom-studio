@@ -482,6 +482,7 @@ inline void report(DiditagainProcessor& proc,
               << "sourceInstrumentPathRaw: "   << rawPath              << "\n"
               << "resolvedFolder: "            << resolvedFolderPath   << "\n"
               << "resolvedFrom: "              << resolvedFrom         << "\n"
+              << "hiddenSourceFolder: "        << (hiddenSourceFolder ? "true" : "false") << "\n"
               << "wavZones: "                  << wavZones             << "\n"
               << "activeLayers: "              << activeLayers         << "\n"
               << "activePartials: "            << activePartials       << "\n"
