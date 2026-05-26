@@ -253,13 +253,20 @@ inline void report(DiditagainProcessor& proc,
     if (needsSource && wantsFolder && resolved.isDirectory() && wavZones == 0)
         warnings.add("NO_ZONES");
 
-    // Base instrument samples must NOT live under Samples/Presets/User/.
+    // Source folders are allowed to live inside the preset's own category
+    // under Samples/Presets/User/<Category>/ as hidden siblings of the
+    // .diapreset files. Only warn when the resolved folder is inside a
+    // DIFFERENT preset category, or when the raw path explicitly points
+    // into a foreign Presets/User location.
     const auto rawNorm      = sourceInstrumentPathRaw.replaceCharacter('\\', '/');
     const auto resolvedNorm = resolvedFolderPath.replaceCharacter('\\', '/');
-    const bool rawInPresetsUser      = rawPathInsidePresetsUser
-                                    || rawNorm.containsIgnoreCase("/Samples/Presets/User/");
+    const bool hiddenSourceFolder    = (resolvedFromIn == "categoryHiddenSourceFolder")
+                                    || resolvedNorm.containsIgnoreCase("/Samples/Presets/User/"
+                                                                       + effectiveCategory + "/");
     const bool resolvedInPresetsUser = resolvedNorm.containsIgnoreCase("/Samples/Presets/User/");
-    if (rawInPresetsUser || (resolvedInPresetsUser && ! rawInPresetsUser))
+    const bool foreignPresetsUser    = resolvedInPresetsUser && ! hiddenSourceFolder;
+    juce::ignoreUnused(rawNorm, rawPathInsidePresetsUser);
+    if (foreignPresetsUser)
         warnings.add("SOURCE_PATH_INSIDE_PRESET_FOLDER");
 
     const auto cLow = effectiveCategory.toLowerCase();
@@ -346,6 +353,7 @@ inline void report(DiditagainProcessor& proc,
         << " sourceInstrumentPathRaw=" << rawPath
         << " resolvedFolder=" << resolvedFolderPath
         << " resolvedFrom=" << resolvedFrom
+        << " hiddenSourceFolder=" << (hiddenSourceFolder ? "true" : "false")
         << " oscillatorEngineActive=" << (oscillatorEngineActive ? "true" : "false")
         << " wavZones=" << wavZones
         << " activeLayers=" << activeLayers
@@ -390,6 +398,7 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("sourceInstrumentPathRaw", rawPath);
     j->setProperty("resolvedFolder",         resolvedFolderPath);
     j->setProperty("resolvedFrom",           resolvedFrom);
+    j->setProperty("hiddenSourceFolder",     hiddenSourceFolder);
     j->setProperty("wavZones",               wavZones);
     j->setProperty("activeLayers",           activeLayers);
     j->setProperty("activePartials",         activePartials);
@@ -472,6 +481,7 @@ inline void report(DiditagainProcessor& proc,
               << "sourceInstrumentPathRaw: "   << rawPath              << "\n"
               << "resolvedFolder: "            << resolvedFolderPath   << "\n"
               << "resolvedFrom: "              << resolvedFrom         << "\n"
+              << "hiddenSourceFolder: "        << (hiddenSourceFolder ? "true" : "false") << "\n"
               << "wavZones: "                  << wavZones             << "\n"
               << "activeLayers: "              << activeLayers         << "\n"
               << "activePartials: "            << activePartials       << "\n"

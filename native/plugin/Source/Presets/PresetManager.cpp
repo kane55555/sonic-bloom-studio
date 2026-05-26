@@ -463,20 +463,11 @@ void PresetManager::loadDroppedSamples()
         }
     }
 
-    // Scan every immediate subfolder of <Samples>/Presets/User/ as its own
-    // category, using the folder name exactly as typed by the user. This
-    // covers both the built-in dropCategories() folders and any custom
-    // folder the user creates (e.g. "My Trumpets", "Halloween FX").
-    auto legacyRoot = getUserPresetDirectory();
-    if (legacyRoot.isDirectory())
-    {
-        auto userDirs = legacyRoot.findChildFiles(juce::File::findDirectories, false);
-        std::sort(userDirs.begin(), userDirs.end(), [](const juce::File& a, const juce::File& b) {
-            return a.getFileName().compareNatural(b.getFileName()) < 0;
-        });
-        for (auto& dir : userDirs)
-            scanCategoryFolder(dir, dir.getFileName(), presets);
-    }
+    // NOTE: subfolders of <Samples>/Presets/User/<Category>/ are intentionally
+    // NOT exposed as browser presets. They are "hidden source folders" used
+    // only by the .diapreset loader to resolve sourceInstrument.path. The
+    // browser shows .diapreset files only (see loadDiapresetFiles()).
+
 }
 
 static void readPresetInfoFromJson(const juce::var& json,
@@ -729,9 +720,8 @@ void PresetManager::loadPreset(int index)
                                 && juce::File::isAbsolutePath(rawNormSlash);
         const bool rawIsInsidePresetsUser = rawNormSlash.containsIgnoreCase("/Samples/Presets/User/");
 
-        // STEP 1 — Honour an absolute sourceInstrument.path exactly. The
-        // .diapreset is the source of truth: do NOT rewrite Samples/Pianos/...
-        // under Samples/Presets/User/.
+        // STEP 1 — Honour an absolute sourceInstrument.path exactly when it
+        // points at a real on-disk folder.
         juce::File resolved;
         juce::String resolvedFrom;
         if (rawIsAbsolute)
@@ -745,44 +735,40 @@ void PresetManager::loadPreset(int index)
             }
         }
 
-        // STEP 2 — Fallback ONLY when raw was empty/relative/inside-Presets/User.
-        // Never silently rewrite an absolute Samples/Pianos/... path to
-        // Samples/Presets/User/Pianos/...
-        const bool allowPresetsUserFallback = rawSourcePath.isEmpty()
-                                           || ! rawIsAbsolute
-                                           || rawIsInsidePresetsUser;
-        if (! resolved.isDirectory() && allowPresetsUserFallback)
+        // STEP 2 — Fall back to the preset's own category folder under
+        // Samples/Presets/User/<Category>/. Source folders are allowed to live
+        // there as hidden siblings of the .diapreset files (the browser hides
+        // them; only .diapreset entries are user-facing).
+        if (! resolved.isDirectory())
         {
             auto catResolved = findCategorySourceFolder(getUserPresetDirectory(), effectiveCategory, sourceLeaf, file);
             if (catResolved.isDirectory())
             {
                 resolved = catResolved;
-                resolvedFrom = "fallbackSearch";
-                didaPresetManagerLog("diapreset routed within folder category=" + effectiveCategory
-                    + " folder=" + resolved.getFullPathName());
+                const auto catNorm = catResolved.getFullPathName().replaceCharacter('\\', '/');
+                const bool insidePresetsUser = catNorm.containsIgnoreCase("/Samples/Presets/User/");
+                resolvedFrom = insidePresetsUser ? juce::String("categoryHiddenSourceFolder")
+                                                 : juce::String("fallbackSearch");
+                didaPresetManagerLog("diapreset routed within category=" + effectiveCategory
+                    + " folder=" + resolved.getFullPathName()
+                    + " resolvedFrom=" + resolvedFrom);
             }
         }
 
-        // STEP 3 — Last-chance discovery under Samples/ (resolveSourcePath
-        // already excludes Samples/Presets/). Also reject anything that lands
-        // inside Presets/User unless the raw path explicitly wanted it.
+        // STEP 3 — Last-chance discovery anywhere under Samples/ via the
+        // loader's resolver. Presets/User hits are accepted as hidden source
+        // folders.
         if (! resolved.isDirectory() && rawSourcePath.isNotEmpty())
         {
             auto discovered = dida::userpreset::resolveSourcePath(rawSourcePath);
             if (discovered.isDirectory())
             {
+                resolved = discovered;
                 const auto discNorm = discovered.getFullPathName().replaceCharacter('\\', '/');
                 const bool inPresetsUser = discNorm.containsIgnoreCase("/Samples/Presets/User/");
-                if (inPresetsUser && ! rawIsInsidePresetsUser)
-                {
-                    didaPresetManagerLog("SOURCE_PATH_INSIDE_PRESET_FOLDER rejecting raw=" + rawSourcePath
-                        + " discovered=" + discovered.getFullPathName());
-                }
-                else
-                {
-                    resolved = discovered;
-                    if (resolvedFrom.isEmpty()) resolvedFrom = "fallbackSearch";
-                }
+                if (resolvedFrom.isEmpty())
+                    resolvedFrom = inPresetsUser ? juce::String("categoryHiddenSourceFolder")
+                                                 : juce::String("fallbackSearch");
             }
         }
 
@@ -1382,6 +1368,11 @@ void PresetManager::seedVintageSynthBankIfMissing()
 //==============================================================================
 void PresetManager::autoIndexUserInstrumentFolders()
 {
+    // Disabled by design: subfolders under <Samples>/Presets/User/<Category>/
+    // are hidden source folders consumed by .diapreset routing only. They
+    // must NOT appear as their own browser entries.
+    if (! showSampleFoldersInBrowser) return;
+
     auto root = getUserPresetDirectory();
     if (! root.isDirectory()) return;
 
