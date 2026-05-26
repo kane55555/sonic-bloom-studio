@@ -253,13 +253,21 @@ inline void report(DiditagainProcessor& proc,
     if (needsSource && wantsFolder && resolved.isDirectory() && wavZones == 0)
         warnings.add("NO_ZONES");
 
-    // Base instrument samples must NOT live under Samples/Presets/User/.
+    // Source folders are allowed to live inside the preset's own category
+    // under Samples/Presets/User/<Category>/ as hidden siblings of the
+    // .diapreset files. Only warn when the resolved folder is inside a
+    // DIFFERENT preset category, or when the raw path explicitly points
+    // into a foreign Presets/User location.
     const auto rawNorm      = sourceInstrumentPathRaw.replaceCharacter('\\', '/');
     const auto resolvedNorm = resolvedFolderPath.replaceCharacter('\\', '/');
+    const bool hiddenSourceFolder    = (resolvedFromIn == "categoryHiddenSourceFolder")
+                                    || resolvedNorm.containsIgnoreCase("/Samples/Presets/User/"
+                                                                       + effectiveCategory + "/");
     const bool rawInPresetsUser      = rawPathInsidePresetsUser
                                     || rawNorm.containsIgnoreCase("/Samples/Presets/User/");
     const bool resolvedInPresetsUser = resolvedNorm.containsIgnoreCase("/Samples/Presets/User/");
-    if (rawInPresetsUser || (resolvedInPresetsUser && ! rawInPresetsUser))
+    const bool foreignPresetsUser    = resolvedInPresetsUser && ! hiddenSourceFolder;
+    if (foreignPresetsUser)
         warnings.add("SOURCE_PATH_INSIDE_PRESET_FOLDER");
 
     const auto cLow = effectiveCategory.toLowerCase();
