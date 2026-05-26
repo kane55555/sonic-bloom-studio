@@ -263,10 +263,9 @@ inline void report(DiditagainProcessor& proc,
     const bool hiddenSourceFolder    = (resolvedFromIn == "categoryHiddenSourceFolder")
                                     || resolvedNorm.containsIgnoreCase("/Samples/Presets/User/"
                                                                        + effectiveCategory + "/");
-    const bool rawInPresetsUser      = rawPathInsidePresetsUser
-                                    || rawNorm.containsIgnoreCase("/Samples/Presets/User/");
     const bool resolvedInPresetsUser = resolvedNorm.containsIgnoreCase("/Samples/Presets/User/");
     const bool foreignPresetsUser    = resolvedInPresetsUser && ! hiddenSourceFolder;
+    juce::ignoreUnused(rawNorm, rawPathInsidePresetsUser);
     if (foreignPresetsUser)
         warnings.add("SOURCE_PATH_INSIDE_PRESET_FOLDER");
 
