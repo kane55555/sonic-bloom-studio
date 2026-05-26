@@ -463,20 +463,11 @@ void PresetManager::loadDroppedSamples()
         }
     }
 
-    // Scan every immediate subfolder of <Samples>/Presets/User/ as its own
-    // category, using the folder name exactly as typed by the user. This
-    // covers both the built-in dropCategories() folders and any custom
-    // folder the user creates (e.g. "My Trumpets", "Halloween FX").
-    auto legacyRoot = getUserPresetDirectory();
-    if (legacyRoot.isDirectory())
-    {
-        auto userDirs = legacyRoot.findChildFiles(juce::File::findDirectories, false);
-        std::sort(userDirs.begin(), userDirs.end(), [](const juce::File& a, const juce::File& b) {
-            return a.getFileName().compareNatural(b.getFileName()) < 0;
-        });
-        for (auto& dir : userDirs)
-            scanCategoryFolder(dir, dir.getFileName(), presets);
-    }
+    // NOTE: subfolders of <Samples>/Presets/User/<Category>/ are intentionally
+    // NOT exposed as browser presets. They are "hidden source folders" used
+    // only by the .diapreset loader to resolve sourceInstrument.path. The
+    // browser shows .diapreset files only (see loadDiapresetFiles()).
+
 }
 
 static void readPresetInfoFromJson(const juce::var& json,
