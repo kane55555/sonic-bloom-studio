@@ -202,6 +202,10 @@ inline void report(DiditagainProcessor& proc,
     auto& fx     = engine.getFx();
 
     const juce::String effectiveCategory = normalizeCategory(effectiveCategoryIn);
+    const auto cLow = effectiveCategory.toLowerCase();
+    const auto nLow = up.presetName.toLowerCase();
+    const bool choirMode = cLow.contains("choir") || cLow.contains("vox")
+                         || cLow.contains("vocal") || nLow.contains("choir") || up.choirMode;
 
     // --- Layer / partial counts -------------------------------------------
     int activeLayers = (up.main.enabled ? 1 : 0) + (up.layer2.enabled ? 1 : 0);
@@ -214,17 +218,20 @@ inline void report(DiditagainProcessor& proc,
     const bool needsSource = engineRequiresSource(up);
     const bool oscillatorEngineActive = ! needsSource;
 
-    // --- FX mixes (read live from actual DSP blocks) ----------------------
+    // --- FX mixes ---------------------------------------------------------
     const float chorusMix = paramValue(proc, "fxChorusMix");
+    const float delayMixParam  = paramValue(proc, "fxDelayMix");
+    const float reverbMixParam = paramValue(proc, "fxReverbMix");
+    const float reverbSizeParam = paramValue(proc, "fxReverbSize");
     const float satMix    = paramValue(proc, "fxSaturationMix");
     const int   polyphony = (int) paramValue(proc, "polyphony");
 
     // --- Live FX-chain state for scale-safety report ----------------------
     auto& reverbBlk = fx.getReverb();
     auto& delayBlk  = fx.getDelay();
-    const float delayMix  = delayBlk.getMix();
-    const float reverbMix = reverbBlk.getMix();
-    const float reverbSize = reverbBlk.getSize();
+    const float delayMix  = choirMode ? delayBlk.getMix() : delayMixParam;
+    const float reverbMix = choirMode ? reverbBlk.getMix() : reverbMixParam;
+    const float reverbSize = choirMode ? reverbBlk.getSize() : reverbSizeParam;
     const float reverbDuckAmount   = reverbBlk.getDuckAmount();
     const bool  reverbDuckEnabled  = reverbDuckAmount > 0.0001f;
     const float reverbInputHpHz    = reverbBlk.getInputHighPassHz();
