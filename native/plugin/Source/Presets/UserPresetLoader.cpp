@@ -1029,22 +1029,29 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     const float delayFeedback = juce::jlimit(0.0f, delayFeedbackCap, p.delay.feedback);
     const float reverbSize = juce::jlimit(0.0f, reverbSizeCap, p.reverb.size);
 
-    setParamById(proc, "fxChorusMix",
-                 juce::jlimit(0.0f, fxL.chorusMax, p.chorus.enabled ? p.chorus.mix : 0.0f));
+    // Chorus: choir natural mode tightens this to 0.025 (0.045 for wide/heaven
+    //         variants) so vocal samples don't acquire a synth-pad shimmer.
+    const float chorusWanted = p.chorus.enabled ? p.chorus.mix : 0.0f;
+    float chorusCap = fxL.chorusMax;
+    if (choirMode)
+        chorusCap = isChoirWidePreset(p) ? 0.045f : 0.025f;
+    const float chorusMixOut = juce::jlimit(0.0f, chorusCap, chorusWanted);
+    setParamById(proc, "fxChorusMix", chorusMixOut);
     setParamById(proc, "fxDelayMix", delayMix);
     setParamById(proc, "fxDelayTime",        p.delay.timeMs / 1000.0f);
     setParamById(proc, "fxDelayFeedback",    delayFeedback);
     setParamById(proc, "fxReverbMix",        reverbMix);
     setParamById(proc, "fxReverbSize",       reverbSize);
-    const float satDrive = juce::jlimit(0.0f, fxL.satMax,
-                                        p.saturation.enabled ? p.saturation.drive : 0.0f);
+    // Saturation: off entirely for choir natural mode.
+    const float satDrive = choirMode ? 0.0f
+                                     : juce::jlimit(0.0f, fxL.satMax,
+                                                    p.saturation.enabled ? p.saturation.drive : 0.0f);
     setParamById(proc, "fxDistortionAmount", satDrive);
     // Saturation mix: clamp tighter for Synth family so vintage presets stay
     // warm instead of distorted. Other families also get a reasonable cap.
     const float satMixCap = (fam == Family::Synth) ? 0.18f : 0.50f;
-    const float satMix = p.saturation.enabled
-        ? juce::jlimit(0.0f, satMixCap, p.saturation.mix)
-        : 0.0f;
+    const float satMix = choirMode ? 0.0f
+                                   : (p.saturation.enabled ? juce::jlimit(0.0f, satMixCap, p.saturation.mix) : 0.0f);
     setParamById(proc, "fxSaturationMix", satMix);
 
     if (choirMode)
