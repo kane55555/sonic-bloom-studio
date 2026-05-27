@@ -1039,6 +1039,7 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
             const float fxSendReleaseMs = resolveFxSendReleaseMs(p, true);
             engine.setFxSendReleaseMsForAll(fxSendReleaseMs);
             auto& pfx = engine.getFx();
+            pfx.setChoirDensityMode(true);
             pfx.setDelayMix(delayMix);
             pfx.setDelayFeedback(delayFeedback);
             pfx.setReverbMix(reverbMix);
@@ -1051,7 +1052,6 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
             pfx.setNoteDensityMaxReduction(0.35f);
             pfx.setDelayDensityWeight(1.0f);
             pfx.setReverbDensityWeight(0.75f);
-            pfx.setChoirDensityMode(true);
             juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-fx-send] preset=") + p.presetName
                 + " fxSendReleaseMs=" + juce::String(fxSendReleaseMs, 1)
                 + " fxSendReleaseSource=" + fxSendReleaseSourceFor(p, true)
