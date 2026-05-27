@@ -621,6 +621,10 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("choirNearestFallbackUsed",    choirNearestFallbackUsed);
     j->setProperty("choirZoneTooFar",             choirZoneTooFar);
     j->setProperty("choirHumanizePitchCents",     choirHumanizePitchCents);
+    j->setProperty("choirLayerDetuneCents",       choirLayerDetuneCents);
+    j->setProperty("choirOscBDetuneCents",        choirOscBDetuneCents);
+    j->setProperty("choirUnisonDetune",           choirUnisonDetune);
+    j->setProperty("choirVintageDriftCents",      choirVintageDriftCents);
     j->setProperty("choirUnisonDisabled",         choirUnisonDisabled);
     j->setProperty("choirAnalogDriftDisabled",    choirAnalogDriftDisabled);
     j->setProperty("layer2GainDb",           up.layer2.gainDb);
