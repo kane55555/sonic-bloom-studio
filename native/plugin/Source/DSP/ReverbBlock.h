@@ -233,6 +233,20 @@ public:
         dirty = true;
     }
 
+    /** External 0..1 multiplier on the wet send. FxChain pulls this down
+        when note density spikes (scale runs, fast chords) so the tail
+        doesn't pile up into a muddy pitch cloud. */
+    void setSendDensityScale(float s) noexcept { sendDensityScale = juce::jlimit(0.0f, 1.0f, s); }
+
+    // Live state accessors for the preset-quality reporter.
+    float getMix()             const noexcept { return mix; }
+    float getSize()            const noexcept { return size; }
+    float getInputHighPassHz() const noexcept { return juce::jmax(inputHpHz, inputHpFloorHz); }
+    float getInputLowPassHz()  const noexcept { return inputLpHz; }
+    float getDuckAmount()      const noexcept { return duckAmount; }
+    float getDuckAttackMs()    const noexcept { return duckAttackMs; }
+    float getDuckReleaseMs()   const noexcept { return duckReleaseMs; }
+
     /** Snap all internal tuning to a named character. Voicing is curated to
         match the spec (Studio/Hall/Dark/Dream/Vintage/Trap/Cathedral/Shimmer). */
     void setCharacter(Character c) noexcept
