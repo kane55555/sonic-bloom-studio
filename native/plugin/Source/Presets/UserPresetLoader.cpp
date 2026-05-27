@@ -689,6 +689,25 @@ bool isChoirModePreset(const UserPreset& p)
         || c.contains("vocal") || n.contains("choir");
 }
 
+bool isChoirWidePreset(const UserPreset& p)
+{
+    const auto n = p.presetName.toLowerCase();
+    return n.contains("wide") || n.contains("heaven");
+}
+
+// Per-preset gain trim applied on top of preset.amp.gainDb when choir mode
+// is active. Keeps choir presets sitting between -20..-10 dB instead of
+// approaching 0 dBFS on chords.
+float choirNaturalGainTrimDb(const UserPreset& p)
+{
+    const auto n = p.presetName.toLowerCase();
+    if (n.contains("clean playable choir aah")) return -7.0f;
+    if (n.contains("dark controlled choir eeh")) return -9.0f;
+    if (n.contains("wide heaven choir ooh"))    return -4.0f;
+    // Generic safety trim: choir samples are usually pre-normalised loud.
+    return -3.0f;
+}
+
 juce::String fxSendReleaseSourceFor(const UserPreset& p, bool choirMode)
 {
     if (choirMode) return "choirModeClamp";
@@ -785,8 +804,16 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     // -- Source / category validation (non-fatal warning only)
     validateSourceForCategory(p);
 
-    // -- Master gain
-    setParamById(proc, "masterGain", p.amp.gainDb);
+    // -- Master gain (choir natural mode applies a per-preset trim so vocal
+    //    samples sit at -20..-10 dB instead of slamming the bus).
+    const float choirGainTrimDb = choirMode ? choirNaturalGainTrimDb(p) : 0.0f;
+    setParamById(proc, "masterGain", p.amp.gainDb + choirGainTrimDb);
+    if (choirMode && std::abs(choirGainTrimDb) > 0.001f)
+        juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-safety] preset=")
+            + p.presetName + " effect=ampGain"
+            + " oldGainDb=" + juce::String(p.amp.gainDb, 2)
+            + " newGainDb=" + juce::String(p.amp.gainDb + choirGainTrimDb, 2)
+            + " reason=choirNaturalGainTrim");
 
     // -- Amp env: clamped to per-category musical ranges
     clampEnvelopeForCategory(proc, p, fam);
@@ -897,11 +924,38 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
         }
     }
 
-    setParamById(proc, "oscBLevel",  p.layer2.enabled
-        ? juce::Decibels::decibelsToGain(layer2GainDb) : 0.0f);
+    // ---- Choir natural mode: synthetic layer-2 reinforcement is disabled by
+    //      default so vocal samples are heard as recorded, not as a pad. A
+    //      preset that explicitly wants air can still leave layer2 enabled,
+    //      but it must sit at <= -36 dB to stay below the recorded tone.
+    bool   choirSyntheticLayerDisabled = false;
+    float  choirLayer2GainDbOut = layer2GainDb;
+    bool   effectiveLayer2Enabled = p.layer2.enabled;
+    if (choirMode && p.layer2.enabled)
+    {
+        const auto wf = p.layer2.eqRole.toLowerCase(); // best signal we have here
+        const bool tooLoud = layer2GainDb > -36.0f;
+        if (! p.experimental && tooLoud)
+        {
+            effectiveLayer2Enabled = false;
+            choirSyntheticLayerDisabled = true;
+            choirLayer2GainDbOut = -120.0f;
+            juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-safety] preset=")
+                + p.presetName + " layer=layer2 reason=natural choir mode disabled synthetic reinforcement"
+                + " oldGainDb=" + juce::String(layer2GainDb, 2));
+        }
+        else if (tooLoud)
+        {
+            choirLayer2GainDbOut = -36.0f;
+        }
+        juce::ignoreUnused(wf);
+    }
+
+    setParamById(proc, "oscBLevel",  effectiveLayer2Enabled
+        ? juce::Decibels::decibelsToGain(choirLayer2GainDbOut) : 0.0f);
     setParamById(proc, "oscBOctave", static_cast<float>(p.layer2.octave));
     setParamById(proc, "oscBSemi",   static_cast<float>(p.layer2.semitone));
-    setParamById(proc, "oscBDetune", p.layer2.detuneCents);
+    setParamById(proc, "oscBDetune", choirMode ? 0.0f : p.layer2.detuneCents);
 
     // ---- eqRole wiring: per-layer carver cutoffs ----
     //
@@ -965,32 +1019,43 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     const auto fxL = fxLimitsFor(fam);
     const float space   = juce::jlimit(0.0f, 1.0f, p.macros.space);
     const float reverbBase = p.reverb.enabled ? p.reverb.mix : 0.0f;
-    const float reverbCap = choirMode ? 0.22f : fxL.reverbMax;
-    const float delayCap  = choirMode ? 0.03f : fxL.delayMax;
-    const float reverbSizeCap = choirMode ? 0.62f : 1.0f;
-    const float delayFeedbackCap = choirMode ? 0.08f : 0.95f;
+    const bool choirIsWide = choirMode && isChoirWidePreset(p);
+    // Natural choir mode: reverb mix ceiling tightens from 0.22 to 0.16 for
+    // clean/dark variants (0.20 for wide/heaven) so vocal samples stay in a
+    // room rather than swimming in a pad-style wash. Delay stays off.
+    const float reverbCap = choirMode ? (choirIsWide ? 0.20f : 0.16f) : fxL.reverbMax;
+    const float delayCap  = choirMode ? 0.00f : fxL.delayMax;
+    const float reverbSizeCap = choirMode ? (choirIsWide ? 0.62f : 0.55f) : 1.0f;
+    const float delayFeedbackCap = choirMode ? 0.00f : 0.95f;
     const float reverbMix  = juce::jlimit(0.0f, reverbCap,
                                           reverbBase * (0.85f + space * 0.30f));
     const float delayMix = juce::jlimit(0.0f, delayCap, p.delay.enabled ? p.delay.mix : 0.0f);
     const float delayFeedback = juce::jlimit(0.0f, delayFeedbackCap, p.delay.feedback);
     const float reverbSize = juce::jlimit(0.0f, reverbSizeCap, p.reverb.size);
 
-    setParamById(proc, "fxChorusMix",
-                 juce::jlimit(0.0f, fxL.chorusMax, p.chorus.enabled ? p.chorus.mix : 0.0f));
+    // Chorus: choir natural mode tightens this to 0.025 (0.045 for wide/heaven
+    //         variants) so vocal samples don't acquire a synth-pad shimmer.
+    const float chorusWanted = p.chorus.enabled ? p.chorus.mix : 0.0f;
+    float chorusCap = fxL.chorusMax;
+    if (choirMode)
+        chorusCap = isChoirWidePreset(p) ? 0.045f : 0.025f;
+    const float chorusMixOut = juce::jlimit(0.0f, chorusCap, chorusWanted);
+    setParamById(proc, "fxChorusMix", chorusMixOut);
     setParamById(proc, "fxDelayMix", delayMix);
     setParamById(proc, "fxDelayTime",        p.delay.timeMs / 1000.0f);
     setParamById(proc, "fxDelayFeedback",    delayFeedback);
     setParamById(proc, "fxReverbMix",        reverbMix);
     setParamById(proc, "fxReverbSize",       reverbSize);
-    const float satDrive = juce::jlimit(0.0f, fxL.satMax,
-                                        p.saturation.enabled ? p.saturation.drive : 0.0f);
+    // Saturation: off entirely for choir natural mode.
+    const float satDrive = choirMode ? 0.0f
+                                     : juce::jlimit(0.0f, fxL.satMax,
+                                                    p.saturation.enabled ? p.saturation.drive : 0.0f);
     setParamById(proc, "fxDistortionAmount", satDrive);
     // Saturation mix: clamp tighter for Synth family so vintage presets stay
     // warm instead of distorted. Other families also get a reasonable cap.
     const float satMixCap = (fam == Family::Synth) ? 0.18f : 0.50f;
-    const float satMix = p.saturation.enabled
-        ? juce::jlimit(0.0f, satMixCap, p.saturation.mix)
-        : 0.0f;
+    const float satMix = choirMode ? 0.0f
+                                   : (p.saturation.enabled ? juce::jlimit(0.0f, satMixCap, p.saturation.mix) : 0.0f);
     setParamById(proc, "fxSaturationMix", satMix);
 
     if (choirMode)
