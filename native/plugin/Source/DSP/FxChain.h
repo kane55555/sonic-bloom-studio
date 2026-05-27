@@ -215,7 +215,7 @@ public:
     void setReverbModDepth(float ms)   { reverb.setModDepth(ms); }
     void setReverbSaturation(float a)  { reverb.setSaturation(a); }
     void setReverbInputHighPassHz(float hz) { reverb.setInputHighPassHz(choirDensityMode ? juce::jlimit(250.0f, 350.0f, hz) : hz); }
-    void setReverbInputHighPassFloorHz(float hz) { reverb.setInputHighPassFloorHz(hz); }
+    void setReverbInputHighPassFloorHz(float hz) { reverb.setInputHighPassFloorHz(choirDensityMode ? juce::jlimit(250.0f, 350.0f, hz) : hz); }
     void setReverbInputLowPassHz(float hz)  { reverb.setInputLowPassHz(choirDensityMode ? juce::jlimit(5000.0f, 6000.0f, hz) : hz); }
     void setReverbDucking(float amount, float attackMs = 6.0f, float releaseMs = 260.0f)
     {
