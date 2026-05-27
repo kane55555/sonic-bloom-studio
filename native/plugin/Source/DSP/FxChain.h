@@ -200,12 +200,12 @@ public:
     void setChorusMode(int m) { chorus.setMode(m); }
 
 
-    void setDelayMix(float m) { delay.setMix(m); delayActive = m > 0.001f; }
+    void setDelayMix(float m) { const float v = choirDensityMode ? juce::jmin(m, 0.03f) : m; delay.setMix(v); delayActive = v > 0.001f; }
     void setDelayTime(float s) { delay.setTimeSeconds(s); }
-    void setDelayFeedback(float f) { delay.setFeedback(f); }
+    void setDelayFeedback(float f) { delay.setFeedback(choirDensityMode ? juce::jmin(f, 0.08f) : f); }
 
-    void setReverbMix(float m) { reverb.setMix(m); reverbActive = m > 0.001f; }
-    void setReverbSize(float s) { reverb.setSize(s); }
+    void setReverbMix(float m) { const float v = choirDensityMode ? juce::jmin(m, 0.22f) : m; reverb.setMix(v); reverbActive = v > 0.001f; }
+    void setReverbSize(float s) { reverb.setSize(choirDensityMode ? juce::jmin(s, 0.62f) : s); }
     void setReverbDamping(float d) { reverb.setDamping(d); }
     void setReverbWidth(float w) { reverb.setWidth(w); }
     void setReverbCharacter(ReverbBlock::Character c) { reverb.setCharacter(c); }
