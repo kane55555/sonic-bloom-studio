@@ -300,6 +300,7 @@ inline void report(DiditagainProcessor& proc,
     }
 
     const auto cLow = effectiveCategory.toLowerCase();
+    const auto nLow = up.presetName.toLowerCase();
     const bool lowEndCat = cLow.contains("808") || cLow.contains("bass") || cLow.contains("sub");
     if (lowEndCat && (reverbMix > 0.10f || delayMix > 0.12f))
         warnings.add("TOO_MUCH_LOW_END");
@@ -319,6 +320,25 @@ inline void report(DiditagainProcessor& proc,
         warnings.add("DELAY_FEEDBACK_TOO_HIGH");
     if (reverbInputHpHz < 120.0f && reverbMix > 0.15f)
         warnings.add("REVERB_LOW_MID_BUILDUP");
+
+    // --- Choir-mode safety state + warnings -------------------------------
+    const bool choirMode = cLow.contains("choir") || cLow.contains("vox")
+                         || cLow.contains("vocal") || nLow.contains("choir");
+    const float fxSendReleaseMsLive = proc.getSynthEngine().getFxSendReleaseMs();
+    const float ampReleaseMsLive    = up.amp.releaseMs;
+    const bool  choirAmpReleaseClamped = choirMode && (up.amp.releaseMs > 900.0f);
+    const bool  choirReverbCapApplied  = choirMode && reverbMix >= 0.219f;
+    const bool  choirDelayCapApplied   = choirMode && delayMix  >= 0.029f;
+    const int   choirActiveVoiceCount  = choirMode ? proc.getSynthEngine().getActiveVoiceCount() : 0;
+    const bool  choirNoteDensityFxReduction = choirMode && noteDensityFxOn;
+    if (choirMode)
+    {
+        if (up.amp.releaseMs > 900.0f) warnings.add("CHOIR_RELEASE_TOO_LONG");
+        if (reverbMix > 0.22f)         warnings.add("CHOIR_REVERB_TOO_WET");
+        if (delayMix  > 0.03f)         warnings.add("CHOIR_DELAY_TOO_HIGH");
+        if (choirActiveVoiceCount > 8) warnings.add("CHOIR_TOO_MANY_OVERLAPPING_VOICES");
+        if (fxSendReleaseMsLive > 180.0f) warnings.add("CHOIR_FX_SEND_TOO_LONG");
+    }
 
     // --- Loudness calibration (suggestion-only) ---------------------------
     const auto target = loudnessTargetForCategory(effectiveCategory);
@@ -436,6 +456,14 @@ inline void report(DiditagainProcessor& proc,
         << " clearFxOnTransportStop=true"
         << " transportStopFxFadeMs=120"
         << " clearFxTailOnPresetChange=" << (fxTailClearOnLoad ? "true" : "false")
+        << " choirMode=" << (choirMode ? "true" : "false")
+        << " choirAmpReleaseClamped=" << (choirAmpReleaseClamped ? "true" : "false")
+        << " choirFxSendReleaseMs=" << juce::String(fxSendReleaseMsLive, 1)
+        << " choirReverbCapApplied=" << (choirReverbCapApplied ? "true" : "false")
+        << " choirDelayCapApplied=" << (choirDelayCapApplied ? "true" : "false")
+        << " choirNoteDensityFxReduction=" << (choirNoteDensityFxReduction ? "true" : "false")
+        << " choirActiveVoiceCount=" << choirActiveVoiceCount
+        << " choirFxInputAfterNoteOffDb=" << juce::String(fxInDb, 2)
         << " layer2Gain=" << fmt(up.layer2.gainDb, 2) << "dB"
         << " layer2BlendMode=" << (up.layer2.blendMode.isNotEmpty() ? up.layer2.blendMode : juce::String("auto"))
         << " layer2EqRole=" << (up.layer2.eqRole.isNotEmpty() ? up.layer2.eqRole : juce::String("auto"))
@@ -503,6 +531,14 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("clearFxOnTransportStop",  true);
     j->setProperty("transportStopFxFadeMs",   120);
     j->setProperty("clearFxTailOnPresetChange", fxTailClearOnLoad);
+    j->setProperty("choirMode",                 choirMode);
+    j->setProperty("choirAmpReleaseClamped",    choirAmpReleaseClamped);
+    j->setProperty("choirFxSendReleaseMs",      fxSendReleaseMsLive);
+    j->setProperty("choirReverbCapApplied",     choirReverbCapApplied);
+    j->setProperty("choirDelayCapApplied",      choirDelayCapApplied);
+    j->setProperty("choirNoteDensityFxReduction", choirNoteDensityFxReduction);
+    j->setProperty("choirActiveVoiceCount",     choirActiveVoiceCount);
+    j->setProperty("choirFxInputAfterNoteOffDb", fxInDb);
     j->setProperty("layer2GainDb",           up.layer2.gainDb);
     j->setProperty("layer2BlendMode",        up.layer2.blendMode.isNotEmpty() ? up.layer2.blendMode : juce::String("auto"));
     j->setProperty("layer2EqRole",           up.layer2.eqRole.isNotEmpty() ? up.layer2.eqRole : juce::String("auto"));
@@ -604,6 +640,14 @@ inline void report(DiditagainProcessor& proc,
               << "clearFxOnTransportStop: true\n"
               << "transportStopFxFadeMs: 120\n"
               << "clearFxTailOnPresetChange: " << (fxTailClearOnLoad ? "true" : "false") << "\n"
+              << "choirMode: "                 << (choirMode ? "true" : "false") << "\n"
+              << "choirAmpReleaseClamped: "    << (choirAmpReleaseClamped ? "true" : "false") << "\n"
+              << "choirFxSendReleaseMs: "      << juce::String(fxSendReleaseMsLive, 1) << "\n"
+              << "choirReverbCapApplied: "     << (choirReverbCapApplied ? "true" : "false") << "\n"
+              << "choirDelayCapApplied: "      << (choirDelayCapApplied ? "true" : "false") << "\n"
+              << "choirNoteDensityFxReduction: " << (choirNoteDensityFxReduction ? "true" : "false") << "\n"
+              << "choirActiveVoiceCount: "     << choirActiveVoiceCount << "\n"
+              << "choirFxInputAfterNoteOffDb: " << juce::String(fxInDb, 2) << "\n"
               << "categoryTargetMinDb: "       << juce::String(target.minDb, 2) << "\n"
               << "categoryTargetMaxDb: "       << juce::String(target.maxDb, 2) << "\n"
               << "suggestedGainAdjustmentDb: " << (notesPlaying ? juce::String(suggestedGainDb, 2) : juce::String("n/a")) << "\n"

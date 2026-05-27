@@ -404,9 +404,22 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
         float reverbDuckRel = 220.0f;
         float delayDuck     = 0.45f;
         float delayDuckRel  = 140.0f;
+        float chorusMixMax  = 1.0f;
+        float satMixMax     = 1.0f;
     };
 
-    auto fxCapsFor = [](const juce::String& catIn) -> FxCaps
+    // -------- Choir mode detection ----------------------------------------
+    // Categories: Choirs, Choirs Ahhh/Ohhh/Ehhh, Choir Aah/Ooh/Eeh, etc.
+    const auto cLowerForChoir = p.category.toLowerCase();
+    const auto nLowerForChoir = p.name.toLowerCase();
+    const bool choirMode = cLowerForChoir.contains("choir")
+                        || cLowerForChoir.contains("vox")
+                        || cLowerForChoir.contains("vocal")
+                        || nLowerForChoir.contains("choir");
+    const bool choirWide = choirMode
+        && (nLowerForChoir.contains("wide") || nLowerForChoir.contains("heaven"));
+
+    auto fxCapsFor = [choirMode, choirWide](const juce::String& catIn) -> FxCaps
     {
         const auto c = catIn.toLowerCase();
         FxCaps k;
@@ -415,7 +428,11 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
         else if (c.contains("acoustic"))                                       { k = { 0.22f, 0.55f, 0.08f, 0.22f, 220.0f, 5200.0f, 0.35f, 180.0f, 0.45f, 140.0f }; }
         else if (c.contains("guitar"))                                         { k = { 0.28f, 0.58f, 0.10f, 0.22f, 220.0f, 5200.0f, 0.35f, 180.0f, 0.45f, 140.0f }; }
         else if (c.contains("brass") || c.contains("trumpet") || c.contains("horn") || c.contains("sax")) { k = { 0.16f, 0.45f, 0.06f, 0.12f, 250.0f, 4200.0f, 0.45f, 120.0f, 0.50f, 120.0f }; }
-        else if (c.contains("choir") || c.contains("vox") || c.contains("vocal")) { k = { 0.28f, 0.65f, 0.20f, 0.18f, 180.0f, 7000.0f, 0.25f, 260.0f, 0.45f, 160.0f }; }
+        else if (choirMode || c.contains("choir") || c.contains("vox") || c.contains("vocal"))
+        {
+            // Choir-specific caps: controlled reverb/delay, vowel-friendly band.
+            k = { 0.22f, 0.62f, 0.03f, 0.08f, 250.0f, 5500.0f, 0.30f, 280.0f, 0.50f, 160.0f, 0.08f, 0.06f };
+        }
         else if (c.contains("string") || c.contains("pad") || c.contains("texture") || c.contains("ambient")) { k = { 0.34f, 0.72f, 0.22f, 0.18f, 200.0f, 7200.0f, 0.25f, 260.0f, 0.45f, 160.0f }; }
         else if (c.contains("bell"))                                           { k = { 0.24f, 0.55f, 0.15f, 0.24f, 350.0f, 8000.0f, 0.30f, 200.0f, 0.45f, 140.0f }; }
         else if (c.contains("pluck"))                                          { k = { 0.22f, 0.50f, 0.14f, 0.22f, 260.0f, 8500.0f, 0.32f, 180.0f, 0.45f, 140.0f }; }
@@ -459,12 +476,41 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
     logClamp("delayMix",   wantDelayMix,   delayMix,   "scale-safe delay cap");
     logClamp("delayFb",    wantDelayFb,    delayFb,    "scale-safe delay feedback cap");
 
+    // ---- Choir-mode chorus/saturation caps -------------------------------
+    float wantChorusMix = p.effects.chorusEnabled ? p.effects.chorusMix : 0.0f;
+    float wantSatMix    = p.effects.satEnabled    ? p.effects.satDrive  : 0.0f;
+    float chorusMixOut  = wantChorusMix;
+    float satMixOut     = wantSatMix;
+    if (choirMode)
+    {
+        const float chorusCap = choirWide ? 0.20f : caps.chorusMixMax;
+        const float satCap    = caps.satMixMax;
+        chorusMixOut = juce::jmin(wantChorusMix, chorusCap);
+        satMixOut    = juce::jmin(wantSatMix,    satCap);
+        if (std::abs(wantChorusMix - chorusMixOut) > 0.001f)
+            juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-safety] preset=") + p.name
+                + " effect=chorus oldValue=" + juce::String(wantChorusMix, 3)
+                + " newValue=" + juce::String(chorusMixOut, 3) + " reason=choirMode cap");
+        if (std::abs(wantSatMix - satMixOut) > 0.001f)
+            juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-safety] preset=") + p.name
+                + " effect=saturation oldValue=" + juce::String(wantSatMix, 3)
+                + " newValue=" + juce::String(satMixOut, 3) + " reason=choirMode cap");
+        if (std::abs(wantReverbMix - reverbMix) > 0.001f)
+            juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-safety] preset=") + p.name
+                + " effect=reverb oldValue=" + juce::String(wantReverbMix, 3)
+                + " newValue=" + juce::String(reverbMix, 3) + " reason=choirMode cap");
+        if (std::abs(wantDelayMix - delayMix) > 0.001f)
+            juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-safety] preset=") + p.name
+                + " effect=delay oldValue=" + juce::String(wantDelayMix, 3)
+                + " newValue=" + juce::String(delayMix, 3) + " reason=choirMode cap");
+    }
+
     setFloat(processor, "fxReverbMix",        reverbMix);
     setFloat(processor, "fxReverbSize",       reverbSize);
     setFloat(processor, "fxDelayMix",         delayMix);
     setFloat(processor, "fxDelayFeedback",    delayFb);
-    setFloat(processor, "fxChorusMix",        p.effects.chorusEnabled ? p.effects.chorusMix : 0.0f);
-    setFloat(processor, "fxDistortionAmount", p.effects.satEnabled    ? p.effects.satDrive  : 0.0f);
+    setFloat(processor, "fxChorusMix",        chorusMixOut);
+    setFloat(processor, "fxDistortionAmount", satMixOut);
 
     // ---- Reverb character voiced per instrument family ----
     applyReverbCharacter(processor, p.category);
@@ -477,9 +523,51 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
         fxChainPtr->setReverbDucking(caps.reverbDuck, 8.0f, caps.reverbDuckRel);
         fxChainPtr->setDelayDucking(caps.delayDuck, 5.0f, caps.delayDuckRel);
         fxChainPtr->setNoteDensityFxReductionEnabled(true);
+        if (choirMode)
+        {
+            // Tighten low-mid mono control on choir wet return.
+            fxChainPtr->setReverbLowMonoControl(250.0f, 0.0f);
+        }
         // Drain old reverb/delay tails so the previous preset doesn't bleed in.
         if (fxChainPtr->getClearFxTailOnPresetChange())
             fxChainPtr->clearTimeFxTails();
+    }
+
+    // ---- Choir amp-release + FX-send-release behavior --------------------
+    if (choirMode && sampleLayer != nullptr)
+    {
+        if (auto* dp = dynamic_cast<DiditagainProcessor*>(&processor))
+        {
+            const float requestedReleaseMs = sampleLayer->ampEnv.release * 1000.0f;
+            const float ampReleaseMs = juce::jlimit(300.0f, 900.0f, requestedReleaseMs);
+            if (std::abs(requestedReleaseMs - ampReleaseMs) > 0.5f)
+                juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-safety] amp release clamped preset=")
+                    + p.name + " old=" + juce::String(requestedReleaseMs, 1)
+                    + " new=" + juce::String(ampReleaseMs, 1));
+            setFloat(processor, "env1Release", ampReleaseMs * 0.001f);
+
+            // FX send must be shorter than amp release: min(180, ampRel * 0.35),
+            // floored at 60ms so it doesn't choke the immediate attack tail.
+            const float fxSendReleaseMs = juce::jlimit(60.0f, 180.0f,
+                                                       juce::jmin(180.0f, ampReleaseMs * 0.35f));
+            dp->getSynthEngine().setFxSendReleaseMsForAll(fxSendReleaseMs);
+
+            juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-fx-send] preset=") + p.name
+                + " ampReleaseMs=" + juce::String(ampReleaseMs, 1)
+                + " fxSendReleaseMs=" + juce::String(fxSendReleaseMs, 1)
+                + " fxSendChokedOnNoteOff=true");
+
+            // Polyphony hint: cap default at 8 for choir presets, allow up to
+            // 10 for wide/heaven variants. We always clamp DOWN — the user can
+            // re-raise polyphony post-load if they explicitly want more voices.
+            float currentPoly = 0.0f;
+            if (auto* pp = findParam(processor, "polyphony"))
+                if (auto* rr = dynamic_cast<juce::RangedAudioParameter*>(pp))
+                    currentPoly = rr->convertFrom0to1(rr->getValue());
+            const int choirPolyTarget = choirWide ? 10 : 8;
+            if ((int) std::lround(currentPoly) > choirPolyTarget)
+                setFloat(processor, "polyphony", (float) choirPolyTarget);
+        }
     }
 
     // Per-category hybrid-synth tuning (unison / spread / exciter / drift)
