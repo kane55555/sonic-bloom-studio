@@ -334,6 +334,83 @@ static juce::File findCategorySourceFolder(const juce::File& userPresetRoot,
     return {};
 }
 
+// Expected hidden source folder name(s) for a given category. Used by the
+// strict per-category resolver so e.g. "Acoustic Guitars" never accidentally
+// reaches into "Electric Guitars/electric guitar 1".
+static juce::StringArray expectedSourceFolderNames(const juce::String& categoryIn)
+{
+    const auto c = categoryIn.trim();
+    auto eq = [&](const char* s){ return c.equalsIgnoreCase(s); };
+    if (eq("Acoustic Guitars") || eq("Acoustic Guitar"))      return { "Acoustic Guitar 1" };
+    if (eq("Electric Guitars") || eq("Electric Guitar"))      return { "Electric Guitar 1", "electric guitar 1", "Guitar 1" };
+    if (eq("Guitars") || eq("Guitar"))                        return { "Guitar 1" };
+    if (eq("Pianos") || eq("Piano"))                          return { "Piano 1" };
+    if (eq("Rhodes"))                                         return { "Rhodes 1" };
+    if (eq("Brass") || eq("Trap Trumpets") || eq("Trumpet")
+        || eq("Trumpets"))                                    return { "Trumpet 1" };
+    if (eq("Saxophone") || eq("Saxophones") || eq("Saxaphone")
+        || eq("Saxaphones"))                                  return { "Saxophone 1", "Saxaphone 1" };
+    if (eq("Cellos") || eq("Cello"))                          return { "Cello 1" };
+    if (eq("Strings"))                                        return { "Strings 1", "Cello 1" };
+    if (eq("Choirs") || eq("Choir"))                          return { "Choir 1", "choir 1" };
+    if (eq("Bells") || eq("Bell"))                            return { "Bell 1" };
+    if (eq("808s") || eq("808"))                              return { "808 1" };
+    if (eq("Leads") || eq("Lead"))                            return { "Lead 1" };
+    if (eq("Synths") || eq("Synth"))                          return { "Lead 1", "Vintage Synth 1" };
+    if (eq("VintageSynth") || eq("Vintage Synths") || eq("Vintage Synth"))
+                                                              return { "Vintage Synth 1" };
+    return {};
+}
+
+// Strict per-category source resolver. Looks ONLY at immediate subdirectories
+// of presetCategoryFolder; never crosses into other categories.
+//
+//   1) Try every name in expectedSourceFolderNames(category).
+//   2) Try preferredLeaf (from sourceInstrument.path) if it lives directly
+//      under presetCategoryFolder.
+//   3) Fallback: any single subdirectory that contains audio.
+//
+// Sets `multipleFoundOut=true` when several subdirectories contain audio and
+// no expected-name match resolved (so the caller can warn).
+static juce::File findStrictCategorySourceFolder(const juce::File& presetCategoryFolder,
+                                                 const juce::String& category,
+                                                 const juce::String& preferredLeaf,
+                                                 bool& multipleFoundOut)
+{
+    multipleFoundOut = false;
+    if (! presetCategoryFolder.isDirectory()) return {};
+
+    auto subdirs = presetCategoryFolder.findChildFiles(juce::File::findDirectories, false);
+
+    const auto expected = expectedSourceFolderNames(category);
+    for (auto& name : expected)
+        for (auto& sub : subdirs)
+            if (sub.getFileName().equalsIgnoreCase(name) && folderHasAnyAudio(sub, true))
+                return sub;
+
+    if (preferredLeaf.isNotEmpty())
+        for (auto& sub : subdirs)
+            if (sub.getFileName().equalsIgnoreCase(preferredLeaf)
+                && folderHasAnyAudio(sub, true))
+                return sub;
+
+    juce::Array<juce::File> withAudio;
+    for (auto& sub : subdirs)
+        if (folderHasAnyAudio(sub, true))
+            withAudio.add(sub);
+
+    if (withAudio.size() == 1) return withAudio.getFirst();
+    if (withAudio.size() > 1)
+    {
+        multipleFoundOut = true;
+        std::sort(withAudio.begin(), withAudio.end(), [](const juce::File& a, const juce::File& b) {
+            return a.getFileName().compareNatural(b.getFileName()) < 0;
+        });
+        return withAudio.getFirst();
+    }
+    return {};
+}
+
 // Scan one "category root" directory. Each immediate subfolder is treated as
 // a preset (multisample group of every WAV inside). Loose WAVs sitting
 // directly in the category folder are collapsed into a single backward-compat
