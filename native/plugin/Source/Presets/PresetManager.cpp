@@ -926,6 +926,8 @@ void PresetManager::loadPreset(int index)
             std::sort(files.begin(), files.end(), [](const juce::File& a, const juce::File& b) {
                 return a.getFileName().compareNatural(b.getFileName()) < 0;
             });
+            requestedSourceFolderWavCount = files.size();
+
 
             for (auto& f : files)
                 if (parseRootMidiFromStem(f.getFileNameWithoutExtension()) >= 0)
