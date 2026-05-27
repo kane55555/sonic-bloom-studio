@@ -359,7 +359,6 @@ inline void report(DiditagainProcessor& proc,
         << " category=" << effectiveCategory
         << " bankCategory=" << bankCategory
         << " engineType=" << engineType
-        << " sourceInstrumentPathRaw=" << rawPath
         << " presetFilePath=" << presetFilePathIn
         << " presetCategoryFolder=" << presetCategoryFolderIn
         << " expectedSourceFolderName=" << expectedSourceFolderNameIn
