@@ -374,6 +374,7 @@ inline void report(DiditagainProcessor& proc,
         << " hiddenSourceFolder=" << (hiddenSourceFolder ? "true" : "false")
         << " allowCrossCategorySource=" << (allowCrossCategorySourceIn ? "true" : "false")
         << " sourceFolderWavCount=" << sourceFolderWavCountIn
+        << " sourceRequiredForEngine=" << (needsSource ? "true" : "false")
         << " oscillatorEngineActive=" << (oscillatorEngineActive ? "true" : "false")
         << " wavZones=" << wavZones
         << " activeLayers=" << activeLayers
