@@ -413,6 +413,11 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("resolvedFolder",         resolvedFolderPath);
     j->setProperty("resolvedFrom",           resolvedFrom);
     j->setProperty("hiddenSourceFolder",     hiddenSourceFolder);
+    j->setProperty("presetFilePath",         presetFilePathIn);
+    j->setProperty("presetCategoryFolder",   presetCategoryFolderIn);
+    j->setProperty("expectedSourceFolderName", expectedSourceFolderNameIn);
+    j->setProperty("allowCrossCategorySource", allowCrossCategorySourceIn);
+    j->setProperty("sourceFolderWavCount",   sourceFolderWavCountIn);
     j->setProperty("wavZones",               wavZones);
     j->setProperty("activeLayers",           activeLayers);
     j->setProperty("activePartials",         activePartials);
