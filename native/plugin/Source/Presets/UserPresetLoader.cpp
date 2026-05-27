@@ -757,8 +757,19 @@ void applyLayerBusCharacter(juce::AudioProcessor& proc, const UserPreset& p, Fam
     const float warmth   = juce::jlimit(0.0f, 1.0f, p.macros.warmth);
     const float width    = juce::jlimit(0.0f, 1.0f, p.macros.width);
     const float movement = juce::jlimit(0.0f, 1.0f, p.macros.movement);
+    const bool naturalChoir = isChoirModePreset(p);
 
     bus.setEnabled(true);
+    if (naturalChoir)
+    {
+        bus.setSaturationDrive(0.0f);
+        bus.setSaturationMix(0.0f);
+        bus.setWidth(juce::jlimit(0.0f, 1.4f, 0.85f * (0.6f + width * 0.5f)));
+        bus.setDriftRate(0.0f);
+        bus.setDriftDepth(0.0f);
+        return;
+    }
+
     // Synth family gets much gentler glue so the shared tanh doesn't pile on
     // top of per-voice saturation. Other families keep their original curve.
     const bool synthFam = (fam == Family::Synth);
