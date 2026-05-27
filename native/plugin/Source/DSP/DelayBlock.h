@@ -128,6 +128,25 @@ public:
         }
     }
 
+    void processWetOnly(juce::AudioBuffer<float>& buffer,
+                        const juce::AudioBuffer<float>& dryInput) noexcept
+    {
+        const float effectiveMix = mix * sendDensityScale;
+        if (effectiveMix <= 0.0001f)
+        {
+            buffer.clear();
+            return;
+        }
+
+        process(buffer);
+
+        const int n = buffer.getNumSamples();
+        const int nc = juce::jmin(buffer.getNumChannels(), dryInput.getNumChannels());
+        const float dryScale = 1.0f - effectiveMix;
+        for (int ch = 0; ch < nc; ++ch)
+            buffer.addFrom(ch, 0, dryInput, ch, 0, n, -dryScale);
+    }
+
     void reset() noexcept { delayLine.reset(); dampL.reset(); dampR.reset(); duckEnv = 0.0f; }
 
 private:
