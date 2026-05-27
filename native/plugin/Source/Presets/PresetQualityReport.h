@@ -360,9 +360,15 @@ inline void report(DiditagainProcessor& proc,
         << " bankCategory=" << bankCategory
         << " engineType=" << engineType
         << " sourceInstrumentPathRaw=" << rawPath
+        << " presetFilePath=" << presetFilePathIn
+        << " presetCategoryFolder=" << presetCategoryFolderIn
+        << " expectedSourceFolderName=" << expectedSourceFolderNameIn
+        << " sourceInstrumentPathRaw=" << rawPath
         << " resolvedFolder=" << resolvedFolderPath
         << " resolvedFrom=" << resolvedFrom
         << " hiddenSourceFolder=" << (hiddenSourceFolder ? "true" : "false")
+        << " allowCrossCategorySource=" << (allowCrossCategorySourceIn ? "true" : "false")
+        << " sourceFolderWavCount=" << sourceFolderWavCountIn
         << " oscillatorEngineActive=" << (oscillatorEngineActive ? "true" : "false")
         << " wavZones=" << wavZones
         << " activeLayers=" << activeLayers
