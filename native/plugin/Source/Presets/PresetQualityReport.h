@@ -415,6 +415,7 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("categoryRaw",            effectiveCategoryIn);
     j->setProperty("engineType",             engineType);
     j->setProperty("oscillatorEngineActive", oscillatorEngineActive);
+    j->setProperty("sourceRequiredForEngine", needsSource);
     j->setProperty("sourceInstrument",       rawPath);
     j->setProperty("sourceInstrumentPathRaw", rawPath);
     j->setProperty("resolvedFolder",         resolvedFolderPath);
