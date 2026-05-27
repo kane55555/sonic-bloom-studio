@@ -276,7 +276,13 @@ inline void report(DiditagainProcessor& proc,
         warnings.add("SOURCE_PATH_INSIDE_PRESET_FOLDER");
 
     for (auto& w : extraSourceWarningsIn)
+    {
+        // Never propagate SOURCE_MISSING when the active engine does not
+        // require a sample folder (pure synth presets: analog, supersaw,
+        // fm2, fm4, wavetable, ...).
+        if (! needsSource && w == "SOURCE_MISSING") continue;
         if (! warnings.contains(w)) warnings.add(w);
+    }
 
     const auto cLow = effectiveCategory.toLowerCase();
     const bool lowEndCat = cLow.contains("808") || cLow.contains("bass") || cLow.contains("sub");
