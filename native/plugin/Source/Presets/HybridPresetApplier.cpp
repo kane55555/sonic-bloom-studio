@@ -558,10 +558,14 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
                 + " fxSendChokedOnNoteOff=true");
 
             // Polyphony hint: cap default at 8 for choir presets, allow up to
-            // 10 for wide/heaven variants.
-            const int currentPoly = (int) std::lround(paramValue(*dp, "polyphony"));
+            // 10 for wide/heaven variants. We always clamp DOWN — the user can
+            // re-raise polyphony post-load if they explicitly want more voices.
+            float currentPoly = 0.0f;
+            if (auto* pp = findParam(processor, "polyphony"))
+                if (auto* rr = dynamic_cast<juce::RangedAudioParameter*>(pp))
+                    currentPoly = rr->convertFrom0to1(rr->getValue());
             const int choirPolyTarget = choirWide ? 10 : 8;
-            if (currentPoly > choirPolyTarget)
+            if ((int) std::lround(currentPoly) > choirPolyTarget)
                 setFloat(processor, "polyphony", (float) choirPolyTarget);
         }
     }
