@@ -300,6 +300,7 @@ inline void report(DiditagainProcessor& proc,
     }
 
     const auto cLow = effectiveCategory.toLowerCase();
+    const auto nLow = up.presetName.toLowerCase();
     const bool lowEndCat = cLow.contains("808") || cLow.contains("bass") || cLow.contains("sub");
     if (lowEndCat && (reverbMix > 0.10f || delayMix > 0.12f))
         warnings.add("TOO_MUCH_LOW_END");
@@ -319,6 +320,25 @@ inline void report(DiditagainProcessor& proc,
         warnings.add("DELAY_FEEDBACK_TOO_HIGH");
     if (reverbInputHpHz < 120.0f && reverbMix > 0.15f)
         warnings.add("REVERB_LOW_MID_BUILDUP");
+
+    // --- Choir-mode safety state + warnings -------------------------------
+    const bool choirMode = cLow.contains("choir") || cLow.contains("vox")
+                         || cLow.contains("vocal") || nLow.contains("choir");
+    const float fxSendReleaseMsLive = proc.getSynthEngine().getFxSendReleaseMs();
+    const float ampReleaseMsLive    = up.amp.releaseMs;
+    const bool  choirAmpReleaseClamped = choirMode && (up.amp.releaseMs > 900.0f);
+    const bool  choirReverbCapApplied  = choirMode && reverbMix >= 0.219f;
+    const bool  choirDelayCapApplied   = choirMode && delayMix  >= 0.029f;
+    const int   choirActiveVoiceCount  = choirMode ? proc.getSynthEngine().getActiveVoiceCount() : 0;
+    const bool  choirNoteDensityFxReduction = choirMode && noteDensityFxOn;
+    if (choirMode)
+    {
+        if (up.amp.releaseMs > 900.0f) warnings.add("CHOIR_RELEASE_TOO_LONG");
+        if (reverbMix > 0.22f)         warnings.add("CHOIR_REVERB_TOO_WET");
+        if (delayMix  > 0.03f)         warnings.add("CHOIR_DELAY_TOO_HIGH");
+        if (choirActiveVoiceCount > 8) warnings.add("CHOIR_TOO_MANY_OVERLAPPING_VOICES");
+        if (fxSendReleaseMsLive > 180.0f) warnings.add("CHOIR_FX_SEND_TOO_LONG");
+    }
 
     // --- Loudness calibration (suggestion-only) ---------------------------
     const auto target = loudnessTargetForCategory(effectiveCategory);
