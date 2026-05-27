@@ -245,6 +245,14 @@ public:
     {
         maxDensityReduction = juce::jlimit(0.0f, 0.6f, amount);
     }
+    void setDelayDensityWeight(float weight) noexcept
+    {
+        delayDensityWeight = juce::jlimit(0.0f, 1.0f, weight);
+    }
+    void setReverbDensityWeight(float weight) noexcept
+    {
+        reverbDensityWeight = juce::jlimit(0.0f, 1.0f, weight);
+    }
 
     // ---- Global "scale-safe" preset toggle ----
     // When true, FX writes from the preset applier are gently tamed:
@@ -270,6 +278,9 @@ public:
     DelayBlock&  getDelay()  noexcept { return delay; }
     ReverbBlock& getReverb() noexcept { return reverb; }
     bool getNoteDensityFxReductionEnabled() const noexcept { return noteDensityFxReductionEnabled; }
+    float getNoteDensityMaxReduction() const noexcept { return maxDensityReduction; }
+    float getDelayDensityWeight() const noexcept { return delayDensityWeight; }
+    float getReverbDensityWeight() const noexcept { return reverbDensityWeight; }
 
     void setEqLowDb (float db) { eq.setLowDb(db); }
     void setEqMidDb (float db) { eq.setMidDb(db); }
@@ -420,6 +431,8 @@ private:
     float densityLastFast = 0.0f;
     float densityEnv  = 0.0f;
     float maxDensityReduction = 0.32f;
+    float delayDensityWeight = 1.0f;
+    float reverbDensityWeight = 1.0f;
     bool  noteDensityFxReductionEnabled = true;
     bool  scaleSafeFxMode = true;
     bool  clearTailOnPresetChange = true;
