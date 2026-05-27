@@ -282,14 +282,44 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
         setFloat(processor, "env1Attack",  sampleLayer->ampEnv.attack);
         setFloat(processor, "env1Decay",   sampleLayer->ampEnv.decay);
         setFloat(processor, "env1Sustain", sampleLayer->ampEnv.sustain);
-        // Clamp release so notes actually stop when the key is lifted.
-        // Anything longer than ~0.8s sounds like the sample is ignoring
-        // note-off and "playing the whole source". Reverb/delay tails
-        // still provide ambient space without dragging the dry sample.
-        const float clampedRelease = juce::jlimit(0.001f, 0.8f,
+        // ---- Per-category amp-release cap (== FX send envelope) ----
+        //
+        // Voice signal flow is: sample -> amp envelope -> layer bus ->
+        // FX (delay/reverb). So clamping the amp release per category
+        // guarantees reverb/delay receive at most `releaseMaxMs` of tail
+        // after a MIDI note-off — never the full WAV duration.
+        //
+        //   Pianos / Rhodes / Keys ........ 250 ms
+        //   Guitars (any) ................. 300 ms (450 ms for ambient/wide)
+        //   Brass / Sax / Horn / Trumpet .. 180 ms
+        //   Choirs / Strings / Pads ....... 450 ms
+        //   Leads / Synths ................ 250 ms
+        //   808 / Bass / Sub ..............  80 ms
+        const auto cLower = p.category.toLowerCase();
+        const auto nLower = p.name.toLowerCase();
+        float releaseMaxMs = 300.0f;
+        if      (cLower.contains("808") || cLower.contains("bass") || cLower.contains("sub")) releaseMaxMs = 80.0f;
+        else if (cLower.contains("brass") || cLower.contains("sax") || cLower.contains("horn") || cLower.contains("trumpet")) releaseMaxMs = 180.0f;
+        else if (cLower.contains("piano") || cLower.contains("rhodes") || cLower.contains("keys")) releaseMaxMs = 250.0f;
+        else if (cLower.contains("lead") || cLower.contains("synth")) releaseMaxMs = 250.0f;
+        else if (cLower.contains("choir") || cLower.contains("vox") || cLower.contains("vocal")
+              || cLower.contains("string") || cLower.contains("pad") || cLower.contains("texture") || cLower.contains("ambient"))
+            releaseMaxMs = 450.0f;
+        else if (cLower.contains("guitar"))
+            releaseMaxMs = (nLower.contains("ambient") || nLower.contains("wide")) ? 450.0f : 300.0f;
+        const float clampedRelease = juce::jlimit(0.001f, releaseMaxMs * 0.001f,
                                                   sampleLayer->ampEnv.release);
         setFloat(processor, "env1Release", clampedRelease);
         setFloat(processor, "oscALevel",   sampleLayer->volume);
+
+        juce::Logger::writeToLog(juce::String("[DIDITAGAIN fx-send] preset=") + p.name
+            + " category=" + p.category
+            + " fxSendPostEnvelope=true fxSendFollowsAmpEnvelope=true"
+            + " noteOffStopsFxSend=true"
+            + " ampReleaseMaxMs=" + juce::String(releaseMaxMs, 1)
+            + " ampReleaseSec=" + juce::String(clampedRelease, 3)
+            + " clearFxOnTransportStop=true transportStopFxFadeMs=120"
+            + " clearFxTailOnPresetChange=true");
     }
     else if (p.hasSourceImport && p.sourceSamplePath.isNotEmpty())
     {
