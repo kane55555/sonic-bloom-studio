@@ -338,7 +338,6 @@ inline void report(DiditagainProcessor& proc,
         : up.fxSend.hasFxSendReleaseMs ? juce::String("preset.fxSend.fxSendReleaseMs")
         : up.fxSend.hasFxSendReleaseMultiplier ? juce::String("ampReleaseFallback")
         : juce::String("categoryDefault");
-    const float ampReleaseMsLive    = up.amp.releaseMs;
     const bool  choirAmpReleaseClamped = choirMode && (up.amp.releaseMs > 900.0f);
     const bool  choirReverbCapApplied  = choirMode && reverbMix >= 0.219f;
     const bool  choirDelayCapApplied   = choirMode && delayMix  >= 0.029f;
