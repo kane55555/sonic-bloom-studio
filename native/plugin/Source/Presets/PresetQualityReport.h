@@ -189,7 +189,13 @@ inline void report(DiditagainProcessor& proc,
                    const juce::String& resolvedFromIn          = {},
                    bool rawPathInsidePresetsUser               = false,
                    const juce::String& browserPresetNameIn     = {},
-                   const juce::String& bankCategoryIn          = {})
+                   const juce::String& bankCategoryIn          = {},
+                   const juce::String& presetFilePathIn        = {},
+                   const juce::String& presetCategoryFolderIn  = {},
+                   const juce::String& expectedSourceFolderNameIn = {},
+                   bool allowCrossCategorySourceIn             = false,
+                   int sourceFolderWavCountIn                  = 0,
+                   const juce::StringArray& extraSourceWarningsIn = {})
 {
     auto& engine = proc.getSynthEngine();
     auto& bus    = engine.getLayerBus();
@@ -268,6 +274,9 @@ inline void report(DiditagainProcessor& proc,
     juce::ignoreUnused(rawNorm, rawPathInsidePresetsUser);
     if (foreignPresetsUser)
         warnings.add("SOURCE_PATH_INSIDE_PRESET_FOLDER");
+
+    for (auto& w : extraSourceWarningsIn)
+        if (! warnings.contains(w)) warnings.add(w);
 
     const auto cLow = effectiveCategory.toLowerCase();
     const bool lowEndCat = cLow.contains("808") || cLow.contains("bass") || cLow.contains("sub");
@@ -350,10 +359,15 @@ inline void report(DiditagainProcessor& proc,
         << " category=" << effectiveCategory
         << " bankCategory=" << bankCategory
         << " engineType=" << engineType
+        << " presetFilePath=" << presetFilePathIn
+        << " presetCategoryFolder=" << presetCategoryFolderIn
+        << " expectedSourceFolderName=" << expectedSourceFolderNameIn
         << " sourceInstrumentPathRaw=" << rawPath
         << " resolvedFolder=" << resolvedFolderPath
         << " resolvedFrom=" << resolvedFrom
         << " hiddenSourceFolder=" << (hiddenSourceFolder ? "true" : "false")
+        << " allowCrossCategorySource=" << (allowCrossCategorySourceIn ? "true" : "false")
+        << " sourceFolderWavCount=" << sourceFolderWavCountIn
         << " oscillatorEngineActive=" << (oscillatorEngineActive ? "true" : "false")
         << " wavZones=" << wavZones
         << " activeLayers=" << activeLayers
@@ -399,6 +413,11 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("resolvedFolder",         resolvedFolderPath);
     j->setProperty("resolvedFrom",           resolvedFrom);
     j->setProperty("hiddenSourceFolder",     hiddenSourceFolder);
+    j->setProperty("presetFilePath",         presetFilePathIn);
+    j->setProperty("presetCategoryFolder",   presetCategoryFolderIn);
+    j->setProperty("expectedSourceFolderName", expectedSourceFolderNameIn);
+    j->setProperty("allowCrossCategorySource", allowCrossCategorySourceIn);
+    j->setProperty("sourceFolderWavCount",   sourceFolderWavCountIn);
     j->setProperty("wavZones",               wavZones);
     j->setProperty("activeLayers",           activeLayers);
     j->setProperty("activePartials",         activePartials);
@@ -482,6 +501,11 @@ inline void report(DiditagainProcessor& proc,
               << "resolvedFolder: "            << resolvedFolderPath   << "\n"
               << "resolvedFrom: "              << resolvedFrom         << "\n"
               << "hiddenSourceFolder: "        << (hiddenSourceFolder ? "true" : "false") << "\n"
+              << "presetFilePath: "            << presetFilePathIn         << "\n"
+              << "presetCategoryFolder: "      << presetCategoryFolderIn   << "\n"
+              << "expectedSourceFolderName: "  << expectedSourceFolderNameIn << "\n"
+              << "allowCrossCategorySource: "  << (allowCrossCategorySourceIn ? "true" : "false") << "\n"
+              << "sourceFolderWavCount: "      << sourceFolderWavCountIn   << "\n"
               << "wavZones: "                  << wavZones             << "\n"
               << "activeLayers: "              << activeLayers         << "\n"
               << "activePartials: "            << activePartials       << "\n"

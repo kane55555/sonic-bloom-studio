@@ -255,7 +255,7 @@ static juce::File resolveCategoryDir(const juce::File& userPresetRoot, const juc
     return {};
 }
 
-static juce::File findCategorySourceFolder(const juce::File& userPresetRoot,
+[[maybe_unused]] static juce::File findCategorySourceFolder(const juce::File& userPresetRoot,
                                            const juce::String& category,
                                            const juce::String& preferredLeaf,
                                            const juce::File& presetFile)
@@ -331,6 +331,83 @@ static juce::File findCategorySourceFolder(const juce::File& userPresetRoot,
         if (folderHasAnyAudio(sub, true))
             return sub;
 
+    return {};
+}
+
+// Expected hidden source folder name(s) for a given category. Used by the
+// strict per-category resolver so e.g. "Acoustic Guitars" never accidentally
+// reaches into "Electric Guitars/electric guitar 1".
+static juce::StringArray expectedSourceFolderNames(const juce::String& categoryIn)
+{
+    const auto c = categoryIn.trim();
+    auto eq = [&](const char* s){ return c.equalsIgnoreCase(s); };
+    if (eq("Acoustic Guitars") || eq("Acoustic Guitar"))      return { "Acoustic Guitar 1" };
+    if (eq("Electric Guitars") || eq("Electric Guitar"))      return { "Electric Guitar 1", "electric guitar 1", "Guitar 1" };
+    if (eq("Guitars") || eq("Guitar"))                        return { "Guitar 1" };
+    if (eq("Pianos") || eq("Piano"))                          return { "Piano 1" };
+    if (eq("Rhodes"))                                         return { "Rhodes 1" };
+    if (eq("Brass") || eq("Trap Trumpets") || eq("Trumpet")
+        || eq("Trumpets"))                                    return { "Trumpet 1" };
+    if (eq("Saxophone") || eq("Saxophones") || eq("Saxaphone")
+        || eq("Saxaphones"))                                  return { "Saxophone 1", "Saxaphone 1" };
+    if (eq("Cellos") || eq("Cello"))                          return { "Cello 1" };
+    if (eq("Strings"))                                        return { "Strings 1", "Cello 1" };
+    if (eq("Choirs") || eq("Choir"))                          return { "Choir 1", "choir 1" };
+    if (eq("Bells") || eq("Bell"))                            return { "Bell 1" };
+    if (eq("808s") || eq("808"))                              return { "808 1" };
+    if (eq("Leads") || eq("Lead"))                            return { "Lead 1" };
+    if (eq("Synths") || eq("Synth"))                          return { "Lead 1", "Vintage Synth 1" };
+    if (eq("VintageSynth") || eq("Vintage Synths") || eq("Vintage Synth"))
+                                                              return { "Vintage Synth 1" };
+    return {};
+}
+
+// Strict per-category source resolver. Looks ONLY at immediate subdirectories
+// of presetCategoryFolder; never crosses into other categories.
+//
+//   1) Try every name in expectedSourceFolderNames(category).
+//   2) Try preferredLeaf (from sourceInstrument.path) if it lives directly
+//      under presetCategoryFolder.
+//   3) Fallback: any single subdirectory that contains audio.
+//
+// Sets `multipleFoundOut=true` when several subdirectories contain audio and
+// no expected-name match resolved (so the caller can warn).
+static juce::File findStrictCategorySourceFolder(const juce::File& presetCategoryFolder,
+                                                 const juce::String& category,
+                                                 const juce::String& preferredLeaf,
+                                                 bool& multipleFoundOut)
+{
+    multipleFoundOut = false;
+    if (! presetCategoryFolder.isDirectory()) return {};
+
+    auto subdirs = presetCategoryFolder.findChildFiles(juce::File::findDirectories, false);
+
+    const auto expected = expectedSourceFolderNames(category);
+    for (auto& name : expected)
+        for (auto& sub : subdirs)
+            if (sub.getFileName().equalsIgnoreCase(name) && folderHasAnyAudio(sub, true))
+                return sub;
+
+    if (preferredLeaf.isNotEmpty())
+        for (auto& sub : subdirs)
+            if (sub.getFileName().equalsIgnoreCase(preferredLeaf)
+                && folderHasAnyAudio(sub, true))
+                return sub;
+
+    juce::Array<juce::File> withAudio;
+    for (auto& sub : subdirs)
+        if (folderHasAnyAudio(sub, true))
+            withAudio.add(sub);
+
+    if (withAudio.size() == 1) return withAudio.getFirst();
+    if (withAudio.size() > 1)
+    {
+        multipleFoundOut = true;
+        std::sort(withAudio.begin(), withAudio.end(), [](const juce::File& a, const juce::File& b) {
+            return a.getFileName().compareNatural(b.getFileName()) < 0;
+        });
+        return withAudio.getFirst();
+    }
     return {};
 }
 
@@ -668,7 +745,15 @@ void PresetManager::applyPendingUserDiapresetAfterSampleLoad()
                                    requestedSampleSources.size(),
                                    requestedSampleRawPath,
                                    requestedSampleResolvedFrom,
-                                   requestedSampleRawInsidePresetsUser);
+                                   requestedSampleRawInsidePresetsUser,
+                                   /*browserPresetName*/ {},
+                                   /*bankCategory*/ {},
+                                   requestedPresetFilePath,
+                                   requestedPresetCategoryFolder,
+                                   requestedExpectedSourceFolderName,
+                                   requestedAllowCrossCategorySource,
+                                   requestedSourceFolderWavCount,
+                                   requestedExtraSourceWarnings);
 }
 
 static void applyOscBlock(juce::AudioProcessor& proc, const juce::var& obj,
@@ -735,9 +820,14 @@ void PresetManager::loadPreset(int index)
 
         didaPresetManagerLog("loading diapreset: " + up.presetName);
 
-        const auto effectiveCategoryRaw = info.category.isNotEmpty()
-            ? info.category
-            : (up.category.isNotEmpty() ? up.category : juce::String("User"));
+        // The .diapreset's actual parent folder is the authoritative category.
+        // This guarantees "Acoustic Guitars/Foo.diapreset" routes to that
+        // folder no matter what info.category or up.category say.
+        const auto parentFolderName = file.getParentDirectory().getFileName();
+        const auto effectiveCategoryRaw = parentFolderName.isNotEmpty()
+            ? parentFolderName
+            : (info.category.isNotEmpty() ? info.category
+                : (up.category.isNotEmpty() ? up.category : juce::String("User")));
         const auto effectiveCategory = normalizeCategoryAlias(effectiveCategoryRaw);
         const auto sourceLeaf = juce::File(up.source.path.replaceCharacter('\\', '/')).getFileName();
 
@@ -747,90 +837,76 @@ void PresetManager::loadPreset(int index)
                                 && juce::File::isAbsolutePath(rawNormSlash);
         const bool rawIsInsidePresetsUser = rawNormSlash.containsIgnoreCase("/Samples/Presets/User/");
 
-        // STEP 1 — Honour an absolute sourceInstrument.path exactly when it
-        // points at a real on-disk folder.
+        // STRICT per-category routing. The .diapreset's parent folder on disk
+        // *is* the category folder; we never reach across categories.
+        const juce::File presetCategoryFolder = file.getParentDirectory();
+        const auto expectedNames = expectedSourceFolderNames(effectiveCategory);
+        const juce::String expectedSourceFolderName =
+            expectedNames.isEmpty() ? juce::String() : expectedNames[0];
+        const bool allowCrossCategorySource = false;
+
         juce::File resolved;
         juce::String resolvedFrom;
+        juce::StringArray extraSourceWarnings;
+
+        // STEP A — search ONLY inside the .diapreset's own category folder.
+        bool multipleFound = false;
+        {
+            auto picked = findStrictCategorySourceFolder(presetCategoryFolder,
+                                                        effectiveCategory,
+                                                        sourceLeaf,
+                                                        multipleFound);
+            if (picked.isDirectory())
+            {
+                resolved = picked;
+                resolvedFrom = "categoryHiddenSourceFolder";
+                didaPresetManagerLog("diapreset routed strict category=" + effectiveCategory
+                    + " folder=" + resolved.getFullPathName());
+                if (multipleFound
+                    && (expectedSourceFolderName.isEmpty()
+                        || ! picked.getFileName().equalsIgnoreCase(expectedSourceFolderName)))
+                    extraSourceWarnings.add("MULTIPLE_SOURCE_FOLDERS_FOUND");
+            }
+        }
+
+        // STEP B — honour an absolute sourceInstrument.path only if it points
+        // INSIDE the same category folder. Otherwise reject as cross-category.
         if (rawIsAbsolute)
         {
             auto abs = dida::userpreset::resolveSourcePath(rawSourcePath);
             if (abs.isDirectory())
             {
-                resolved = abs;
-                resolvedFrom = "absoluteSourceInstrumentPath";
-                didaPresetManagerLog("diapreset using absolute source path=" + resolved.getFullPathName());
-            }
-        }
-
-        // STEP 2 — Fall back to the preset's own category folder under
-        // Samples/Presets/User/<Category>/. Source folders are allowed to live
-        // there as hidden siblings of the .diapreset files (the browser hides
-        // them; only .diapreset entries are user-facing).
-        if (! resolved.isDirectory())
-        {
-            auto catResolved = findCategorySourceFolder(getUserPresetDirectory(), effectiveCategory, sourceLeaf, file);
-            if (catResolved.isDirectory())
-            {
-                resolved = catResolved;
-                const auto catNorm = catResolved.getFullPathName().replaceCharacter('\\', '/');
-                const bool insidePresetsUser = catNorm.containsIgnoreCase("/Samples/Presets/User/");
-                resolvedFrom = insidePresetsUser ? juce::String("categoryHiddenSourceFolder")
-                                                 : juce::String("fallbackSearch");
-                didaPresetManagerLog("diapreset routed within category=" + effectiveCategory
-                    + " folder=" + resolved.getFullPathName()
-                    + " resolvedFrom=" + resolvedFrom);
-            }
-        }
-
-        // STEP 2.5 — Look under Samples/<Category>/ for a subfolder whose name
-        // is mentioned in the preset name (e.g. "Hard Pick Guitar" -> Electric
-        // vs. "Soft Velvet Guitar" -> Acoustic). This is what disambiguates
-        // banks that ship a single sourcePath but the user has multiple
-        // instrument variants on disk.
-        if (! resolved.isDirectory())
-        {
-            auto samplesRoot = dida::SampleLibrary::getSamplesRoot();
-            for (auto& variant : { effectiveCategory,
-                                   effectiveCategory.endsWithIgnoreCase("s")
-                                       ? effectiveCategory.dropLastCharacters(1)
-                                       : effectiveCategory + "s" })
-            {
-                auto catDir = samplesRoot.getChildFile(variant);
-                if (! catDir.isDirectory()) continue;
-                auto picked = findCategorySourceFolder(samplesRoot, variant, sourceLeaf, file);
-                if (picked.isDirectory())
+                const bool isUnderCatFolder = abs.isAChildOf(presetCategoryFolder)
+                                           || abs == presetCategoryFolder;
+                if (isUnderCatFolder)
                 {
-                    resolved = picked;
-                    resolvedFrom = "samplesCategoryKeyword";
-                    didaPresetManagerLog("diapreset routed via Samples/" + variant
-                        + " keyword folder=" + resolved.getFullPathName());
-                    break;
+                    if (! resolved.isDirectory())
+                    {
+                        resolved = abs;
+                        resolvedFrom = "absoluteSourceInstrumentPath";
+                        didaPresetManagerLog("diapreset using absolute source path=" + resolved.getFullPathName());
+                    }
+                }
+                else if (! allowCrossCategorySource)
+                {
+                    extraSourceWarnings.add("WRONG_CATEGORY_SOURCE_FOLDER");
+                    didaPresetManagerLog(juce::String("diapreset REJECTED cross-category source")
+                        + " presetCategoryFolder=" + presetCategoryFolder.getFullPathName()
+                        + " attemptedResolvedFolder=" + abs.getFullPathName()
+                        + " reason=rejectedCrossCategorySource");
                 }
             }
         }
 
-        // STEP 3 — Last-chance discovery anywhere under Samples/ via the
-        // loader's resolver. Presets/User hits are accepted as hidden source
-        // folders.
-        if (! resolved.isDirectory() && rawSourcePath.isNotEmpty())
-        {
-            auto discovered = dida::userpreset::resolveSourcePath(rawSourcePath);
-            if (discovered.isDirectory())
-            {
-                resolved = discovered;
-                const auto discNorm = discovered.getFullPathName().replaceCharacter('\\', '/');
-                const bool inPresetsUser = discNorm.containsIgnoreCase("/Samples/Presets/User/");
-                if (resolvedFrom.isEmpty())
-                    resolvedFrom = inPresetsUser ? juce::String("categoryHiddenSourceFolder")
-                                                 : juce::String("fallbackSearch");
-            }
-        }
-
         if (! resolved.isDirectory())
         {
+            extraSourceWarnings.addIfNotAlreadyThere("SOURCE_MISSING");
             didaPresetManagerLog("diapreset source folder missing in category=" + effectiveCategory
+                + " presetCategoryFolder=" + presetCategoryFolder.getFullPathName()
+                + " expectedSourceFolderName=" + expectedSourceFolderName
                 + " path=" + up.source.path);
         }
+
 
         // Common reset of sample state; we re-fill it below when we have a folder.
         requestedInstrument        = {};
@@ -844,6 +920,12 @@ void PresetManager::loadPreset(int index)
         requestedSampleRawPath     = rawSourcePath;
         requestedSampleResolvedFrom = resolvedFrom;
         requestedSampleRawInsidePresetsUser = rawIsInsidePresetsUser;
+        requestedPresetFilePath          = file.getFullPathName();
+        requestedPresetCategoryFolder    = presetCategoryFolder.getFullPathName();
+        requestedExpectedSourceFolderName = expectedSourceFolderName;
+        requestedAllowCrossCategorySource = allowCrossCategorySource;
+        requestedSourceFolderWavCount    = 0;
+        requestedExtraSourceWarnings     = extraSourceWarnings;
         macroMapper.clear();
         requestedPresetIsUserDiapreset = true;
         pendingUserDiapreset = up;
@@ -857,6 +939,8 @@ void PresetManager::loadPreset(int index)
             std::sort(files.begin(), files.end(), [](const juce::File& a, const juce::File& b) {
                 return a.getFileName().compareNatural(b.getFileName()) < 0;
             });
+            requestedSourceFolderWavCount = files.size();
+
 
             for (auto& f : files)
                 if (parseRootMidiFromStem(f.getFileNameWithoutExtension()) >= 0)
