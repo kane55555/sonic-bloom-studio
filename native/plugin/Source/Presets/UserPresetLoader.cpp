@@ -182,6 +182,20 @@ bool parseFile(const juce::File& file, UserPreset& out, juce::String& errorOut)
     out.saturation.drive   = getF(sat, "drive",   out.saturation.drive);
     out.saturation.mix     = getF(sat, "mix",     out.saturation.mix);
 
+    auto fxSend = json.getProperty("fxSend", juce::var());
+    out.fxSend.hasFxSendReleaseMs = fxSend.isObject() && fxSend.hasProperty("fxSendReleaseMs");
+    out.fxSend.fxSendReleaseMs = getF(fxSend, "fxSendReleaseMs", out.fxSend.fxSendReleaseMs);
+    out.fxSend.hasFxSendMaximumReleaseMs = fxSend.isObject() && fxSend.hasProperty("fxSendMaximumReleaseMs");
+    out.fxSend.fxSendMaximumReleaseMs = getF(fxSend, "fxSendMaximumReleaseMs", out.fxSend.fxSendMaximumReleaseMs);
+    out.fxSend.hasFxSendReleaseMultiplier = fxSend.isObject() && fxSend.hasProperty("fxSendReleaseMultiplier");
+    out.fxSend.fxSendReleaseMultiplier = getF(fxSend, "fxSendReleaseMultiplier", out.fxSend.fxSendReleaseMultiplier);
+    out.fxSend.noteOffStopsFxSend = getB(fxSend, "noteOffStopsFxSend", out.fxSend.noteOffStopsFxSend);
+
+    out.choirMode = getB(json, "choirMode", out.choirMode);
+    auto safety = json.getProperty("safety", juce::var());
+    out.safety.hasChoirFxSendReleaseMaxMs = safety.isObject() && safety.hasProperty("choirFxSendReleaseMaxMs");
+    out.safety.choirFxSendReleaseMaxMs = getF(safety, "choirFxSendReleaseMaxMs", out.safety.choirFxSendReleaseMaxMs);
+
     auto mod = json.getProperty("modulation", juce::var());
     auto parseLfo = [](const juce::var& v, LfoBlock& l) {
         if (! v.isObject()) return;
@@ -667,6 +681,45 @@ FxLimits fxLimitsFor(Family f)
 
 }
 
+bool isChoirModePreset(const UserPreset& p)
+{
+    const auto c = p.category.toLowerCase();
+    const auto n = p.presetName.toLowerCase();
+    return p.choirMode || c.contains("choir") || c.contains("vox")
+        || c.contains("vocal") || n.contains("choir");
+}
+
+juce::String fxSendReleaseSourceFor(const UserPreset& p, bool choirMode)
+{
+    if (choirMode) return "choirModeClamp";
+    if (p.fxSend.hasFxSendReleaseMs) return "preset.fxSend.fxSendReleaseMs";
+    if (p.fxSend.hasFxSendReleaseMultiplier) return "ampReleaseFallback";
+    return "categoryDefault";
+}
+
+float resolveFxSendReleaseMs(const UserPreset& p, bool choirMode)
+{
+    if (choirMode)
+    {
+        const float maxMs = p.safety.hasChoirFxSendReleaseMaxMs
+            ? p.safety.choirFxSendReleaseMaxMs
+            : (p.fxSend.hasFxSendMaximumReleaseMs ? p.fxSend.fxSendMaximumReleaseMs : 180.0f);
+        const float requested = p.fxSend.hasFxSendReleaseMs
+            ? p.fxSend.fxSendReleaseMs
+            : juce::jmin(maxMs, p.amp.releaseMs * (p.fxSend.hasFxSendReleaseMultiplier
+                ? p.fxSend.fxSendReleaseMultiplier : 0.35f));
+        return juce::jlimit(40.0f, juce::jlimit(40.0f, 180.0f, maxMs), requested);
+    }
+
+    if (p.fxSend.hasFxSendReleaseMs)
+        return juce::jlimit(5.0f, 500.0f, p.fxSend.fxSendReleaseMs);
+
+    if (p.fxSend.hasFxSendReleaseMultiplier)
+        return juce::jlimit(5.0f, 500.0f, p.amp.releaseMs * p.fxSend.fxSendReleaseMultiplier);
+
+    return 80.0f;
+}
+
 void applyLayerBusCharacter(juce::AudioProcessor& proc, const UserPreset& p, Family fam)
 {
     auto* dp = dynamic_cast<DiditagainProcessor*>(&proc);
@@ -728,6 +781,7 @@ void clampEnvelopeForCategory(juce::AudioProcessor& proc, const UserPreset& p, F
 void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
 {
     const Family fam = familyOf(p.category);
+    const bool choirMode = isChoirModePreset(p);
 
     // -- Source / category validation (non-fatal warning only)
     validateSourceForCategory(p);
@@ -912,17 +966,23 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     const auto fxL = fxLimitsFor(fam);
     const float space   = juce::jlimit(0.0f, 1.0f, p.macros.space);
     const float reverbBase = p.reverb.enabled ? p.reverb.mix : 0.0f;
-    const float reverbMix  = juce::jlimit(0.0f, fxL.reverbMax,
+    const float reverbCap = choirMode ? 0.22f : fxL.reverbMax;
+    const float delayCap  = choirMode ? 0.03f : fxL.delayMax;
+    const float reverbSizeCap = choirMode ? 0.62f : 1.0f;
+    const float delayFeedbackCap = choirMode ? 0.08f : 0.95f;
+    const float reverbMix  = juce::jlimit(0.0f, reverbCap,
                                           reverbBase * (0.85f + space * 0.30f));
+    const float delayMix = juce::jlimit(0.0f, delayCap, p.delay.enabled ? p.delay.mix : 0.0f);
+    const float delayFeedback = juce::jlimit(0.0f, delayFeedbackCap, p.delay.feedback);
+    const float reverbSize = juce::jlimit(0.0f, reverbSizeCap, p.reverb.size);
 
     setParamById(proc, "fxChorusMix",
                  juce::jlimit(0.0f, fxL.chorusMax, p.chorus.enabled ? p.chorus.mix : 0.0f));
-    setParamById(proc, "fxDelayMix",
-                 juce::jlimit(0.0f, fxL.delayMax,  p.delay.enabled  ? p.delay.mix  : 0.0f));
+    setParamById(proc, "fxDelayMix", delayMix);
     setParamById(proc, "fxDelayTime",        p.delay.timeMs / 1000.0f);
-    setParamById(proc, "fxDelayFeedback",    p.delay.feedback);
+    setParamById(proc, "fxDelayFeedback",    delayFeedback);
     setParamById(proc, "fxReverbMix",        reverbMix);
-    setParamById(proc, "fxReverbSize",       p.reverb.size);
+    setParamById(proc, "fxReverbSize",       reverbSize);
     const float satDrive = juce::jlimit(0.0f, fxL.satMax,
                                         p.saturation.enabled ? p.saturation.drive : 0.0f);
     setParamById(proc, "fxDistortionAmount", satDrive);
@@ -933,6 +993,20 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
         ? juce::jlimit(0.0f, satMixCap, p.saturation.mix)
         : 0.0f;
     setParamById(proc, "fxSaturationMix", satMix);
+
+    if (choirMode)
+    {
+        if (std::abs(p.delay.feedback - delayFeedback) > 0.001f)
+            juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-safety] effect=delay")
+                + " oldFeedback=" + juce::String(p.delay.feedback, 3)
+                + " newFeedback=" + juce::String(delayFeedback, 3)
+                + " reason=choirMode");
+        if (std::abs((p.delay.enabled ? p.delay.mix : 0.0f) - delayMix) > 0.001f)
+            juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-safety] effect=delay")
+                + " oldMix=" + juce::String(p.delay.enabled ? p.delay.mix : 0.0f, 3)
+                + " newMix=" + juce::String(delayMix, 3)
+                + " reason=choirMode");
+    }
 
     // -- LFOs (rate + shape; routing matrix is owned by the engine elsewhere)
     setParamById(proc, "lfo1Rate", p.lfo1.rateHz);
@@ -958,6 +1032,41 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     // -- Premium voicing: shared layer-bus + per-category reverb character.
     applyLayerBusCharacter(proc, p, fam);
     dida::preset::applyReverbCharacterForCategory(proc, p.category);
+    if (auto* dp = dynamic_cast<DiditagainProcessor*>(&proc))
+    {
+        auto& engine = dp->getSynthEngine();
+        if (choirMode)
+        {
+            const float fxSendReleaseMs = resolveFxSendReleaseMs(p, true);
+            engine.setFxSendReleaseMsForAll(fxSendReleaseMs);
+            auto& pfx = engine.getFx();
+            pfx.setDelayMix(delayMix);
+            pfx.setDelayFeedback(delayFeedback);
+            pfx.setReverbMix(reverbMix);
+            pfx.setReverbSize(reverbSize);
+            pfx.setReverbInputHighPassHz(300.0f);
+            pfx.setReverbInputLowPassHz(5500.0f);
+            pfx.setReverbDucking(0.32f, 6.0f, 220.0f);
+            pfx.setDelayDucking(0.50f, 5.0f, 140.0f);
+            pfx.setNoteDensityFxReductionEnabled(true);
+            pfx.setNoteDensityMaxReduction(0.35f);
+            pfx.setDelayDensityWeight(1.0f);
+            pfx.setReverbDensityWeight(0.75f);
+            pfx.setChoirDensityMode(true);
+            juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-fx-send] preset=") + p.presetName
+                + " fxSendReleaseMs=" + juce::String(fxSendReleaseMs, 1)
+                + " fxSendReleaseSource=" + fxSendReleaseSourceFor(p, true)
+                + " noteOffStopsFxSend=" + (p.fxSend.noteOffStopsFxSend ? "true" : "false"));
+        }
+        else
+        {
+            auto& pfx = engine.getFx();
+            pfx.setChoirDensityMode(false);
+            pfx.setNoteDensityMaxReduction(0.32f);
+            pfx.setDelayDensityWeight(1.0f);
+            pfx.setReverbDensityWeight(1.0f);
+        }
+    }
 
     // -- Mod-matrix translation: for the routings the engine natively
     //    understands, fold the entry's amount into the matching APVTS param
@@ -1125,6 +1234,21 @@ juce::String toJson(const UserPreset& p)
     sat->setProperty("mix", p.saturation.mix);
     fx->setProperty("saturation", juce::var(sat));
     obj->setProperty("fx", juce::var(fx));
+
+    auto fxSend = new juce::DynamicObject();
+    if (p.fxSend.hasFxSendReleaseMs) fxSend->setProperty("fxSendReleaseMs", p.fxSend.fxSendReleaseMs);
+    if (p.fxSend.hasFxSendMaximumReleaseMs) fxSend->setProperty("fxSendMaximumReleaseMs", p.fxSend.fxSendMaximumReleaseMs);
+    if (p.fxSend.hasFxSendReleaseMultiplier) fxSend->setProperty("fxSendReleaseMultiplier", p.fxSend.fxSendReleaseMultiplier);
+    fxSend->setProperty("noteOffStopsFxSend", p.fxSend.noteOffStopsFxSend);
+    obj->setProperty("fxSend", juce::var(fxSend));
+
+    if (p.choirMode) obj->setProperty("choirMode", true);
+    if (p.safety.hasChoirFxSendReleaseMaxMs)
+    {
+        auto safety = new juce::DynamicObject();
+        safety->setProperty("choirFxSendReleaseMaxMs", p.safety.choirFxSendReleaseMaxMs);
+        obj->setProperty("safety", juce::var(safety));
+    }
 
     auto lfoToVar = [](const LfoBlock& l) {
         auto* o = new juce::DynamicObject();

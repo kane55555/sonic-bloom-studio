@@ -83,6 +83,23 @@ struct FxDelayBlock    { bool enabled=false; float timeMs=300.0f; float feedback
 struct FxReverbBlock   { bool enabled=false; float size=0.5f; float damping=0.4f; float mix=0.0f; };
 struct FxSatBlock      { bool enabled=false; float drive=0.0f; float mix=0.0f; };
 
+struct FxSendBlock
+{
+    bool  hasFxSendReleaseMs = false;
+    float fxSendReleaseMs = 80.0f;
+    bool  hasFxSendMaximumReleaseMs = false;
+    float fxSendMaximumReleaseMs = 180.0f;
+    bool  hasFxSendReleaseMultiplier = false;
+    float fxSendReleaseMultiplier = 0.35f;
+    bool  noteOffStopsFxSend = true;
+};
+
+struct SafetyBlock
+{
+    bool  hasChoirFxSendReleaseMaxMs = false;
+    float choirFxSendReleaseMaxMs = 180.0f;
+};
+
 struct LfoBlock
 {
     bool  enabled = false;
@@ -174,6 +191,8 @@ struct UserPreset
     FxDelayBlock  delay;
     FxReverbBlock reverb;
     FxSatBlock    saturation;
+    FxSendBlock   fxSend;
+    SafetyBlock   safety;
 
     LfoBlock lfo1;
     LfoBlock lfo2;
@@ -186,6 +205,7 @@ struct UserPreset
     LayerEqCarveBlock   layerEq;
     FilterMovementBlock filterMovement;
     bool                experimental = false;
+    bool                choirMode = false;
 
     // Optional mod-matrix routings. Empty by default; preserved across
     // load/save even when entries aren't yet wired to engine destinations.

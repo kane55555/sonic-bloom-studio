@@ -57,12 +57,13 @@ public:
         //      what stops scale runs and fast chords from turning into a
         //      muddy reverb/delay cloud.
         updateNoteDensity(buffer);
-        const float densityScale = noteDensityFxReductionEnabled
-            ? juce::jlimit(1.0f - maxDensityReduction, 1.0f,
-                           1.0f - densityEnv * maxDensityReduction)
-            : 1.0f;
-        delay.setSendDensityScale(densityScale);
-        reverb.setSendDensityScale(densityScale);
+        const float densityReduction = noteDensityFxReductionEnabled
+            ? juce::jlimit(0.0f, maxDensityReduction, densityEnv * maxDensityReduction)
+            : 0.0f;
+        const float choirDelayScale  = (choirDensityMode && activeVoiceCountForDensity >= 8) ? 0.50f : 1.0f;
+        const float choirReverbScale = (choirDensityMode && activeVoiceCountForDensity >= 8) ? 0.65f : 1.0f;
+        delay.setSendDensityScale (choirDelayScale  * (1.0f - densityReduction * delayDensityWeight));
+        reverb.setSendDensityScale(choirReverbScale * (1.0f - densityReduction * reverbDensityWeight));
 
         // 1) Saturation
         if (saturationActive)
@@ -127,12 +128,13 @@ public:
         captureRecentPeak(buffer, fxInRecent);
         updateNoteDensity(buffer);
 
-        const float densityScale = noteDensityFxReductionEnabled
-            ? juce::jlimit(1.0f - maxDensityReduction, 1.0f,
-                           1.0f - densityEnv * maxDensityReduction)
-            : 1.0f;
-        delay.setSendDensityScale(densityScale);
-        reverb.setSendDensityScale(densityScale);
+        const float densityReduction = noteDensityFxReductionEnabled
+            ? juce::jlimit(0.0f, maxDensityReduction, densityEnv * maxDensityReduction)
+            : 0.0f;
+        const float choirDelayScale  = (choirDensityMode && activeVoiceCountForDensity >= 8) ? 0.50f : 1.0f;
+        const float choirReverbScale = (choirDensityMode && activeVoiceCountForDensity >= 8) ? 0.65f : 1.0f;
+        delay.setSendDensityScale (choirDelayScale  * (1.0f - densityReduction * delayDensityWeight));
+        reverb.setSendDensityScale(choirReverbScale * (1.0f - densityReduction * reverbDensityWeight));
 
         if (saturationActive)
         {
@@ -198,12 +200,12 @@ public:
     void setChorusMode(int m) { chorus.setMode(m); }
 
 
-    void setDelayMix(float m) { delay.setMix(m); delayActive = m > 0.001f; }
+    void setDelayMix(float m) { const float v = choirDensityMode ? juce::jmin(m, 0.03f) : m; delay.setMix(v); delayActive = v > 0.001f; }
     void setDelayTime(float s) { delay.setTimeSeconds(s); }
-    void setDelayFeedback(float f) { delay.setFeedback(f); }
+    void setDelayFeedback(float f) { delay.setFeedback(choirDensityMode ? juce::jmin(f, 0.08f) : f); }
 
-    void setReverbMix(float m) { reverb.setMix(m); reverbActive = m > 0.001f; }
-    void setReverbSize(float s) { reverb.setSize(s); }
+    void setReverbMix(float m) { const float v = choirDensityMode ? juce::jmin(m, 0.22f) : m; reverb.setMix(v); reverbActive = v > 0.001f; }
+    void setReverbSize(float s) { reverb.setSize(choirDensityMode ? juce::jmin(s, 0.62f) : s); }
     void setReverbDamping(float d) { reverb.setDamping(d); }
     void setReverbWidth(float w) { reverb.setWidth(w); }
     void setReverbCharacter(ReverbBlock::Character c) { reverb.setCharacter(c); }
@@ -245,6 +247,16 @@ public:
     {
         maxDensityReduction = juce::jlimit(0.0f, 0.6f, amount);
     }
+    void setDelayDensityWeight(float weight) noexcept
+    {
+        delayDensityWeight = juce::jlimit(0.0f, 1.0f, weight);
+    }
+    void setReverbDensityWeight(float weight) noexcept
+    {
+        reverbDensityWeight = juce::jlimit(0.0f, 1.0f, weight);
+    }
+    void setChoirDensityMode(bool enabled) noexcept { choirDensityMode = enabled; }
+    void setActiveVoiceCountForDensity(int count) noexcept { activeVoiceCountForDensity = juce::jmax(0, count); }
 
     // ---- Global "scale-safe" preset toggle ----
     // When true, FX writes from the preset applier are gently tamed:
@@ -270,6 +282,11 @@ public:
     DelayBlock&  getDelay()  noexcept { return delay; }
     ReverbBlock& getReverb() noexcept { return reverb; }
     bool getNoteDensityFxReductionEnabled() const noexcept { return noteDensityFxReductionEnabled; }
+    float getNoteDensityMaxReduction() const noexcept { return maxDensityReduction; }
+    float getDelayDensityWeight() const noexcept { return delayDensityWeight; }
+    float getReverbDensityWeight() const noexcept { return reverbDensityWeight; }
+    bool getChoirDensityMode() const noexcept { return choirDensityMode; }
+    int getActiveVoiceCountForDensity() const noexcept { return activeVoiceCountForDensity; }
 
     void setEqLowDb (float db) { eq.setLowDb(db); }
     void setEqMidDb (float db) { eq.setMidDb(db); }
@@ -420,9 +437,13 @@ private:
     float densityLastFast = 0.0f;
     float densityEnv  = 0.0f;
     float maxDensityReduction = 0.32f;
+    float delayDensityWeight = 1.0f;
+    float reverbDensityWeight = 1.0f;
     bool  noteDensityFxReductionEnabled = true;
     bool  scaleSafeFxMode = true;
     bool  clearTailOnPresetChange = true;
+    bool  choirDensityMode = false;
+    int   activeVoiceCountForDensity = 0;
 
     Saturation       sat;
 

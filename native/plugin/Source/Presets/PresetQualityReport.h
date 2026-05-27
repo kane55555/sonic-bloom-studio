@@ -323,9 +323,21 @@ inline void report(DiditagainProcessor& proc,
 
     // --- Choir-mode safety state + warnings -------------------------------
     const bool choirMode = cLow.contains("choir") || cLow.contains("vox")
-                         || cLow.contains("vocal") || nLow.contains("choir");
+                         || cLow.contains("vocal") || nLow.contains("choir") || up.choirMode;
     const float fxSendReleaseMsLive = proc.getSynthEngine().getFxSendReleaseMs();
-    const float ampReleaseMsLive    = up.amp.releaseMs;
+    const auto choirFxSendCap = up.safety.hasChoirFxSendReleaseMaxMs
+        ? up.safety.choirFxSendReleaseMaxMs
+        : (up.fxSend.hasFxSendMaximumReleaseMs ? up.fxSend.fxSendMaximumReleaseMs : 180.0f);
+    const float choirFxSendReleaseMs = choirMode
+        ? juce::jlimit(40.0f, juce::jlimit(40.0f, 180.0f, choirFxSendCap),
+                       up.fxSend.hasFxSendReleaseMs ? up.fxSend.fxSendReleaseMs
+                                                    : juce::jmin(choirFxSendCap, up.amp.releaseMs
+                                                        * (up.fxSend.hasFxSendReleaseMultiplier ? up.fxSend.fxSendReleaseMultiplier : 0.35f)))
+        : fxSendReleaseMsLive;
+    const juce::String fxSendReleaseSource = choirMode ? juce::String("choirModeClamp")
+        : up.fxSend.hasFxSendReleaseMs ? juce::String("preset.fxSend.fxSendReleaseMs")
+        : up.fxSend.hasFxSendReleaseMultiplier ? juce::String("ampReleaseFallback")
+        : juce::String("categoryDefault");
     const bool  choirAmpReleaseClamped = choirMode && (up.amp.releaseMs > 900.0f);
     const bool  choirReverbCapApplied  = choirMode && reverbMix >= 0.219f;
     const bool  choirDelayCapApplied   = choirMode && delayMix  >= 0.029f;
@@ -335,7 +347,7 @@ inline void report(DiditagainProcessor& proc,
     {
         if (up.amp.releaseMs > 900.0f) warnings.add("CHOIR_RELEASE_TOO_LONG");
         if (reverbMix > 0.22f)         warnings.add("CHOIR_REVERB_TOO_WET");
-        if (delayMix  > 0.03f)         warnings.add("CHOIR_DELAY_TOO_HIGH");
+        if (delayMix  > 0.03f || delayFeedback > 0.08f) warnings.add("CHOIR_DELAY_TOO_HIGH");
         if (choirActiveVoiceCount > 8) warnings.add("CHOIR_TOO_MANY_OVERLAPPING_VOICES");
         if (fxSendReleaseMsLive > 180.0f) warnings.add("CHOIR_FX_SEND_TOO_LONG");
     }
@@ -451,14 +463,15 @@ inline void report(DiditagainProcessor& proc,
         << " fxTailClearOnPresetChange=" << (fxTailClearOnLoad ? "true" : "false")
         << " fxSendPostEnvelope=true"
         << " fxSendFollowsAmpEnvelope=true"
-        << " fxSendReleaseMs=" << juce::String(up.amp.releaseMs, 1)
+        << " fxSendReleaseMs=" << juce::String(fxSendReleaseMsLive, 1)
+        << " fxSendReleaseSource=" << fxSendReleaseSource
         << " noteOffStopsFxSend=true"
         << " clearFxOnTransportStop=true"
         << " transportStopFxFadeMs=120"
         << " clearFxTailOnPresetChange=" << (fxTailClearOnLoad ? "true" : "false")
         << " choirMode=" << (choirMode ? "true" : "false")
         << " choirAmpReleaseClamped=" << (choirAmpReleaseClamped ? "true" : "false")
-        << " choirFxSendReleaseMs=" << juce::String(fxSendReleaseMsLive, 1)
+        << " choirFxSendReleaseMs=" << juce::String(choirFxSendReleaseMs, 1)
         << " choirReverbCapApplied=" << (choirReverbCapApplied ? "true" : "false")
         << " choirDelayCapApplied=" << (choirDelayCapApplied ? "true" : "false")
         << " choirNoteDensityFxReduction=" << (choirNoteDensityFxReduction ? "true" : "false")
@@ -526,14 +539,15 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("fxTailClearOnPresetChange", fxTailClearOnLoad);
     j->setProperty("fxSendPostEnvelope",      true);
     j->setProperty("fxSendFollowsAmpEnvelope", true);
-    j->setProperty("fxSendReleaseMs",         up.amp.releaseMs);
+    j->setProperty("fxSendReleaseMs",         fxSendReleaseMsLive);
+    j->setProperty("fxSendReleaseSource",     fxSendReleaseSource);
     j->setProperty("noteOffStopsFxSend",      true);
     j->setProperty("clearFxOnTransportStop",  true);
     j->setProperty("transportStopFxFadeMs",   120);
     j->setProperty("clearFxTailOnPresetChange", fxTailClearOnLoad);
     j->setProperty("choirMode",                 choirMode);
     j->setProperty("choirAmpReleaseClamped",    choirAmpReleaseClamped);
-    j->setProperty("choirFxSendReleaseMs",      fxSendReleaseMsLive);
+    j->setProperty("choirFxSendReleaseMs",      choirFxSendReleaseMs);
     j->setProperty("choirReverbCapApplied",     choirReverbCapApplied);
     j->setProperty("choirDelayCapApplied",      choirDelayCapApplied);
     j->setProperty("choirNoteDensityFxReduction", choirNoteDensityFxReduction);
@@ -635,14 +649,15 @@ inline void report(DiditagainProcessor& proc,
               << "fxTailClearOnPresetChange: " << (fxTailClearOnLoad ? "true" : "false") << "\n"
               << "fxSendPostEnvelope: true\n"
               << "fxSendFollowsAmpEnvelope: true\n"
-              << "fxSendReleaseMs: "           << juce::String(up.amp.releaseMs, 1) << "\n"
+              << "fxSendReleaseMs: "           << juce::String(fxSendReleaseMsLive, 1) << "\n"
+              << "fxSendReleaseSource: "       << fxSendReleaseSource << "\n"
               << "noteOffStopsFxSend: true\n"
               << "clearFxOnTransportStop: true\n"
               << "transportStopFxFadeMs: 120\n"
               << "clearFxTailOnPresetChange: " << (fxTailClearOnLoad ? "true" : "false") << "\n"
               << "choirMode: "                 << (choirMode ? "true" : "false") << "\n"
               << "choirAmpReleaseClamped: "    << (choirAmpReleaseClamped ? "true" : "false") << "\n"
-              << "choirFxSendReleaseMs: "      << juce::String(fxSendReleaseMsLive, 1) << "\n"
+              << "choirFxSendReleaseMs: "      << juce::String(choirFxSendReleaseMs, 1) << "\n"
               << "choirReverbCapApplied: "     << (choirReverbCapApplied ? "true" : "false") << "\n"
               << "choirDelayCapApplied: "      << (choirDelayCapApplied ? "true" : "false") << "\n"
               << "choirNoteDensityFxReduction: " << (choirNoteDensityFxReduction ? "true" : "false") << "\n"

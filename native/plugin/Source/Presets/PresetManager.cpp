@@ -733,7 +733,9 @@ void PresetManager::applyPendingUserDiapresetAfterSampleLoad()
         { pfx.setReverbInputHighPassHz(360.0f); pfx.setReverbInputLowPassHz(4200.0f); pfx.setReverbDiffusion(0.45f); pfx.setReverbDucking(0.10f, 4.0f, 180.0f); pfx.setReverbLowMonoControl(340.0f, 0.0f); pfx.setReverbWidth(0.25f); }
         else if (c.contains("brass") || c.contains("trumpet") || c.contains("horn") || c.contains("trap"))
         { pfx.setReverbInputHighPassHz(240.0f); pfx.setReverbInputLowPassHz(5600.0f); pfx.setReverbDiffusion(0.54f); pfx.setReverbDucking(0.28f, 4.0f, 220.0f); pfx.setReverbLowMonoControl(320.0f, 0.03f); pfx.setReverbWidth(0.78f); }
-        else if (c.contains("pad") || c.contains("choir") || c.contains("vox") || c.contains("vocal") || c.contains("string") || c.contains("texture"))
+        else if (pendingUserDiapreset.choirMode || c.contains("choir") || c.contains("vox") || c.contains("vocal"))
+        { pfx.setReverbInputHighPassHz(300.0f); pfx.setReverbInputLowPassHz(5500.0f); pfx.setReverbDiffusion(0.69f); pfx.setReverbDucking(0.32f, 6.0f, 220.0f); pfx.setDelayDucking(0.50f, 5.0f, 140.0f); pfx.setNoteDensityFxReductionEnabled(true); pfx.setNoteDensityMaxReduction(0.35f); pfx.setDelayDensityWeight(1.0f); pfx.setReverbDensityWeight(0.75f); pfx.setChoirDensityMode(true); pfx.setReverbLowMonoControl(300.0f, 0.0f); pfx.setReverbWidth(0.90f); }
+        else if (c.contains("pad") || c.contains("string") || c.contains("texture"))
         { pfx.setReverbInputHighPassHz(350.0f); pfx.setReverbInputLowPassHz(7400.0f); pfx.setReverbDiffusion(0.69f); pfx.setReverbDucking(0.28f, 8.0f, 380.0f); pfx.setReverbLowMonoControl(350.0f, 0.04f); pfx.setReverbWidth(0.92f); }
         else if (c.contains("guitar"))
         { pfx.setReverbInputHighPassHz(280.0f); pfx.setReverbInputLowPassHz(4800.0f); pfx.setReverbDiffusion(0.58f); pfx.setReverbDucking(0.22f, 5.0f, 260.0f); pfx.setReverbLowMonoControl(300.0f, 0.05f); pfx.setReverbWidth(0.72f); }
