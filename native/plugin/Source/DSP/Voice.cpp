@@ -185,6 +185,13 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
 
     velocity = juce::jlimit(0.0f, 1.0f, vel);
     isActive = true;
+    fxSendLevel = 1.0f;
+    fxSendTarget = 1.0f;
+    fxSendReleaseStep = 0.0f;
+    fxSendReleaseSamples = 0;
+    fxSendReleaseCounter = 0;
+    fxSendActive = true;
+    noteReleasedForFxSend = false;
     recalcGlideCoeff();
 
     loZone = hiZone = nullptr;
@@ -280,9 +287,17 @@ void SynthVoice::stopNote(float, bool allowTailOff)
     ampEnv.noteOff();
     filterEnv.noteOff();
     modEnv.noteOff();
+    beginFxSendRelease(fxSendReleaseMs);
     for (auto& slot : partials_)
         if (slot.enabled && slot.engine) slot.engine->noteOff();
-    if (! allowTailOff) { clearCurrentNote(); reset(); }
+    if (! allowTailOff)
+    {
+        fxSendLevel = 0.0f;
+        fxSendTarget = 0.0f;
+        fxSendActive = false;
+        clearCurrentNote();
+        reset();
+    }
 }
 
 
@@ -867,6 +882,23 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             }
             peakSamp = peakOscB = peakSub = peakNoise = peakOut = 0.0f;
             meterFrameCounter = 0;
+        }
+
+        const float fxSendGain = nextFxSendGain();
+        if (auto* fxSendBuffer = currentFxSendRenderBuffer)
+        {
+            if (fxSendGain > 0.0f && s < fxSendBuffer->getNumSamples())
+            {
+                if (fxSendBuffer->getNumChannels() >= 2)
+                {
+                    fxSendBuffer->addSample(0, s, l * fxSendGain);
+                    fxSendBuffer->addSample(1, s, r * fxSendGain);
+                }
+                else if (fxSendBuffer->getNumChannels() > 0)
+                {
+                    fxSendBuffer->addSample(0, s, 0.5f * (l + r) * fxSendGain);
+                }
+            }
         }
 
         if (numCh >= 2) { outputBuffer.addSample(0, s, l); outputBuffer.addSample(1, s, r); }
