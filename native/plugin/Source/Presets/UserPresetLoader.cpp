@@ -182,6 +182,20 @@ bool parseFile(const juce::File& file, UserPreset& out, juce::String& errorOut)
     out.saturation.drive   = getF(sat, "drive",   out.saturation.drive);
     out.saturation.mix     = getF(sat, "mix",     out.saturation.mix);
 
+    auto fxSend = json.getProperty("fxSend", juce::var());
+    out.fxSend.hasFxSendReleaseMs = fxSend.isObject() && fxSend.hasProperty("fxSendReleaseMs");
+    out.fxSend.fxSendReleaseMs = getF(fxSend, "fxSendReleaseMs", out.fxSend.fxSendReleaseMs);
+    out.fxSend.hasFxSendMaximumReleaseMs = fxSend.isObject() && fxSend.hasProperty("fxSendMaximumReleaseMs");
+    out.fxSend.fxSendMaximumReleaseMs = getF(fxSend, "fxSendMaximumReleaseMs", out.fxSend.fxSendMaximumReleaseMs);
+    out.fxSend.hasFxSendReleaseMultiplier = fxSend.isObject() && fxSend.hasProperty("fxSendReleaseMultiplier");
+    out.fxSend.fxSendReleaseMultiplier = getF(fxSend, "fxSendReleaseMultiplier", out.fxSend.fxSendReleaseMultiplier);
+    out.fxSend.noteOffStopsFxSend = getB(fxSend, "noteOffStopsFxSend", out.fxSend.noteOffStopsFxSend);
+
+    out.choirMode = getB(json, "choirMode", out.choirMode);
+    auto safety = json.getProperty("safety", juce::var());
+    out.safety.hasChoirFxSendReleaseMaxMs = safety.isObject() && safety.hasProperty("choirFxSendReleaseMaxMs");
+    out.safety.choirFxSendReleaseMaxMs = getF(safety, "choirFxSendReleaseMaxMs", out.safety.choirFxSendReleaseMaxMs);
+
     auto mod = json.getProperty("modulation", juce::var());
     auto parseLfo = [](const juce::var& v, LfoBlock& l) {
         if (! v.isObject()) return;
