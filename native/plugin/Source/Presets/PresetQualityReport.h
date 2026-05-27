@@ -131,8 +131,9 @@ inline LoudnessTarget loudnessTargetForCategory(const juce::String& catIn)
     if (c.contains("brass") || c.contains("trumpet") || c.contains("horn")
         || c.contains("sax")  || c.contains("guitar"))
         return { -16.0f,  -8.0f };
-    if (c.contains("string") || c.contains("choir") || c.contains("vox")
-        || c.contains("vocal") || c.contains("pad"))
+    if (c.contains("choir") || c.contains("vox") || c.contains("vocal"))
+        return { -18.0f, -11.0f };
+    if (c.contains("string") || c.contains("pad"))
         return { -20.0f, -10.0f };
     if (c.contains("808") || c.contains("bass") || c.contains("sub"))
         return { -12.0f,  -6.0f };
