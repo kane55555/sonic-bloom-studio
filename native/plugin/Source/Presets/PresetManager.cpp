@@ -89,6 +89,11 @@ void PresetManager::scanPresetDirectory()
         + juce::String(diapresetCount)
         + " categories=" + juce::String(seenCats.size())
         + " sampleFoldersExposed=" + juce::String(showSampleFoldersInBrowser ? 1 : 0));
+
+    // Read-only hidden source-folder validation pass. Writes
+    // Logs/source_folder_validation.{json,txt} and emits one
+    // "[DIDITAGAIN source-validator]" line per folder. No audio behaviour.
+    dida::sourcevalidator::validateAll();
 }
 
 // Parse a trailing note token like "C3", "F#4", "Gb2", "Fs4" from a filename
