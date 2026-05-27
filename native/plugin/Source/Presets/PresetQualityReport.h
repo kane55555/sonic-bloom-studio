@@ -350,6 +350,22 @@ inline void report(DiditagainProcessor& proc,
                                        && delayDuckEnabled && std::abs(delayDuckAmount - 0.50f) < 0.001f;
     const int   choirActiveVoiceCount  = choirMode ? proc.getSynthEngine().getActiveVoiceCount() : 0;
     const bool  choirNoteDensityFxReduction = choirMode && noteDensityFxOn;
+
+    // -- Natural choir-mode state (sample-first vocal behavior) -------------
+    const bool  choirNaturalMode             = choirMode;
+    const float effectiveLayer2GainDb        = up.layer2.enabled ? up.layer2.gainDb : -120.0f;
+    const bool  choirSyntheticLayerDisabled  = choirMode
+                                              && (! up.layer2.enabled
+                                                  || effectiveLayer2GainDb <= -36.0f);
+    const float choirLayer2GainDb            = effectiveLayer2GainDb;
+    const bool  choirNearestFallbackUsed     = choirMode
+                                              && up.source.mappingMode.equalsIgnoreCase("nearest");
+    const bool  choirZoneTooFar              = choirNearestFallbackUsed; // best signal we have at load time
+    const float choirPitchShiftMaxSemis      = 0.0f; // populated by engine in future; reported for parity
+    const float choirHumanizePitchCents      = juce::jmin(up.advanced.humanizePitchCents, 0.5f);
+    const bool  choirUnisonDisabled          = choirMode; // engine enforces choir unison off via dspForCategory
+    const bool  choirAnalogDriftDisabled     = choirMode; // analog drift not engaged on choir path
+
     if (choirMode)
     {
         if (up.amp.releaseMs > 900.0f) warnings.add("CHOIR_RELEASE_TOO_LONG");
@@ -360,6 +376,15 @@ inline void report(DiditagainProcessor& proc,
         if (fxSendReleaseMsLive > 180.0f) warnings.add("CHOIR_FX_SEND_NOT_APPLIED");
         if (! choirDelayCapApplied) warnings.add("CHOIR_DELAY_CAP_NOT_APPLIED");
         if (! choirReverbCapApplied) warnings.add("CHOIR_REVERB_CAP_NOT_APPLIED");
+
+        // -- Natural-mode (sample-first) warnings --
+        if (up.layer2.enabled && effectiveLayer2GainDb > -36.0f)
+            warnings.add("CHOIR_SYNTH_LAYER_ACTIVE");
+        if (finalDb > -10.0f) warnings.add("CHOIR_TOO_HOT");
+        if (choirZoneTooFar)  warnings.add("CHOIR_ZONE_TOO_FAR");
+        const float choirChorusCap = (nLow.contains("wide") || nLow.contains("heaven")) ? 0.045f : 0.025f;
+        if (chorusMix > choirChorusCap + 0.001f) warnings.add("CHOIR_CHORUS_TOO_HIGH");
+        if (up.advanced.humanizePitchCents > 0.5f) warnings.add("CHOIR_DETUNE_TOO_HIGH");
     }
 
     // --- Loudness calibration (suggestion-only) ---------------------------
