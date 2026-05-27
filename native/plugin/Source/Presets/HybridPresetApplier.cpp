@@ -353,7 +353,21 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
     }
 
     // ---- Layer 2 oscillator body -> Osc B ----
-    if (bodyLayer != nullptr && bodyLayer->enabled)
+    if (naturalChoirMode)
+    {
+        setFloat(processor, "oscBLevel", 0.0f);
+        setFloat(processor, "oscBOctave", 0.0f);
+        setFloat(processor, "oscBSemi", 0.0f);
+        setFloat(processor, "oscBDetune", 0.0f);
+        setFloat(processor, "oscADetune", 0.0f);
+        setFloat(processor, "oscAOctave", 0.0f);
+        setFloat(processor, "oscASemi", 0.0f);
+        setFloat(processor, "unisonVoices", 1.0f);
+        setFloat(processor, "unisonDetune", 0.0f);
+        setFloat(processor, "unisonSpread", 0.0f);
+        setFloat(processor, "vintageAmount", 0.0f);
+    }
+    else if (bodyLayer != nullptr && bodyLayer->enabled)
     {
         setChoice(processor, "oscBWaveform", waveformToChoiceLabel(bodyLayer->waveform));
         setFloat (processor, "oscBLevel",    bodyLayer->volume);
@@ -369,13 +383,20 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
     }
 
     // ---- Layer 3 noise / air ----
-    if (airLayer != nullptr && airLayer->enabled)
+    if (naturalChoirMode)
+        setFloat(processor, "noiseLevel", 0.0f);
+    else if (airLayer != nullptr && airLayer->enabled)
         setFloat(processor, "noiseLevel", juce::jlimit(0.0f, 0.18f, airLayer->volume * 0.45f));
     else
         setFloat(processor, "noiseLevel", 0.0f);
 
     // ---- Layer 4 shimmer / sub ----
-    if (shimmerLayer != nullptr && shimmerLayer->enabled)
+    if (naturalChoirMode)
+    {
+        setBool (processor, "subOscEnabled", false);
+        setFloat(processor, "subOscLevel",   0.0f);
+    }
+    else if (shimmerLayer != nullptr && shimmerLayer->enabled)
     {
         setBool (processor, "subOscEnabled", true);
         setFloat(processor, "subOscLevel",   shimmerLayer->volume);
