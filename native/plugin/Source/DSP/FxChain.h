@@ -159,10 +159,14 @@ public:
         }
 
         dryFxScratch.setSize(buffer.getNumChannels(), buffer.getNumSamples(), false, false, true);
+        reverbWetScratch.setSize(buffer.getNumChannels(), buffer.getNumSamples(), false, false, true);
         dryFxScratch.makeCopyOf(buffer, true);
+
         delay.processWetOnly(buffer, dryFxScratch);
-        dryFxScratch.makeCopyOf(buffer, true);
-        reverb.processWetOnly(buffer, dryFxScratch);
+        reverbWetScratch.makeCopyOf(dryFxScratch, true);
+        reverb.processWetOnly(reverbWetScratch, dryFxScratch);
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+            buffer.addFrom(ch, 0, reverbWetScratch, ch, 0, buffer.getNumSamples());
 
         eq.process(buffer);
         comp.process(buffer);
@@ -425,6 +429,7 @@ private:
     GainStage        masterGain;
 
     juce::AudioBuffer<float> dryFxScratch;
+    juce::AudioBuffer<float> reverbWetScratch;
 
     juce::dsp::FirstOrderTPTFilter<float> wetHpL, wetHpR;
     float wetHpHz = 80.0f;
