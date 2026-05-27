@@ -745,7 +745,15 @@ void PresetManager::applyPendingUserDiapresetAfterSampleLoad()
                                    requestedSampleSources.size(),
                                    requestedSampleRawPath,
                                    requestedSampleResolvedFrom,
-                                   requestedSampleRawInsidePresetsUser);
+                                   requestedSampleRawInsidePresetsUser,
+                                   /*browserPresetName*/ {},
+                                   /*bankCategory*/ {},
+                                   requestedPresetFilePath,
+                                   requestedPresetCategoryFolder,
+                                   requestedExpectedSourceFolderName,
+                                   requestedAllowCrossCategorySource,
+                                   requestedSourceFolderWavCount,
+                                   requestedExtraSourceWarnings);
 }
 
 static void applyOscBlock(juce::AudioProcessor& proc, const juce::var& obj,
