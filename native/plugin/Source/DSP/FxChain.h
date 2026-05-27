@@ -52,6 +52,18 @@ public:
         // Capture pre-FX peak for the quality reporter.
         captureRecentPeak(buffer, fxInRecent);
 
+        // 0.5) Update note-density tracker from the dry buffer envelope and
+        //      compute the send multiplier shared by delay + reverb. This is
+        //      what stops scale runs and fast chords from turning into a
+        //      muddy reverb/delay cloud.
+        updateNoteDensity(buffer);
+        const float densityScale = noteDensityFxReductionEnabled
+            ? juce::jlimit(1.0f - maxDensityReduction, 1.0f,
+                           1.0f - densityEnv * maxDensityReduction)
+            : 1.0f;
+        delay.setSendDensityScale(densityScale);
+        reverb.setSendDensityScale(densityScale);
+
         // 1) Saturation
         if (saturationActive)
         {
