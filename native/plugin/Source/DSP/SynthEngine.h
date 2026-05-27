@@ -33,6 +33,7 @@ public:
                            int startSample, int numSamples);
 
     void resetForPresetChange();
+    void chokeAllFxSends(float fadeMs) noexcept;
     bool hasHeldNotes() const noexcept;
     bool hasActiveVoices() const noexcept;
     int getHeldNoteCount() const noexcept;
@@ -97,6 +98,8 @@ private:
 
     FxChain fx;
     LayerBusProcessor layerBus;
+    juce::AudioBuffer<float> dryRenderBuffer;
+    juce::AudioBuffer<float> fxSendBuffer;
     std::array<std::array<HeldNote, 128>, 16> heldNotes {};
     bool    monoMode = false;
     bool    fallbackSynthesisEnabled = true;
