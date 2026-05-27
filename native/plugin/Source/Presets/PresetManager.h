@@ -125,8 +125,14 @@ private:
     juce::String requestedCategory;
     // Debug/quality-report context for the most recently routed .diapreset.
     juce::String requestedSampleRawPath;       // sourceInstrument.path as written
-    juce::String requestedSampleResolvedFrom;  // "absoluteSourceInstrumentPath" | "fallbackSearch" | "notRequiredForEngine" | ""
+    juce::String requestedSampleResolvedFrom;  // "absoluteSourceInstrumentPath" | "categoryHiddenSourceFolder" | ...
     bool         requestedSampleRawInsidePresetsUser = false;
+    juce::String requestedPresetFilePath;
+    juce::String requestedPresetCategoryFolder;
+    juce::String requestedExpectedSourceFolderName;
+    bool         requestedAllowCrossCategorySource = false;
+    int          requestedSourceFolderWavCount = 0;
+    juce::StringArray requestedExtraSourceWarnings;
     dida::preset::MacroMapper macroMapper;
     bool requestedPresetIsUserDiapreset = false;
     bool pendingUserDiapresetApply = false;
