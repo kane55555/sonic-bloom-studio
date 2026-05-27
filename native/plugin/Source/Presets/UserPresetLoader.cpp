@@ -994,6 +994,20 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
         : 0.0f;
     setParamById(proc, "fxSaturationMix", satMix);
 
+    if (choirMode)
+    {
+        if (std::abs(p.delay.feedback - delayFeedback) > 0.001f)
+            juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-safety] effect=delay")
+                + " oldFeedback=" + juce::String(p.delay.feedback, 3)
+                + " newFeedback=" + juce::String(delayFeedback, 3)
+                + " reason=choirMode");
+        if (std::abs((p.delay.enabled ? p.delay.mix : 0.0f) - delayMix) > 0.001f)
+            juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-safety] effect=delay")
+                + " oldMix=" + juce::String(p.delay.enabled ? p.delay.mix : 0.0f, 3)
+                + " newMix=" + juce::String(delayMix, 3)
+                + " reason=choirMode");
+    }
+
     // -- LFOs (rate + shape; routing matrix is owned by the engine elsewhere)
     setParamById(proc, "lfo1Rate", p.lfo1.rateHz);
     setChoiceById(proc, "lfo1Shape", lfoShapeIndex(p.lfo1.shape));
@@ -1018,6 +1032,37 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     // -- Premium voicing: shared layer-bus + per-category reverb character.
     applyLayerBusCharacter(proc, p, fam);
     dida::preset::applyReverbCharacterForCategory(proc, p.category);
+    if (auto* dp = dynamic_cast<DiditagainProcessor*>(&proc))
+    {
+        auto& engine = dp->getSynthEngine();
+        if (choirMode)
+        {
+            const float fxSendReleaseMs = resolveFxSendReleaseMs(p, true);
+            engine.setFxSendReleaseMsForAll(fxSendReleaseMs);
+            auto& pfx = engine.getFx();
+            pfx.setReverbInputHighPassHz(300.0f);
+            pfx.setReverbInputLowPassHz(5500.0f);
+            pfx.setReverbDucking(0.32f, 6.0f, 220.0f);
+            pfx.setDelayDucking(0.50f, 5.0f, 140.0f);
+            pfx.setNoteDensityFxReductionEnabled(true);
+            pfx.setNoteDensityMaxReduction(0.35f);
+            pfx.setDelayDensityWeight(1.0f);
+            pfx.setReverbDensityWeight(0.75f);
+            pfx.setChoirDensityMode(true);
+            juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-fx-send] preset=") + p.presetName
+                + " fxSendReleaseMs=" + juce::String(fxSendReleaseMs, 1)
+                + " fxSendReleaseSource=" + fxSendReleaseSourceFor(p, true)
+                + " noteOffStopsFxSend=" + (p.fxSend.noteOffStopsFxSend ? "true" : "false"));
+        }
+        else
+        {
+            auto& pfx = engine.getFx();
+            pfx.setChoirDensityMode(false);
+            pfx.setNoteDensityMaxReduction(0.32f);
+            pfx.setDelayDensityWeight(1.0f);
+            pfx.setReverbDensityWeight(1.0f);
+        }
+    }
 
     // -- Mod-matrix translation: for the routings the engine natively
     //    understands, fold the entry's amount into the matching APVTS param
