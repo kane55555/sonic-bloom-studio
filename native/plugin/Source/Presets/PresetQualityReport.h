@@ -512,6 +512,15 @@ inline void report(DiditagainProcessor& proc,
         << " choirNoteDensityFxReduction=" << (choirNoteDensityFxReduction ? "true" : "false")
         << " choirActiveVoiceCount=" << choirActiveVoiceCount
         << " choirFxInputAfterNoteOffDb=" << juce::String(fxInDb, 2)
+        << " choirNaturalMode=" << (choirNaturalMode ? "true" : "false")
+        << " choirSyntheticLayerDisabled=" << (choirSyntheticLayerDisabled ? "true" : "false")
+        << " choirLayer2GainDb=" << juce::String(choirLayer2GainDb, 2)
+        << " choirPitchShiftMaxSemis=" << juce::String(choirPitchShiftMaxSemis, 2)
+        << " choirNearestFallbackUsed=" << (choirNearestFallbackUsed ? "true" : "false")
+        << " choirZoneTooFar=" << (choirZoneTooFar ? "true" : "false")
+        << " choirHumanizePitchCents=" << juce::String(choirHumanizePitchCents, 2)
+        << " choirUnisonDisabled=" << (choirUnisonDisabled ? "true" : "false")
+        << " choirAnalogDriftDisabled=" << (choirAnalogDriftDisabled ? "true" : "false")
         << " layer2Gain=" << fmt(up.layer2.gainDb, 2) << "dB"
         << " layer2BlendMode=" << (up.layer2.blendMode.isNotEmpty() ? up.layer2.blendMode : juce::String("auto"))
         << " layer2EqRole=" << (up.layer2.eqRole.isNotEmpty() ? up.layer2.eqRole : juce::String("auto"))
