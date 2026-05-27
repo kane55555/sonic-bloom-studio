@@ -681,6 +681,45 @@ FxLimits fxLimitsFor(Family f)
 
 }
 
+bool isChoirModePreset(const UserPreset& p)
+{
+    const auto c = p.category.toLowerCase();
+    const auto n = p.presetName.toLowerCase();
+    return p.choirMode || c.contains("choir") || c.contains("vox")
+        || c.contains("vocal") || n.contains("choir");
+}
+
+juce::String fxSendReleaseSourceFor(const UserPreset& p, bool choirMode)
+{
+    if (choirMode) return "choirModeClamp";
+    if (p.fxSend.hasFxSendReleaseMs) return "preset.fxSend.fxSendReleaseMs";
+    if (p.fxSend.hasFxSendReleaseMultiplier) return "ampReleaseFallback";
+    return "categoryDefault";
+}
+
+float resolveFxSendReleaseMs(const UserPreset& p, bool choirMode)
+{
+    if (choirMode)
+    {
+        const float maxMs = p.safety.hasChoirFxSendReleaseMaxMs
+            ? p.safety.choirFxSendReleaseMaxMs
+            : (p.fxSend.hasFxSendMaximumReleaseMs ? p.fxSend.fxSendMaximumReleaseMs : 180.0f);
+        const float requested = p.fxSend.hasFxSendReleaseMs
+            ? p.fxSend.fxSendReleaseMs
+            : juce::jmin(maxMs, p.amp.releaseMs * (p.fxSend.hasFxSendReleaseMultiplier
+                ? p.fxSend.fxSendReleaseMultiplier : 0.35f));
+        return juce::jlimit(40.0f, juce::jlimit(40.0f, 180.0f, maxMs), requested);
+    }
+
+    if (p.fxSend.hasFxSendReleaseMs)
+        return juce::jlimit(5.0f, 500.0f, p.fxSend.fxSendReleaseMs);
+
+    if (p.fxSend.hasFxSendReleaseMultiplier)
+        return juce::jlimit(5.0f, 500.0f, p.amp.releaseMs * p.fxSend.fxSendReleaseMultiplier);
+
+    return 80.0f;
+}
+
 void applyLayerBusCharacter(juce::AudioProcessor& proc, const UserPreset& p, Family fam)
 {
     auto* dp = dynamic_cast<DiditagainProcessor*>(&proc);
