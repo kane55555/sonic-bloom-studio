@@ -282,7 +282,13 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
         setFloat(processor, "env1Attack",  sampleLayer->ampEnv.attack);
         setFloat(processor, "env1Decay",   sampleLayer->ampEnv.decay);
         setFloat(processor, "env1Sustain", sampleLayer->ampEnv.sustain);
-        setFloat(processor, "env1Release", sampleLayer->ampEnv.release);
+        // Clamp release so notes actually stop when the key is lifted.
+        // Anything longer than ~0.8s sounds like the sample is ignoring
+        // note-off and "playing the whole source". Reverb/delay tails
+        // still provide ambient space without dragging the dry sample.
+        const float clampedRelease = juce::jlimit(0.001f, 0.8f,
+                                                  sampleLayer->ampEnv.release);
+        setFloat(processor, "env1Release", clampedRelease);
         setFloat(processor, "oscALevel",   sampleLayer->volume);
     }
     else if (p.hasSourceImport && p.sourceSamplePath.isNotEmpty())
