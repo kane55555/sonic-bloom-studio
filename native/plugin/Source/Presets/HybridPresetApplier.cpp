@@ -27,7 +27,7 @@ static CategoryDsp dspForCategory(const juce::String& categoryIn) noexcept
     if (c.contains("lead") || c.contains("alien"))     { d = { 7, 0.55f, 0.85f, 0.45f, 0.30f }; }
     else if (c.contains("pad") || c.contains("texture") || c.contains("ambient"))
                                                        { d = { 5, 0.35f, 0.90f, 0.25f, 0.55f }; }
-    else if (c.contains("choir") || c.contains("vox")) { d = { 4, 0.20f, 0.75f, 0.20f, 0.40f }; }
+    else if (c.contains("choir") || c.contains("vox")) { d = { 1, 0.00f, 0.00f, 0.00f, 0.00f }; }
     else if (c.contains("brass") || c.contains("horn")|| c.contains("trumpet"))
                                                        { d = { 3, 0.18f, 0.55f, 0.40f, 0.20f }; }
     else if (c.contains("piano") || c.contains("keys")){ d = { 1, 0.00f, 0.10f, 0.18f, 0.15f }; }
