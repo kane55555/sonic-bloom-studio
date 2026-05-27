@@ -933,13 +933,20 @@ void PresetManager::loadPreset(int index)
             }
         }
 
-        if (! resolved.isDirectory())
+        const bool sourceRequiredForEngine = dida::presetreport::engineRequiresSource(up);
+
+        if (! resolved.isDirectory() && sourceRequiredForEngine)
         {
             extraSourceWarnings.addIfNotAlreadyThere("SOURCE_MISSING");
             didaPresetManagerLog("diapreset source folder missing in category=" + effectiveCategory
                 + " presetCategoryFolder=" + presetCategoryFolder.getFullPathName()
                 + " expectedSourceFolderName=" + expectedSourceFolderName
                 + " path=" + up.source.path);
+        }
+        else if (! resolved.isDirectory())
+        {
+            didaPresetManagerLog("diapreset has no source folder but engine does not require one"
+                " (engineType=" + up.engineType + ") name=" + up.presetName);
         }
 
 
