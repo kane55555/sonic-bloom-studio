@@ -255,6 +255,8 @@ public:
     {
         reverbDensityWeight = juce::jlimit(0.0f, 1.0f, weight);
     }
+    void setChoirDensityMode(bool enabled) noexcept { choirDensityMode = enabled; }
+    void setActiveVoiceCountForDensity(int count) noexcept { activeVoiceCountForDensity = juce::jmax(0, count); }
 
     // ---- Global "scale-safe" preset toggle ----
     // When true, FX writes from the preset applier are gently tamed:
@@ -283,6 +285,8 @@ public:
     float getNoteDensityMaxReduction() const noexcept { return maxDensityReduction; }
     float getDelayDensityWeight() const noexcept { return delayDensityWeight; }
     float getReverbDensityWeight() const noexcept { return reverbDensityWeight; }
+    bool getChoirDensityMode() const noexcept { return choirDensityMode; }
+    int getActiveVoiceCountForDensity() const noexcept { return activeVoiceCountForDensity; }
 
     void setEqLowDb (float db) { eq.setLowDb(db); }
     void setEqMidDb (float db) { eq.setMidDb(db); }
@@ -438,6 +442,8 @@ private:
     bool  noteDensityFxReductionEnabled = true;
     bool  scaleSafeFxMode = true;
     bool  clearTailOnPresetChange = true;
+    bool  choirDensityMode = false;
+    int   activeVoiceCountForDensity = 0;
 
     Saturation       sat;
 
