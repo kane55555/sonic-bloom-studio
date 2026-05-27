@@ -306,8 +306,6 @@ inline void report(DiditagainProcessor& proc,
         if (! warnings.contains(w)) warnings.add(w);
     }
 
-    const auto cLow = effectiveCategory.toLowerCase();
-    const auto nLow = up.presetName.toLowerCase();
     const bool lowEndCat = cLow.contains("808") || cLow.contains("bass") || cLow.contains("sub");
     if (lowEndCat && (reverbMix > 0.10f || delayMix > 0.12f))
         warnings.add("TOO_MUCH_LOW_END");
@@ -329,8 +327,6 @@ inline void report(DiditagainProcessor& proc,
         warnings.add("REVERB_LOW_MID_BUILDUP");
 
     // --- Choir-mode safety state + warnings -------------------------------
-    const bool choirMode = cLow.contains("choir") || cLow.contains("vox")
-                         || cLow.contains("vocal") || nLow.contains("choir") || up.choirMode;
     const float fxSendReleaseMsLive = proc.getSynthEngine().getFxSendReleaseMs();
     const float choirFxSendRequested = up.fxSend.hasFxSendReleaseMs
         ? up.fxSend.fxSendReleaseMs
