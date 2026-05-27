@@ -291,6 +291,33 @@ static juce::File findCategorySourceFolder(const juce::File& userPresetRoot,
                 && folderHasAnyAudio(sub, true))
                 return sub;
 
+    // 2b) Disambiguate by preset-name keyword. When the category contains
+    //     several named instrument subfolders (e.g. Guitars/Acoustic vs
+    //     Guitars/Electric, Brass/Trumpet vs Brass/Trombone), route presets
+    //     whose name mentions a subfolder's name into that subfolder.
+    const auto presetStem = presetFile.getFileNameWithoutExtension().toLowerCase();
+    if (presetStem.isNotEmpty())
+    {
+        juce::File bestMatch;
+        int bestLen = 0;
+        for (auto& sub : subdirs)
+        {
+            const auto leaf = sub.getFileName().toLowerCase().trim();
+            if (leaf.isEmpty()) continue;
+            // Strip a trailing " <n>" or "<n>" from subfolder names
+            // ("Acoustic 1" -> "acoustic") so name-keyword matches still work.
+            auto stem = leaf;
+            while (stem.isNotEmpty() && (juce::CharacterFunctions::isDigit(stem.getLastCharacter())
+                                         || stem.getLastCharacter() == ' '))
+                stem = stem.dropLastCharacters(1);
+            if (stem.length() < 4) continue;            // skip "1", "alt" noise
+            if (! presetStem.containsWholeWord(stem)) continue;
+            if (! folderHasAnyAudio(sub, true)) continue;
+            if (stem.length() > bestLen) { bestMatch = sub; bestLen = stem.length(); }
+        }
+        if (bestMatch.isDirectory()) return bestMatch;
+    }
+
     // 3) Prefer mapped audio (midi-root suffix) anywhere in the category.
     if (folderHasMappedAudio(catDir, false)) return catDir;
     for (auto& sub : subdirs)
@@ -752,6 +779,33 @@ void PresetManager::loadPreset(int index)
                 didaPresetManagerLog("diapreset routed within category=" + effectiveCategory
                     + " folder=" + resolved.getFullPathName()
                     + " resolvedFrom=" + resolvedFrom);
+            }
+        }
+
+        // STEP 2.5 — Look under Samples/<Category>/ for a subfolder whose name
+        // is mentioned in the preset name (e.g. "Hard Pick Guitar" -> Electric
+        // vs. "Soft Velvet Guitar" -> Acoustic). This is what disambiguates
+        // banks that ship a single sourcePath but the user has multiple
+        // instrument variants on disk.
+        if (! resolved.isDirectory())
+        {
+            auto samplesRoot = dida::SampleLibrary::getSamplesRoot();
+            for (auto& variant : { effectiveCategory,
+                                   effectiveCategory.endsWithIgnoreCase("s")
+                                       ? effectiveCategory.dropLastCharacters(1)
+                                       : effectiveCategory + "s" })
+            {
+                auto catDir = samplesRoot.getChildFile(variant);
+                if (! catDir.isDirectory()) continue;
+                auto picked = findCategorySourceFolder(samplesRoot, variant, sourceLeaf, file);
+                if (picked.isDirectory())
+                {
+                    resolved = picked;
+                    resolvedFrom = "samplesCategoryKeyword";
+                    didaPresetManagerLog("diapreset routed via Samples/" + variant
+                        + " keyword folder=" + resolved.getFullPathName());
+                    break;
+                }
             }
         }
 
