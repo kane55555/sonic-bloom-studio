@@ -701,9 +701,9 @@ bool isChoirWidePreset(const UserPreset& p)
 float choirNaturalGainTrimDb(const UserPreset& p)
 {
     const auto n = p.presetName.toLowerCase();
-    if (n.contains("clean playable choir aah")) return -2.0f;
-    if (n.contains("dark controlled choir eeh")) return -6.0f;
-    if (n.contains("wide heaven choir ooh"))    return -3.0f;
+    if (n.contains("clean playable choir aah")) return  0.0f;  // +2 dB vs prior (-2)
+    if (n.contains("dark controlled choir eeh")) return -14.0f; // -8 dB vs prior (-6)
+    if (n.contains("wide heaven choir ooh"))    return -10.0f;  // -7 dB vs prior (-3)
     // Generic safety trim: choir samples are usually pre-normalised loud.
     return -3.0f;
 }
