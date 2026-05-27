@@ -168,14 +168,14 @@ public:
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
             buffer.addFrom(ch, 0, reverbWetScratch, ch, 0, buffer.getNumSamples());
 
-        eq.process(buffer);
-        comp.process(buffer);
         detectAndLogClipping(buffer);
         captureRecentPeak(buffer, fxOutRecent);
     }
 
     void finalizeOutput(juce::AudioBuffer<float>& buffer)
     {
+        eq.process(buffer);
+        comp.process(buffer);
         masterGain.process(buffer);
         detectAndLogClipping(buffer);
         captureRecentPeak(buffer, fxOutRecent);
