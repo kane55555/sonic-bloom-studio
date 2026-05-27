@@ -217,6 +217,22 @@ static juce::String filterTypeToChoice(const juce::String& t)
     return "LP24";
 }
 
+static bool isNaturalChoirPreset(const HybridPresetV2& p) noexcept
+{
+    const auto c = p.category.toLowerCase();
+    const auto n = p.name.toLowerCase();
+    return c.contains("choir") || c.contains("vox") || c.contains("vocal") || n.contains("choir");
+}
+
+static float naturalChoirReverbMix(const HybridPresetV2& p) noexcept
+{
+    const auto n = p.name.toLowerCase();
+    if (n.contains("clean playable choir aah")) return 0.10f;
+    if (n.contains("dark controlled choir eeh")) return 0.11f;
+    if (n.contains("wide heaven choir ooh"))    return 0.15f;
+    return (n.contains("wide") || n.contains("heaven")) ? 0.15f : 0.11f;
+}
+
 bool HybridPresetApplier::shouldLoopForCategory(const juce::String& category,
                                                 bool oneShotMode,
                                                 bool layerLoop)
