@@ -304,6 +304,22 @@ inline void report(DiditagainProcessor& proc,
     if (lowEndCat && (reverbMix > 0.10f || delayMix > 0.12f))
         warnings.add("TOO_MUCH_LOW_END");
 
+    // --- FX scale-safety warnings -----------------------------------------
+    // Big reverb on melodic/scale-friendly categories blurs note transitions.
+    const bool scaleSensitive = cLow.contains("piano")  || cLow.contains("rhodes")
+                             || cLow.contains("guitar") || cLow.contains("brass")
+                             || cLow.contains("sax")    || cLow.contains("trumpet")
+                             || cLow.contains("horn")   || cLow.contains("bell")
+                             || cLow.contains("pluck")  || cLow.contains("lead");
+    if (scaleSensitive && reverbSize > 0.65f)
+        warnings.add("REVERB_TOO_LONG_FOR_SCALE");
+    if (scaleSensitive && reverbMix > 0.30f && ! reverbDuckEnabled)
+        warnings.add("FX_TAIL_BUILDUP_RISK");
+    if (delayFeedback > 0.55f)
+        warnings.add("DELAY_FEEDBACK_TOO_HIGH");
+    if (reverbInputHpHz < 120.0f && reverbMix > 0.15f)
+        warnings.add("REVERB_LOW_MID_BUILDUP");
+
     // --- Loudness calibration (suggestion-only) ---------------------------
     const auto target = loudnessTargetForCategory(effectiveCategory);
     const float targetCenterDb = 0.5f * (target.minDb + target.maxDb);
