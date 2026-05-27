@@ -782,6 +782,33 @@ void PresetManager::loadPreset(int index)
             }
         }
 
+        // STEP 2.5 — Look under Samples/<Category>/ for a subfolder whose name
+        // is mentioned in the preset name (e.g. "Hard Pick Guitar" -> Electric
+        // vs. "Soft Velvet Guitar" -> Acoustic). This is what disambiguates
+        // banks that ship a single sourcePath but the user has multiple
+        // instrument variants on disk.
+        if (! resolved.isDirectory())
+        {
+            auto samplesRoot = dida::SampleLibrary::getSamplesRoot();
+            for (auto& variant : { effectiveCategory,
+                                   effectiveCategory.endsWithIgnoreCase("s")
+                                       ? effectiveCategory.dropLastCharacters(1)
+                                       : effectiveCategory + "s" })
+            {
+                auto catDir = samplesRoot.getChildFile(variant);
+                if (! catDir.isDirectory()) continue;
+                auto picked = findCategorySourceFolder(samplesRoot, variant, sourceLeaf, file);
+                if (picked.isDirectory())
+                {
+                    resolved = picked;
+                    resolvedFrom = "samplesCategoryKeyword";
+                    didaPresetManagerLog("diapreset routed via Samples/" + variant
+                        + " keyword folder=" + resolved.getFullPathName());
+                    break;
+                }
+            }
+        }
+
         // STEP 3 — Last-chance discovery anywhere under Samples/ via the
         // loader's resolver. Presets/User hits are accepted as hidden source
         // folders.
