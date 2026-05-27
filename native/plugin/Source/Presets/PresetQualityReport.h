@@ -532,6 +532,10 @@ inline void report(DiditagainProcessor& proc,
         << " choirNearestFallbackUsed=" << (choirNearestFallbackUsed ? "true" : "false")
         << " choirZoneTooFar=" << (choirZoneTooFar ? "true" : "false")
         << " choirHumanizePitchCents=" << juce::String(choirHumanizePitchCents, 2)
+        << " choirLayerDetuneCents=" << juce::String(choirLayerDetuneCents, 2)
+        << " choirOscBDetuneCents=" << juce::String(choirOscBDetuneCents, 2)
+        << " choirUnisonDetune=" << juce::String(choirUnisonDetune, 3)
+        << " choirVintageDriftCents=" << juce::String(choirVintageDriftCents, 2)
         << " choirUnisonDisabled=" << (choirUnisonDisabled ? "true" : "false")
         << " choirAnalogDriftDisabled=" << (choirAnalogDriftDisabled ? "true" : "false")
         << " layer2Gain=" << fmt(up.layer2.gainDb, 2) << "dB"
