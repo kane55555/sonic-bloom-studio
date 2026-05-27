@@ -431,7 +431,7 @@ inline void report(DiditagainProcessor& proc,
         << " fxTailClearOnPresetChange=" << (fxTailClearOnLoad ? "true" : "false")
         << " fxSendPostEnvelope=true"
         << " fxSendFollowsAmpEnvelope=true"
-        << " fxSendReleaseMs=" << juce::String(up.layer1.ampEnv.release * 1000.0f, 1)
+        << " fxSendReleaseMs=" << juce::String(up.amp.releaseMs, 1)
         << " noteOffStopsFxSend=true"
         << " clearFxOnTransportStop=true"
         << " transportStopFxFadeMs=120"
@@ -498,7 +498,7 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("fxTailClearOnPresetChange", fxTailClearOnLoad);
     j->setProperty("fxSendPostEnvelope",      true);
     j->setProperty("fxSendFollowsAmpEnvelope", true);
-    j->setProperty("fxSendReleaseMs",         up.layer1.ampEnv.release * 1000.0f);
+    j->setProperty("fxSendReleaseMs",         up.amp.releaseMs);
     j->setProperty("noteOffStopsFxSend",      true);
     j->setProperty("clearFxOnTransportStop",  true);
     j->setProperty("transportStopFxFadeMs",   120);
@@ -599,7 +599,7 @@ inline void report(DiditagainProcessor& proc,
               << "fxTailClearOnPresetChange: " << (fxTailClearOnLoad ? "true" : "false") << "\n"
               << "fxSendPostEnvelope: true\n"
               << "fxSendFollowsAmpEnvelope: true\n"
-              << "fxSendReleaseMs: "           << juce::String(up.layer1.ampEnv.release * 1000.0f, 1) << "\n"
+              << "fxSendReleaseMs: "           << juce::String(up.amp.releaseMs, 1) << "\n"
               << "noteOffStopsFxSend: true\n"
               << "clearFxOnTransportStop: true\n"
               << "transportStopFxFadeMs: 120\n"
