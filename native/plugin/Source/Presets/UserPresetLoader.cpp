@@ -924,11 +924,38 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
         }
     }
 
-    setParamById(proc, "oscBLevel",  p.layer2.enabled
-        ? juce::Decibels::decibelsToGain(layer2GainDb) : 0.0f);
+    // ---- Choir natural mode: synthetic layer-2 reinforcement is disabled by
+    //      default so vocal samples are heard as recorded, not as a pad. A
+    //      preset that explicitly wants air can still leave layer2 enabled,
+    //      but it must sit at <= -36 dB to stay below the recorded tone.
+    bool   choirSyntheticLayerDisabled = false;
+    float  choirLayer2GainDbOut = layer2GainDb;
+    bool   effectiveLayer2Enabled = p.layer2.enabled;
+    if (choirMode && p.layer2.enabled)
+    {
+        const auto wf = p.layer2.eqRole.toLowerCase(); // best signal we have here
+        const bool tooLoud = layer2GainDb > -36.0f;
+        if (! p.experimental && tooLoud)
+        {
+            effectiveLayer2Enabled = false;
+            choirSyntheticLayerDisabled = true;
+            choirLayer2GainDbOut = -120.0f;
+            juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-safety] preset=")
+                + p.presetName + " layer=layer2 reason=natural choir mode disabled synthetic reinforcement"
+                + " oldGainDb=" + juce::String(layer2GainDb, 2));
+        }
+        else if (tooLoud)
+        {
+            choirLayer2GainDbOut = -36.0f;
+        }
+        juce::ignoreUnused(wf);
+    }
+
+    setParamById(proc, "oscBLevel",  effectiveLayer2Enabled
+        ? juce::Decibels::decibelsToGain(choirLayer2GainDbOut) : 0.0f);
     setParamById(proc, "oscBOctave", static_cast<float>(p.layer2.octave));
     setParamById(proc, "oscBSemi",   static_cast<float>(p.layer2.semitone));
-    setParamById(proc, "oscBDetune", p.layer2.detuneCents);
+    setParamById(proc, "oscBDetune", choirMode ? 0.0f : p.layer2.detuneCents);
 
     // ---- eqRole wiring: per-layer carver cutoffs ----
     //
