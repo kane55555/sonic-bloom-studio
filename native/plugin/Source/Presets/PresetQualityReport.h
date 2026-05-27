@@ -386,13 +386,18 @@ inline void report(DiditagainProcessor& proc,
         if (! choirReverbCapApplied) warnings.add("CHOIR_REVERB_CAP_NOT_APPLIED");
 
         // -- Natural-mode (sample-first) warnings --
-        if (up.layer2.enabled && effectiveLayer2GainDb > -36.0f)
+        if (! choirSyntheticLayerDisabled && effectiveLayer2GainDb > -120.0f)
             warnings.add("CHOIR_SYNTH_LAYER_ACTIVE");
         if (finalDb > -10.0f) warnings.add("CHOIR_TOO_HOT");
         if (choirZoneTooFar)  warnings.add("CHOIR_ZONE_TOO_FAR");
-        const float choirChorusCap = (nLow.contains("wide") || nLow.contains("heaven")) ? 0.045f : 0.025f;
+        const float choirChorusCap = (nLow.contains("wide") || nLow.contains("heaven")) ? 0.015f : 0.0f;
         if (chorusMix > choirChorusCap + 0.001f) warnings.add("CHOIR_CHORUS_TOO_HIGH");
-        if (up.advanced.humanizePitchCents > 0.5f) warnings.add("CHOIR_DETUNE_TOO_HIGH");
+        if (std::abs(choirHumanizePitchCents) > 0.25f
+            || std::abs(choirLayerDetuneCents) > 0.25f
+            || std::abs(choirOscBDetuneCents) > 0.25f
+            || std::abs(choirUnisonDetune) > 0.25f
+            || std::abs(choirVintageDriftCents) > 0.25f)
+            warnings.add("CHOIR_DETUNE_TOO_HIGH");
     }
 
     // --- Loudness calibration (suggestion-only) ---------------------------
