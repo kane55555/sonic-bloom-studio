@@ -464,14 +464,15 @@ inline void report(DiditagainProcessor& proc,
         << " fxTailClearOnPresetChange=" << (fxTailClearOnLoad ? "true" : "false")
         << " fxSendPostEnvelope=true"
         << " fxSendFollowsAmpEnvelope=true"
-        << " fxSendReleaseMs=" << juce::String(up.amp.releaseMs, 1)
+        << " fxSendReleaseMs=" << juce::String(fxSendReleaseMsLive, 1)
+        << " fxSendReleaseSource=" << fxSendReleaseSource
         << " noteOffStopsFxSend=true"
         << " clearFxOnTransportStop=true"
         << " transportStopFxFadeMs=120"
         << " clearFxTailOnPresetChange=" << (fxTailClearOnLoad ? "true" : "false")
         << " choirMode=" << (choirMode ? "true" : "false")
         << " choirAmpReleaseClamped=" << (choirAmpReleaseClamped ? "true" : "false")
-        << " choirFxSendReleaseMs=" << juce::String(fxSendReleaseMsLive, 1)
+        << " choirFxSendReleaseMs=" << juce::String(choirFxSendReleaseMs, 1)
         << " choirReverbCapApplied=" << (choirReverbCapApplied ? "true" : "false")
         << " choirDelayCapApplied=" << (choirDelayCapApplied ? "true" : "false")
         << " choirNoteDensityFxReduction=" << (choirNoteDensityFxReduction ? "true" : "false")
@@ -539,14 +540,15 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("fxTailClearOnPresetChange", fxTailClearOnLoad);
     j->setProperty("fxSendPostEnvelope",      true);
     j->setProperty("fxSendFollowsAmpEnvelope", true);
-    j->setProperty("fxSendReleaseMs",         up.amp.releaseMs);
+    j->setProperty("fxSendReleaseMs",         fxSendReleaseMsLive);
+    j->setProperty("fxSendReleaseSource",     fxSendReleaseSource);
     j->setProperty("noteOffStopsFxSend",      true);
     j->setProperty("clearFxOnTransportStop",  true);
     j->setProperty("transportStopFxFadeMs",   120);
     j->setProperty("clearFxTailOnPresetChange", fxTailClearOnLoad);
     j->setProperty("choirMode",                 choirMode);
     j->setProperty("choirAmpReleaseClamped",    choirAmpReleaseClamped);
-    j->setProperty("choirFxSendReleaseMs",      fxSendReleaseMsLive);
+    j->setProperty("choirFxSendReleaseMs",      choirFxSendReleaseMs);
     j->setProperty("choirReverbCapApplied",     choirReverbCapApplied);
     j->setProperty("choirDelayCapApplied",      choirDelayCapApplied);
     j->setProperty("choirNoteDensityFxReduction", choirNoteDensityFxReduction);
