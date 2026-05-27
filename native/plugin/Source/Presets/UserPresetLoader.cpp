@@ -804,8 +804,16 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     // -- Source / category validation (non-fatal warning only)
     validateSourceForCategory(p);
 
-    // -- Master gain
-    setParamById(proc, "masterGain", p.amp.gainDb);
+    // -- Master gain (choir natural mode applies a per-preset trim so vocal
+    //    samples sit at -20..-10 dB instead of slamming the bus).
+    const float choirGainTrimDb = choirMode ? choirNaturalGainTrimDb(p) : 0.0f;
+    setParamById(proc, "masterGain", p.amp.gainDb + choirGainTrimDb);
+    if (choirMode && std::abs(choirGainTrimDb) > 0.001f)
+        juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-safety] preset=")
+            + p.presetName + " effect=ampGain"
+            + " oldGainDb=" + juce::String(p.amp.gainDb, 2)
+            + " newGainDb=" + juce::String(p.amp.gainDb + choirGainTrimDb, 2)
+            + " reason=choirNaturalGainTrim");
 
     // -- Amp env: clamped to per-category musical ranges
     clampEnvelopeForCategory(proc, p, fam);
