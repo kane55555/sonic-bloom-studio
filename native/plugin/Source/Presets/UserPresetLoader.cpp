@@ -1235,6 +1235,21 @@ juce::String toJson(const UserPreset& p)
     fx->setProperty("saturation", juce::var(sat));
     obj->setProperty("fx", juce::var(fx));
 
+    auto fxSend = new juce::DynamicObject();
+    if (p.fxSend.hasFxSendReleaseMs) fxSend->setProperty("fxSendReleaseMs", p.fxSend.fxSendReleaseMs);
+    if (p.fxSend.hasFxSendMaximumReleaseMs) fxSend->setProperty("fxSendMaximumReleaseMs", p.fxSend.fxSendMaximumReleaseMs);
+    if (p.fxSend.hasFxSendReleaseMultiplier) fxSend->setProperty("fxSendReleaseMultiplier", p.fxSend.fxSendReleaseMultiplier);
+    fxSend->setProperty("noteOffStopsFxSend", p.fxSend.noteOffStopsFxSend);
+    obj->setProperty("fxSend", juce::var(fxSend));
+
+    if (p.choirMode) obj->setProperty("choirMode", true);
+    if (p.safety.hasChoirFxSendReleaseMaxMs)
+    {
+        auto safety = new juce::DynamicObject();
+        safety->setProperty("choirFxSendReleaseMaxMs", p.safety.choirFxSendReleaseMaxMs);
+        obj->setProperty("safety", juce::var(safety));
+    }
+
     auto lfoToVar = [](const LfoBlock& l) {
         auto* o = new juce::DynamicObject();
         o->setProperty("enabled", l.enabled); o->setProperty("target", l.target);
