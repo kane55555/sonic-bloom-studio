@@ -504,10 +504,13 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
     const float wantDelayMix   = p.effects.delayEnabled  ? p.effects.delayMix  : 0.0f;
     const float wantDelayFb    = p.effects.delayFb;
 
-    const float reverbMix  = juce::jlimit(0.0f, caps.reverbMixMax,  wantReverbMix  * scaleSafeMixMul);
+    const float reverbMix  = choirMode ? naturalChoirReverbMix(p)
+                                       : juce::jlimit(0.0f, caps.reverbMixMax,  wantReverbMix  * scaleSafeMixMul);
     const float reverbSize = juce::jlimit(0.0f, caps.reverbSizeMax, wantReverbSize);
-    const float delayMix   = juce::jlimit(0.0f, caps.delayMixMax,   wantDelayMix   * scaleSafeMixMul);
-    const float delayFb    = juce::jlimit(0.0f, juce::jmax(0.0f, caps.delayFbMax + scaleSafeFbBias), wantDelayFb);
+    const float delayMix   = choirMode ? 0.0f
+                                       : juce::jlimit(0.0f, caps.delayMixMax,   wantDelayMix   * scaleSafeMixMul);
+    const float delayFb    = choirMode ? 0.0f
+                                       : juce::jlimit(0.0f, juce::jmax(0.0f, caps.delayFbMax + scaleSafeFbBias), wantDelayFb);
 
     logClamp("reverbMix",  wantReverbMix,  reverbMix,  "scale-safe reverb cap");
     logClamp("reverbSize", wantReverbSize, reverbSize, "scale-safe reverb cap");
@@ -521,8 +524,8 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
     float satMixOut     = wantSatMix;
     if (choirMode)
     {
-        const float chorusCap = choirWide ? 0.20f : caps.chorusMixMax;
-        const float satCap    = caps.satMixMax;
+        const float chorusCap = choirWide ? 0.015f : 0.0f;
+        const float satCap    = 0.0f;
         chorusMixOut = juce::jmin(wantChorusMix, chorusCap);
         satMixOut    = juce::jmin(wantSatMix,    satCap);
         if (std::abs(wantChorusMix - chorusMixOut) > 0.001f)
