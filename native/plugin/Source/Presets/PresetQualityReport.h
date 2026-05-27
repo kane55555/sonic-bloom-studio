@@ -323,8 +323,21 @@ inline void report(DiditagainProcessor& proc,
 
     // --- Choir-mode safety state + warnings -------------------------------
     const bool choirMode = cLow.contains("choir") || cLow.contains("vox")
-                         || cLow.contains("vocal") || nLow.contains("choir");
+                         || cLow.contains("vocal") || nLow.contains("choir") || up.choirMode;
     const float fxSendReleaseMsLive = proc.getSynthEngine().getFxSendReleaseMs();
+    const auto choirFxSendCap = up.safety.hasChoirFxSendReleaseMaxMs
+        ? up.safety.choirFxSendReleaseMaxMs
+        : (up.fxSend.hasFxSendMaximumReleaseMs ? up.fxSend.fxSendMaximumReleaseMs : 180.0f);
+    const float choirFxSendReleaseMs = choirMode
+        ? juce::jlimit(40.0f, juce::jlimit(40.0f, 180.0f, choirFxSendCap),
+                       up.fxSend.hasFxSendReleaseMs ? up.fxSend.fxSendReleaseMs
+                                                    : juce::jmin(choirFxSendCap, up.amp.releaseMs
+                                                        * (up.fxSend.hasFxSendReleaseMultiplier ? up.fxSend.fxSendReleaseMultiplier : 0.35f)))
+        : fxSendReleaseMsLive;
+    const juce::String fxSendReleaseSource = choirMode ? juce::String("choirModeClamp")
+        : up.fxSend.hasFxSendReleaseMs ? juce::String("preset.fxSend.fxSendReleaseMs")
+        : up.fxSend.hasFxSendReleaseMultiplier ? juce::String("ampReleaseFallback")
+        : juce::String("categoryDefault");
     const float ampReleaseMsLive    = up.amp.releaseMs;
     const bool  choirAmpReleaseClamped = choirMode && (up.amp.releaseMs > 900.0f);
     const bool  choirReverbCapApplied  = choirMode && reverbMix >= 0.219f;
@@ -335,7 +348,7 @@ inline void report(DiditagainProcessor& proc,
     {
         if (up.amp.releaseMs > 900.0f) warnings.add("CHOIR_RELEASE_TOO_LONG");
         if (reverbMix > 0.22f)         warnings.add("CHOIR_REVERB_TOO_WET");
-        if (delayMix  > 0.03f)         warnings.add("CHOIR_DELAY_TOO_HIGH");
+        if (delayMix  > 0.03f || delayFeedback > 0.08f) warnings.add("CHOIR_DELAY_TOO_HIGH");
         if (choirActiveVoiceCount > 8) warnings.add("CHOIR_TOO_MANY_OVERLAPPING_VOICES");
         if (fxSendReleaseMsLive > 180.0f) warnings.add("CHOIR_FX_SEND_TOO_LONG");
     }
