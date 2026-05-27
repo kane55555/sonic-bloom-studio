@@ -218,8 +218,23 @@ inline void report(DiditagainProcessor& proc,
     const float chorusMix = paramValue(proc, "fxChorusMix");
     const float delayMix  = paramValue(proc, "fxDelayMix");
     const float reverbMix = paramValue(proc, "fxReverbMix");
+    const float reverbSize = paramValue(proc, "fxReverbSize");
     const float satMix    = paramValue(proc, "fxSaturationMix");
     const int   polyphony = (int) paramValue(proc, "polyphony");
+
+    // --- Live FX-chain state for scale-safety report ----------------------
+    auto& reverbBlk = fx.getReverb();
+    auto& delayBlk  = fx.getDelay();
+    const float reverbDuckAmount   = reverbBlk.getDuckAmount();
+    const bool  reverbDuckEnabled  = reverbDuckAmount > 0.0001f;
+    const float reverbInputHpHz    = reverbBlk.getInputHighPassHz();
+    const float reverbInputLpHz    = reverbBlk.getInputLowPassHz();
+    const float delayDuckAmount    = delayBlk.getDuckAmount();
+    const bool  delayDuckEnabled   = delayDuckAmount > 0.0001f;
+    const float delayFeedback      = delayBlk.getFeedback();
+    const bool  scaleSafeFxMode    = fx.getScaleSafeFxMode();
+    const bool  noteDensityFxOn    = fx.getNoteDensityFxReductionEnabled();
+    const bool  fxTailClearOnLoad  = fx.getClearFxTailOnPresetChange();
 
     // --- Peak snapshots (last logged-frame peak; 0 = silent so far) -------
     const float busPeakDb   = bus.getRecentPeakDb();
@@ -288,6 +303,22 @@ inline void report(DiditagainProcessor& proc,
     const bool lowEndCat = cLow.contains("808") || cLow.contains("bass") || cLow.contains("sub");
     if (lowEndCat && (reverbMix > 0.10f || delayMix > 0.12f))
         warnings.add("TOO_MUCH_LOW_END");
+
+    // --- FX scale-safety warnings -----------------------------------------
+    // Big reverb on melodic/scale-friendly categories blurs note transitions.
+    const bool scaleSensitive = cLow.contains("piano")  || cLow.contains("rhodes")
+                             || cLow.contains("guitar") || cLow.contains("brass")
+                             || cLow.contains("sax")    || cLow.contains("trumpet")
+                             || cLow.contains("horn")   || cLow.contains("bell")
+                             || cLow.contains("pluck")  || cLow.contains("lead");
+    if (scaleSensitive && reverbSize > 0.65f)
+        warnings.add("REVERB_TOO_LONG_FOR_SCALE");
+    if (scaleSensitive && reverbMix > 0.30f && ! reverbDuckEnabled)
+        warnings.add("FX_TAIL_BUILDUP_RISK");
+    if (delayFeedback > 0.55f)
+        warnings.add("DELAY_FEEDBACK_TOO_HIGH");
+    if (reverbInputHpHz < 120.0f && reverbMix > 0.15f)
+        warnings.add("REVERB_LOW_MID_BUILDUP");
 
     // --- Loudness calibration (suggestion-only) ---------------------------
     const auto target = loudnessTargetForCategory(effectiveCategory);
@@ -388,6 +419,16 @@ inline void report(DiditagainProcessor& proc,
         << " delayMix=" << fmt(delayMix)
         << " chorusMix=" << fmt(chorusMix)
         << " saturationMix=" << fmt(satMix)
+        << " reverbDuckingEnabled=" << (reverbDuckEnabled ? "true" : "false")
+        << " reverbDuckingAmount=" << fmt(reverbDuckAmount)
+        << " reverbInputHighpassHz=" << juce::String(reverbInputHpHz, 1)
+        << " reverbInputLowpassHz=" << juce::String(reverbInputLpHz, 1)
+        << " delayDuckingEnabled=" << (delayDuckEnabled ? "true" : "false")
+        << " delayDuckingAmount=" << fmt(delayDuckAmount)
+        << " delayFeedback=" << fmt(delayFeedback)
+        << " scaleSafeFxMode=" << (scaleSafeFxMode ? "true" : "false")
+        << " noteDensityFxReduction=" << (noteDensityFxOn ? "true" : "false")
+        << " fxTailClearOnPresetChange=" << (fxTailClearOnLoad ? "true" : "false")
         << " layer2Gain=" << fmt(up.layer2.gainDb, 2) << "dB"
         << " layer2BlendMode=" << (up.layer2.blendMode.isNotEmpty() ? up.layer2.blendMode : juce::String("auto"))
         << " layer2EqRole=" << (up.layer2.eqRole.isNotEmpty() ? up.layer2.eqRole : juce::String("auto"))
@@ -438,6 +479,16 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("delayMix",               delayMix);
     j->setProperty("chorusMix",              chorusMix);
     j->setProperty("saturationMix",          satMix);
+    j->setProperty("reverbDuckingEnabled",   reverbDuckEnabled);
+    j->setProperty("reverbDuckingAmount",    reverbDuckAmount);
+    j->setProperty("reverbInputHighpassHz",  reverbInputHpHz);
+    j->setProperty("reverbInputLowpassHz",   reverbInputLpHz);
+    j->setProperty("delayDuckingEnabled",    delayDuckEnabled);
+    j->setProperty("delayDuckingAmount",     delayDuckAmount);
+    j->setProperty("delayFeedback",          delayFeedback);
+    j->setProperty("scaleSafeFxMode",        scaleSafeFxMode);
+    j->setProperty("noteDensityFxReduction", noteDensityFxOn);
+    j->setProperty("fxTailClearOnPresetChange", fxTailClearOnLoad);
     j->setProperty("layer2GainDb",           up.layer2.gainDb);
     j->setProperty("layer2BlendMode",        up.layer2.blendMode.isNotEmpty() ? up.layer2.blendMode : juce::String("auto"));
     j->setProperty("layer2EqRole",           up.layer2.eqRole.isNotEmpty() ? up.layer2.eqRole : juce::String("auto"));
@@ -522,6 +573,16 @@ inline void report(DiditagainProcessor& proc,
               << "fxInputPeakDb: "             << juce::String(fxInDb, 2)    << "\n"
               << "fxOutputPeakDb: "            << juce::String(fxOutDb, 2)   << "\n"
               << "finalPeakDb: "               << juce::String(finalDb, 2)   << "\n"
+              << "reverbDuckingEnabled: "      << (reverbDuckEnabled ? "true" : "false") << "\n"
+              << "reverbDuckingAmount: "       << juce::String(reverbDuckAmount, 3) << "\n"
+              << "reverbInputHighpassHz: "     << juce::String(reverbInputHpHz, 1) << "\n"
+              << "reverbInputLowpassHz: "      << juce::String(reverbInputLpHz, 1) << "\n"
+              << "delayDuckingEnabled: "       << (delayDuckEnabled ? "true" : "false") << "\n"
+              << "delayDuckingAmount: "        << juce::String(delayDuckAmount, 3) << "\n"
+              << "delayFeedback: "             << juce::String(delayFeedback, 3) << "\n"
+              << "scaleSafeFxMode: "           << (scaleSafeFxMode ? "true" : "false") << "\n"
+              << "noteDensityFxReduction: "    << (noteDensityFxOn ? "true" : "false") << "\n"
+              << "fxTailClearOnPresetChange: " << (fxTailClearOnLoad ? "true" : "false") << "\n"
               << "categoryTargetMinDb: "       << juce::String(target.minDb, 2) << "\n"
               << "categoryTargetMaxDb: "       << juce::String(target.maxDb, 2) << "\n"
               << "suggestedGainAdjustmentDb: " << (notesPlaying ? juce::String(suggestedGainDb, 2) : juce::String("n/a")) << "\n"

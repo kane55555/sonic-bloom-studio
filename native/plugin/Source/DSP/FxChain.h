@@ -52,6 +52,18 @@ public:
         // Capture pre-FX peak for the quality reporter.
         captureRecentPeak(buffer, fxInRecent);
 
+        // 0.5) Update note-density tracker from the dry buffer envelope and
+        //      compute the send multiplier shared by delay + reverb. This is
+        //      what stops scale runs and fast chords from turning into a
+        //      muddy reverb/delay cloud.
+        updateNoteDensity(buffer);
+        const float densityScale = noteDensityFxReductionEnabled
+            ? juce::jlimit(1.0f - maxDensityReduction, 1.0f,
+                           1.0f - densityEnv * maxDensityReduction)
+            : 1.0f;
+        delay.setSendDensityScale(densityScale);
+        reverb.setSendDensityScale(densityScale);
+
         // 1) Saturation
         if (saturationActive)
         {
@@ -156,6 +168,44 @@ public:
         reverb.notifyTransportPlaying();
     }
 
+    // ---- Delay scale-safety ----
+    void setDelayDucking(float amount, float attackMs = 5.0f, float releaseMs = 140.0f)
+    {
+        delay.setDucking(amount, attackMs, releaseMs);
+    }
+
+    // ---- Note-density-aware send reduction ----
+    void setNoteDensityFxReductionEnabled(bool enabled) noexcept { noteDensityFxReductionEnabled = enabled; }
+    void setNoteDensityMaxReduction(float amount) noexcept
+    {
+        maxDensityReduction = juce::jlimit(0.0f, 0.6f, amount);
+    }
+
+    // ---- Global "scale-safe" preset toggle ----
+    // When true, FX writes from the preset applier are gently tamed:
+    //  - reverb/delay mix scaled by 0.75
+    //  - delay feedback clamp tightened by -0.05
+    //  - reverb + delay ducking forced on
+    //  - density reduction always enabled
+    void setScaleSafeFxMode(bool on) noexcept { scaleSafeFxMode = on; }
+    bool getScaleSafeFxMode() const noexcept { return scaleSafeFxMode; }
+
+    void setClearFxTailOnPresetChange(bool on) noexcept { clearTailOnPresetChange = on; }
+    bool getClearFxTailOnPresetChange() const noexcept { return clearTailOnPresetChange; }
+
+    // Drains delay + reverb tank. Called by the preset applier when a new
+    // preset is loaded so old reverb tails don't bleed into new instruments.
+    void clearTimeFxTails()
+    {
+        delay.reset();
+        reverb.reset();
+    }
+
+    // Accessors used by the preset-quality reporter.
+    DelayBlock&  getDelay()  noexcept { return delay; }
+    ReverbBlock& getReverb() noexcept { return reverb; }
+    bool getNoteDensityFxReductionEnabled() const noexcept { return noteDensityFxReductionEnabled; }
+
     void setEqLowDb (float db) { eq.setLowDb(db); }
     void setEqMidDb (float db) { eq.setMidDb(db); }
     void setEqHighDb(float db) { eq.setHighDb(db); }
@@ -254,12 +304,60 @@ private:
         return lin > 1.0e-6f ? juce::Decibels::gainToDecibels(lin) : -120.0f;
     }
 
+    // Detect note onsets in the dry buffer (rising-edge envelope crossings)
+    // and decay them across ~500ms. The resulting `densityEnv` (0..~1) scales
+    // the reverb/delay sends so fast scales/chords don't pile up wet tails.
+    void updateNoteDensity(const juce::AudioBuffer<float>& buffer) noexcept
+    {
+        const int n = buffer.getNumSamples();
+        if (n <= 0) return;
+        const int nc = buffer.getNumChannels();
+        const auto* L = buffer.getReadPointer(0);
+        const auto* R = nc > 1 ? buffer.getReadPointer(1) : L;
+
+        // Lazy init time constants for current sample rate from buffer length;
+        // exact SR is captured by prepare on each block via reverb.prepare,
+        // but we don't have it directly here. Approximate with 44.1k — the
+        // density curve is intentionally forgiving.
+        constexpr float fastCoef    = 0.002f;   // ~10ms attack
+        constexpr float slowCoef    = 0.00003f; // ~500ms decay
+        constexpr float onsetThresh = 0.06f;
+
+        for (int i = 0; i < n; ++i)
+        {
+            const float x = 0.5f * (std::fabs(L[i]) + std::fabs(R[i]));
+            // Fast envelope
+            densityFast += (x - densityFast) * fastCoef;
+            // Detect rising edge above slow envelope by `onsetThresh`.
+            if (densityFast > densitySlow + onsetThresh
+                && (densityFast - densityLastFast) > 0.0f)
+            {
+                // Accumulate onset energy; saturate at 1.0.
+                densityEnv = juce::jmin(1.0f, densityEnv + 0.35f);
+            }
+            densityLastFast = densityFast;
+            densitySlow += (densityFast - densitySlow) * slowCoef;
+            // Decay density env back to 0 over ~500ms.
+            densityEnv *= (1.0f - slowCoef * 6.0f);
+            if (densityEnv < 0.0f) densityEnv = 0.0f;
+        }
+    }
+
     int clipFramesSinceLog = 100000;
     float fxInPeak = 0.0f;  int fxInFrames = 0;
     std::atomic<float> fxInRecent  { 0.0f };
     std::atomic<float> fxOutRecent { 0.0f };
     std::atomic<float> finalRecent { 0.0f };
 
+    // Density-aware FX send reduction state.
+    float densityFast = 0.0f;
+    float densitySlow = 0.0f;
+    float densityLastFast = 0.0f;
+    float densityEnv  = 0.0f;
+    float maxDensityReduction = 0.32f;
+    bool  noteDensityFxReductionEnabled = true;
+    bool  scaleSafeFxMode = true;
+    bool  clearTailOnPresetChange = true;
 
     Saturation       sat;
 

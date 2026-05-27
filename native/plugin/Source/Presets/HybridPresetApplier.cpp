@@ -358,16 +358,100 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
     setFloat (processor, "filter1Resonance", p.globalFilter.resonance);
     setFloat (processor, "filter1Drive",     p.globalFilter.drive);
 
-    // ---- Effects ----
-    setFloat(processor, "fxReverbMix",        p.effects.reverbEnabled ? juce::jlimit(0.0f, 0.38f, p.effects.reverbMix) : 0.0f);
-    setFloat(processor, "fxReverbSize",       juce::jlimit(0.0f, 0.72f, p.effects.reverbSize));
-    setFloat(processor, "fxDelayMix",         p.effects.delayEnabled  ? p.effects.delayMix  : 0.0f);
-    setFloat(processor, "fxDelayFeedback",    p.effects.delayFb);
+    // ---- Effects (scale-safe category caps) ------------------------------
+    // The user-facing complaint was that fast notes / scale runs piled the
+    // previous notes' reverb + delay tails on top of each other into a muddy
+    // pitch cloud. Defence-in-depth here: clamp mix / size / feedback per
+    // category, then apply reverb input filtering + ducking + delay ducking.
+    struct FxCaps {
+        float reverbMixMax  = 0.40f;
+        float reverbSizeMax = 0.70f;
+        float delayMixMax   = 0.30f;
+        float delayFbMax    = 0.40f;
+        float reverbHp      = 220.0f;
+        float reverbLp      = 7000.0f;
+        float reverbDuck    = 0.30f;
+        float reverbDuckRel = 220.0f;
+        float delayDuck     = 0.45f;
+        float delayDuckRel  = 140.0f;
+    };
+
+    auto fxCapsFor = [](const juce::String& catIn) -> FxCaps
+    {
+        const auto c = catIn.toLowerCase();
+        FxCaps k;
+        if (c.contains("rhodes"))                                              { k = { 0.20f, 0.52f, 0.10f, 0.18f, 200.0f, 6500.0f, 0.30f, 160.0f, 0.45f, 140.0f }; }
+        else if (c.contains("piano") || c.contains("keys"))                    { k = { 0.18f, 0.48f, 0.08f, 0.18f, 180.0f, 6500.0f, 0.30f, 160.0f, 0.45f, 140.0f }; }
+        else if (c.contains("acoustic"))                                       { k = { 0.22f, 0.55f, 0.08f, 0.22f, 220.0f, 5200.0f, 0.35f, 180.0f, 0.45f, 140.0f }; }
+        else if (c.contains("guitar"))                                         { k = { 0.28f, 0.58f, 0.10f, 0.22f, 220.0f, 5200.0f, 0.35f, 180.0f, 0.45f, 140.0f }; }
+        else if (c.contains("brass") || c.contains("trumpet") || c.contains("horn") || c.contains("sax")) { k = { 0.16f, 0.45f, 0.06f, 0.12f, 250.0f, 4200.0f, 0.45f, 120.0f, 0.50f, 120.0f }; }
+        else if (c.contains("choir") || c.contains("vox") || c.contains("vocal")) { k = { 0.28f, 0.65f, 0.20f, 0.18f, 180.0f, 7000.0f, 0.25f, 260.0f, 0.45f, 160.0f }; }
+        else if (c.contains("string") || c.contains("pad") || c.contains("texture") || c.contains("ambient")) { k = { 0.34f, 0.72f, 0.22f, 0.18f, 200.0f, 7200.0f, 0.25f, 260.0f, 0.45f, 160.0f }; }
+        else if (c.contains("bell"))                                           { k = { 0.24f, 0.55f, 0.15f, 0.24f, 350.0f, 8000.0f, 0.30f, 200.0f, 0.45f, 140.0f }; }
+        else if (c.contains("pluck"))                                          { k = { 0.22f, 0.50f, 0.14f, 0.22f, 260.0f, 8500.0f, 0.32f, 180.0f, 0.45f, 140.0f }; }
+        else if (c.contains("808") || c.contains("bass") || c.contains("sub")) { k = { 0.04f, 0.30f, 0.05f, 0.18f, 500.0f, 4200.0f, 0.20f, 160.0f, 0.40f, 140.0f }; }
+        else if (c.contains("lead") || c.contains("synth"))                    { k = { 0.22f, 0.55f, 0.12f, 0.20f, 200.0f, 8500.0f, 0.35f, 150.0f, 0.45f, 140.0f }; }
+        else if (c.contains("riser") || c.contains("fx"))                      { k = { 0.40f, 0.85f, 0.30f, 0.30f, 220.0f, 9000.0f, 0.25f, 320.0f, 0.40f, 180.0f }; }
+        return k;
+    };
+
+    const auto caps = fxCapsFor(p.category);
+
+    auto* fxChainPtr = [&processor]() -> FxChain* {
+        if (auto* dp = dynamic_cast<DiditagainProcessor*>(&processor))
+            return &dp->getSynthEngine().getFx();
+        return nullptr;
+    }();
+    const bool scaleSafe = fxChainPtr != nullptr && fxChainPtr->getScaleSafeFxMode();
+    const float scaleSafeMixMul = scaleSafe ? 0.75f : 1.0f;
+    const float scaleSafeFbBias = scaleSafe ? -0.05f : 0.0f;
+
+    auto logClamp = [&](const char* effect, float oldV, float newV, const char* reason) {
+        if (std::abs(oldV - newV) > 0.001f)
+            juce::Logger::writeToLog(juce::String("[DIDITAGAIN fx-safety] preset=") + p.name
+                + " category=" + p.category + " effect=" + effect
+                + " old=" + juce::String(oldV, 3) + " new=" + juce::String(newV, 3)
+                + " reason=" + reason);
+    };
+
+    const float wantReverbMix  = p.effects.reverbEnabled ? p.effects.reverbMix : 0.0f;
+    const float wantReverbSize = p.effects.reverbSize;
+    const float wantDelayMix   = p.effects.delayEnabled  ? p.effects.delayMix  : 0.0f;
+    const float wantDelayFb    = p.effects.delayFb;
+
+    const float reverbMix  = juce::jlimit(0.0f, caps.reverbMixMax,  wantReverbMix  * scaleSafeMixMul);
+    const float reverbSize = juce::jlimit(0.0f, caps.reverbSizeMax, wantReverbSize);
+    const float delayMix   = juce::jlimit(0.0f, caps.delayMixMax,   wantDelayMix   * scaleSafeMixMul);
+    const float delayFb    = juce::jlimit(0.0f, juce::jmax(0.0f, caps.delayFbMax + scaleSafeFbBias), wantDelayFb);
+
+    logClamp("reverbMix",  wantReverbMix,  reverbMix,  "scale-safe reverb cap");
+    logClamp("reverbSize", wantReverbSize, reverbSize, "scale-safe reverb cap");
+    logClamp("delayMix",   wantDelayMix,   delayMix,   "scale-safe delay cap");
+    logClamp("delayFb",    wantDelayFb,    delayFb,    "scale-safe delay feedback cap");
+
+    setFloat(processor, "fxReverbMix",        reverbMix);
+    setFloat(processor, "fxReverbSize",       reverbSize);
+    setFloat(processor, "fxDelayMix",         delayMix);
+    setFloat(processor, "fxDelayFeedback",    delayFb);
     setFloat(processor, "fxChorusMix",        p.effects.chorusEnabled ? p.effects.chorusMix : 0.0f);
     setFloat(processor, "fxDistortionAmount", p.effects.satEnabled    ? p.effects.satDrive  : 0.0f);
 
     // ---- Reverb character voiced per instrument family ----
     applyReverbCharacter(processor, p.category);
+
+    // ---- Reverb input filtering + delay ducking per category ----
+    if (fxChainPtr != nullptr)
+    {
+        fxChainPtr->setReverbInputHighPassHz(caps.reverbHp);
+        fxChainPtr->setReverbInputLowPassHz(caps.reverbLp);
+        fxChainPtr->setReverbDucking(caps.reverbDuck, 8.0f, caps.reverbDuckRel);
+        fxChainPtr->setDelayDucking(caps.delayDuck, 5.0f, caps.delayDuckRel);
+        fxChainPtr->setNoteDensityFxReductionEnabled(true);
+        // Drain old reverb/delay tails so the previous preset doesn't bleed in.
+        if (fxChainPtr->getClearFxTailOnPresetChange())
+            fxChainPtr->clearTimeFxTails();
+    }
+
     // Per-category hybrid-synth tuning (unison / spread / exciter / drift)
     // plus role-aware EQ carving and followMainEnvelope fade-in.
     const float mainAttackMs = (sampleLayer != nullptr)

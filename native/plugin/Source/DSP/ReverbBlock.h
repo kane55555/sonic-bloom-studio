@@ -69,7 +69,8 @@ public:
 
     void process(juce::AudioBuffer<float>& buffer) noexcept
     {
-        if (mix <= 0.0001f)
+        const float effectiveMix = mix * sendDensityScale;
+        if (effectiveMix <= 0.0001f)
         {
             reset();
             return;
@@ -126,8 +127,8 @@ public:
         auto* L = buffer.getWritePointer(0);
         auto* R = nc > 1 ? buffer.getWritePointer(1) : L;
 
-        const float dry = 1.0f - mix;
-        const float wet = mix;
+        const float dry = 1.0f - effectiveMix;
+        const float wet = effectiveMix;
         const float w   = juce::jlimit(0.0f, 1.0f, width);
 
         // Apply silence-watchdog decay: temporarily scale each comb's
@@ -231,6 +232,20 @@ public:
         lowStereoWidth = juce::jlimit(0.0f, 0.5f, lowWidth);
         dirty = true;
     }
+
+    /** External 0..1 multiplier on the wet send. FxChain pulls this down
+        when note density spikes (scale runs, fast chords) so the tail
+        doesn't pile up into a muddy pitch cloud. */
+    void setSendDensityScale(float s) noexcept { sendDensityScale = juce::jlimit(0.0f, 1.0f, s); }
+
+    // Live state accessors for the preset-quality reporter.
+    float getMix()             const noexcept { return mix; }
+    float getSize()            const noexcept { return size; }
+    float getInputHighPassHz() const noexcept { return juce::jmax(inputHpHz, inputHpFloorHz); }
+    float getInputLowPassHz()  const noexcept { return inputLpHz; }
+    float getDuckAmount()      const noexcept { return duckAmount; }
+    float getDuckAttackMs()    const noexcept { return duckAttackMs; }
+    float getDuckReleaseMs()   const noexcept { return duckReleaseMs; }
 
     /** Snap all internal tuning to a named character. Voicing is curated to
         match the spec (Studio/Hall/Dark/Dream/Vintage/Trap/Cathedral/Shimmer). */
@@ -489,5 +504,6 @@ private:
     Character character = Character::Studio;
     bool dirty = true;
     int silenceSamples = 0; // input-silence counter for tail watchdog
+    float sendDensityScale = 1.0f;
 };
 
