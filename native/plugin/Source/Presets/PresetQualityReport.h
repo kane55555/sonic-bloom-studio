@@ -218,8 +218,23 @@ inline void report(DiditagainProcessor& proc,
     const float chorusMix = paramValue(proc, "fxChorusMix");
     const float delayMix  = paramValue(proc, "fxDelayMix");
     const float reverbMix = paramValue(proc, "fxReverbMix");
+    const float reverbSize = paramValue(proc, "fxReverbSize");
     const float satMix    = paramValue(proc, "fxSaturationMix");
     const int   polyphony = (int) paramValue(proc, "polyphony");
+
+    // --- Live FX-chain state for scale-safety report ----------------------
+    auto& reverbBlk = fx.getReverb();
+    auto& delayBlk  = fx.getDelay();
+    const float reverbDuckAmount   = reverbBlk.getDuckAmount();
+    const bool  reverbDuckEnabled  = reverbDuckAmount > 0.0001f;
+    const float reverbInputHpHz    = reverbBlk.getInputHighPassHz();
+    const float reverbInputLpHz    = reverbBlk.getInputLowPassHz();
+    const float delayDuckAmount    = delayBlk.getDuckAmount();
+    const bool  delayDuckEnabled   = delayDuckAmount > 0.0001f;
+    const float delayFeedback      = delayBlk.getFeedback();
+    const bool  scaleSafeFxMode    = fx.getScaleSafeFxMode();
+    const bool  noteDensityFxOn    = fx.getNoteDensityFxReductionEnabled();
+    const bool  fxTailClearOnLoad  = fx.getClearFxTailOnPresetChange();
 
     // --- Peak snapshots (last logged-frame peak; 0 = silent so far) -------
     const float busPeakDb   = bus.getRecentPeakDb();
