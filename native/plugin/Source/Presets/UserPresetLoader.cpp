@@ -1008,6 +1008,13 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     setParamById(proc, "oscALevel",    1.0f);
     setParamById(proc, "subOscLevel",  0.0f);
     setParamById(proc, "noiseLevel",   0.0f);
+    setParamById(proc, "oscADetune",   choirMode ? 0.0f : p.main.detuneCents);
+    setParamById(proc, "oscAOctave",   choirMode ? 0.0f : static_cast<float>(p.main.octave));
+    setParamById(proc, "oscASemi",     choirMode ? 0.0f : static_cast<float>(p.main.semitone));
+    setParamById(proc, "unisonVoices", choirMode ? 1.0f : 1.0f);
+    setParamById(proc, "unisonDetune", choirMode ? 0.0f : 0.2f);
+    setParamById(proc, "unisonSpread", choirMode ? 0.0f : 0.5f);
+    setParamById(proc, "vintageAmount", choirMode ? 0.0f : 0.25f);
     for (auto* param : proc.getParameters())
         if (auto* b = dynamic_cast<juce::AudioParameterBool*>(param))
             if (b->paramID == "subOscEnabled") setParamRaw(b, 0.0f);
