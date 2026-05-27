@@ -1040,6 +1040,10 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
             const float fxSendReleaseMs = resolveFxSendReleaseMs(p, true);
             engine.setFxSendReleaseMsForAll(fxSendReleaseMs);
             auto& pfx = engine.getFx();
+            pfx.setDelayMix(delayMix);
+            pfx.setDelayFeedback(delayFeedback);
+            pfx.setReverbMix(reverbMix);
+            pfx.setReverbSize(reverbSize);
             pfx.setReverbInputHighPassHz(300.0f);
             pfx.setReverbInputLowPassHz(5500.0f);
             pfx.setReverbDucking(0.32f, 6.0f, 220.0f);
