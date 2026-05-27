@@ -429,6 +429,13 @@ inline void report(DiditagainProcessor& proc,
         << " scaleSafeFxMode=" << (scaleSafeFxMode ? "true" : "false")
         << " noteDensityFxReduction=" << (noteDensityFxOn ? "true" : "false")
         << " fxTailClearOnPresetChange=" << (fxTailClearOnLoad ? "true" : "false")
+        << " fxSendPostEnvelope=true"
+        << " fxSendFollowsAmpEnvelope=true"
+        << " fxSendReleaseMs=" << juce::String(up.amp.releaseMs, 1)
+        << " noteOffStopsFxSend=true"
+        << " clearFxOnTransportStop=true"
+        << " transportStopFxFadeMs=120"
+        << " clearFxTailOnPresetChange=" << (fxTailClearOnLoad ? "true" : "false")
         << " layer2Gain=" << fmt(up.layer2.gainDb, 2) << "dB"
         << " layer2BlendMode=" << (up.layer2.blendMode.isNotEmpty() ? up.layer2.blendMode : juce::String("auto"))
         << " layer2EqRole=" << (up.layer2.eqRole.isNotEmpty() ? up.layer2.eqRole : juce::String("auto"))
@@ -489,6 +496,13 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("scaleSafeFxMode",        scaleSafeFxMode);
     j->setProperty("noteDensityFxReduction", noteDensityFxOn);
     j->setProperty("fxTailClearOnPresetChange", fxTailClearOnLoad);
+    j->setProperty("fxSendPostEnvelope",      true);
+    j->setProperty("fxSendFollowsAmpEnvelope", true);
+    j->setProperty("fxSendReleaseMs",         up.amp.releaseMs);
+    j->setProperty("noteOffStopsFxSend",      true);
+    j->setProperty("clearFxOnTransportStop",  true);
+    j->setProperty("transportStopFxFadeMs",   120);
+    j->setProperty("clearFxTailOnPresetChange", fxTailClearOnLoad);
     j->setProperty("layer2GainDb",           up.layer2.gainDb);
     j->setProperty("layer2BlendMode",        up.layer2.blendMode.isNotEmpty() ? up.layer2.blendMode : juce::String("auto"));
     j->setProperty("layer2EqRole",           up.layer2.eqRole.isNotEmpty() ? up.layer2.eqRole : juce::String("auto"));
@@ -583,6 +597,13 @@ inline void report(DiditagainProcessor& proc,
               << "scaleSafeFxMode: "           << (scaleSafeFxMode ? "true" : "false") << "\n"
               << "noteDensityFxReduction: "    << (noteDensityFxOn ? "true" : "false") << "\n"
               << "fxTailClearOnPresetChange: " << (fxTailClearOnLoad ? "true" : "false") << "\n"
+              << "fxSendPostEnvelope: true\n"
+              << "fxSendFollowsAmpEnvelope: true\n"
+              << "fxSendReleaseMs: "           << juce::String(up.amp.releaseMs, 1) << "\n"
+              << "noteOffStopsFxSend: true\n"
+              << "clearFxOnTransportStop: true\n"
+              << "transportStopFxFadeMs: 120\n"
+              << "clearFxTailOnPresetChange: " << (fxTailClearOnLoad ? "true" : "false") << "\n"
               << "categoryTargetMinDb: "       << juce::String(target.minDb, 2) << "\n"
               << "categoryTargetMaxDb: "       << juce::String(target.maxDb, 2) << "\n"
               << "suggestedGainAdjustmentDb: " << (notesPlaying ? juce::String(suggestedGainDb, 2) : juce::String("n/a")) << "\n"
