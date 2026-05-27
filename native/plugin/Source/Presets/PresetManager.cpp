@@ -255,7 +255,7 @@ static juce::File resolveCategoryDir(const juce::File& userPresetRoot, const juc
     return {};
 }
 
-static juce::File findCategorySourceFolder(const juce::File& userPresetRoot,
+[[maybe_unused]] static juce::File findCategorySourceFolder(const juce::File& userPresetRoot,
                                            const juce::String& category,
                                            const juce::String& preferredLeaf,
                                            const juce::File& presetFile)
