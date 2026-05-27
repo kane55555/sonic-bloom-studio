@@ -514,6 +514,7 @@ inline void report(DiditagainProcessor& proc,
               << "expectedSourceFolderName: "  << expectedSourceFolderNameIn << "\n"
               << "allowCrossCategorySource: "  << (allowCrossCategorySourceIn ? "true" : "false") << "\n"
               << "sourceFolderWavCount: "      << sourceFolderWavCountIn   << "\n"
+              << "sourceRequiredForEngine: "   << (needsSource ? "true" : "false") << "\n"
               << "wavZones: "                  << wavZones             << "\n"
               << "activeLayers: "              << activeLayers         << "\n"
               << "activePartials: "            << activePartials       << "\n"
