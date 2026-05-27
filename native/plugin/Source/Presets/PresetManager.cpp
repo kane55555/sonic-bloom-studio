@@ -826,10 +826,46 @@ void PresetManager::loadPreset(int index)
 
         didaPresetManagerLog("loading diapreset: " + up.presetName);
 
-        // The .diapreset's actual parent folder is the authoritative category.
-        // This guarantees "Acoustic Guitars/Foo.diapreset" routes to that
-        // folder no matter what info.category or up.category say.
-        const auto parentFolderName = file.getParentDirectory().getFileName();
+        const auto rawSourcePath = up.source.path.trim();
+        const auto rawNormSlash  = rawSourcePath.replaceCharacter('\\', '/');
+        const bool rawIsAbsolute = rawSourcePath.isNotEmpty()
+                                && juce::File::isAbsolutePath(rawNormSlash);
+        const bool rawIsInsidePresetsUser = rawNormSlash.containsIgnoreCase("/Samples/Presets/User/");
+
+        // The .diapreset's parent folder is the default authoritative category.
+        // EXCEPTION: when sourceInstrument.path explicitly points inside a
+        // different "Presets/User/<OtherCategory>/..." folder that actually
+        // exists on disk, treat THAT folder as the authoritative category.
+        // This prevents e.g. an "Acoustic Guitar" preset that was dropped into
+        // the wrong Guitars folder from being normalised down to "Guitars" and
+        // routed to "Guitar 1".
+        auto parentFolderName = file.getParentDirectory().getFileName();
+        juce::File presetCategoryFolder = file.getParentDirectory();
+
+        if (rawIsInsidePresetsUser)
+        {
+            const int marker = rawNormSlash.indexOfIgnoreCase("/Samples/Presets/User/");
+            if (marker >= 0)
+            {
+                const auto tail = rawNormSlash.substring(marker + juce::String("/Samples/Presets/User/").length());
+                const int slash = tail.indexOfChar('/');
+                const auto otherCat = (slash > 0 ? tail.substring(0, slash) : tail).trim();
+                if (otherCat.isNotEmpty()
+                    && ! otherCat.equalsIgnoreCase(parentFolderName))
+                {
+                    auto candidate = file.getParentDirectory().getParentDirectory().getChildFile(otherCat);
+                    if (candidate.isDirectory())
+                    {
+                        didaPresetManagerLog("diapreset category overridden by sourceInstrument.path"
+                            " from=" + parentFolderName + " to=" + otherCat
+                            + " file=" + file.getFullPathName());
+                        presetCategoryFolder = candidate;
+                        parentFolderName = otherCat;
+                    }
+                }
+            }
+        }
+
         const auto effectiveCategoryRaw = parentFolderName.isNotEmpty()
             ? parentFolderName
             : (info.category.isNotEmpty() ? info.category
@@ -837,15 +873,8 @@ void PresetManager::loadPreset(int index)
         const auto effectiveCategory = normalizeCategoryAlias(effectiveCategoryRaw);
         const auto sourceLeaf = juce::File(up.source.path.replaceCharacter('\\', '/')).getFileName();
 
-        const auto rawSourcePath = up.source.path.trim();
-        const auto rawNormSlash  = rawSourcePath.replaceCharacter('\\', '/');
-        const bool rawIsAbsolute = rawSourcePath.isNotEmpty()
-                                && juce::File::isAbsolutePath(rawNormSlash);
-        const bool rawIsInsidePresetsUser = rawNormSlash.containsIgnoreCase("/Samples/Presets/User/");
-
-        // STRICT per-category routing. The .diapreset's parent folder on disk
-        // *is* the category folder; we never reach across categories.
-        const juce::File presetCategoryFolder = file.getParentDirectory();
+        // STRICT per-category routing. We only search inside presetCategoryFolder
+        // and never reach across categories.
         const auto expectedNames = expectedSourceFolderNames(effectiveCategory);
         const juce::String expectedSourceFolderName =
             expectedNames.isEmpty() ? juce::String() : expectedNames[0];
