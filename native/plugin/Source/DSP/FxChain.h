@@ -170,6 +170,12 @@ public:
 
         eq.process(buffer);
         comp.process(buffer);
+        detectAndLogClipping(buffer);
+        captureRecentPeak(buffer, fxOutRecent);
+    }
+
+    void finalizeOutput(juce::AudioBuffer<float>& buffer)
+    {
         masterGain.process(buffer);
         detectAndLogClipping(buffer);
         captureRecentPeak(buffer, fxOutRecent);
