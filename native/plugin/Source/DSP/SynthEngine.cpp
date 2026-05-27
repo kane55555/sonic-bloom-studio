@@ -34,6 +34,7 @@ void SynthEngine::renderBlockWithFx(juce::AudioBuffer<float>& buffer,
     SynthVoice::endFxSendRender();
     updateHeldNotes(midi);
     layerBus.process(dryRenderBuffer);
+    fx.setActiveVoiceCountForDensity(getActiveVoiceCount());
     fx.processWetSend(fxSendBuffer);
 
     buffer.makeCopyOf(dryRenderBuffer, true);
