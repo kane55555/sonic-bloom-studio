@@ -820,9 +820,14 @@ void PresetManager::loadPreset(int index)
 
         didaPresetManagerLog("loading diapreset: " + up.presetName);
 
-        const auto effectiveCategoryRaw = info.category.isNotEmpty()
-            ? info.category
-            : (up.category.isNotEmpty() ? up.category : juce::String("User"));
+        // The .diapreset's actual parent folder is the authoritative category.
+        // This guarantees "Acoustic Guitars/Foo.diapreset" routes to that
+        // folder no matter what info.category or up.category say.
+        const auto parentFolderName = file.getParentDirectory().getFileName();
+        const auto effectiveCategoryRaw = parentFolderName.isNotEmpty()
+            ? parentFolderName
+            : (info.category.isNotEmpty() ? info.category
+                : (up.category.isNotEmpty() ? up.category : juce::String("User")));
         const auto effectiveCategory = normalizeCategoryAlias(effectiveCategoryRaw);
         const auto sourceLeaf = juce::File(up.source.path.replaceCharacter('\\', '/')).getFileName();
 
