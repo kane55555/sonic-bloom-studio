@@ -27,7 +27,7 @@ static CategoryDsp dspForCategory(const juce::String& categoryIn) noexcept
     if (c.contains("lead") || c.contains("alien"))     { d = { 7, 0.55f, 0.85f, 0.45f, 0.30f }; }
     else if (c.contains("pad") || c.contains("texture") || c.contains("ambient"))
                                                        { d = { 5, 0.35f, 0.90f, 0.25f, 0.55f }; }
-    else if (c.contains("choir") || c.contains("vox")) { d = { 4, 0.20f, 0.75f, 0.20f, 0.40f }; }
+    else if (c.contains("choir") || c.contains("vox")) { d = { 1, 0.00f, 0.00f, 0.00f, 0.00f }; }
     else if (c.contains("brass") || c.contains("horn")|| c.contains("trumpet"))
                                                        { d = { 3, 0.18f, 0.55f, 0.40f, 0.20f }; }
     else if (c.contains("piano") || c.contains("keys")){ d = { 1, 0.00f, 0.10f, 0.18f, 0.15f }; }
@@ -217,6 +217,22 @@ static juce::String filterTypeToChoice(const juce::String& t)
     return "LP24";
 }
 
+static bool isNaturalChoirPreset(const HybridPresetV2& p) noexcept
+{
+    const auto c = p.category.toLowerCase();
+    const auto n = p.name.toLowerCase();
+    return c.contains("choir") || c.contains("vox") || c.contains("vocal") || n.contains("choir");
+}
+
+static float naturalChoirReverbMix(const HybridPresetV2& p) noexcept
+{
+    const auto n = p.name.toLowerCase();
+    if (n.contains("clean playable choir aah")) return 0.10f;
+    if (n.contains("dark controlled choir eeh")) return 0.11f;
+    if (n.contains("wide heaven choir ooh"))    return 0.15f;
+    return (n.contains("wide") || n.contains("heaven")) ? 0.15f : 0.11f;
+}
+
 bool HybridPresetApplier::shouldLoopForCategory(const juce::String& category,
                                                 bool oneShotMode,
                                                 bool layerLoop)
@@ -243,6 +259,7 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
     AppliedPresetState out;
     out.preset   = p;
     out.category = p.category;
+    const bool naturalChoirMode = isNaturalChoirPreset(p);
 
     // ---- Locate logical layers ----
     const LayerV2* sampleLayer = nullptr;
@@ -336,7 +353,21 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
     }
 
     // ---- Layer 2 oscillator body -> Osc B ----
-    if (bodyLayer != nullptr && bodyLayer->enabled)
+    if (naturalChoirMode)
+    {
+        setFloat(processor, "oscBLevel", 0.0f);
+        setFloat(processor, "oscBOctave", 0.0f);
+        setFloat(processor, "oscBSemi", 0.0f);
+        setFloat(processor, "oscBDetune", 0.0f);
+        setFloat(processor, "oscADetune", 0.0f);
+        setFloat(processor, "oscAOctave", 0.0f);
+        setFloat(processor, "oscASemi", 0.0f);
+        setFloat(processor, "unisonVoices", 1.0f);
+        setFloat(processor, "unisonDetune", 0.0f);
+        setFloat(processor, "unisonSpread", 0.0f);
+        setFloat(processor, "vintageAmount", 0.0f);
+    }
+    else if (bodyLayer != nullptr && bodyLayer->enabled)
     {
         setChoice(processor, "oscBWaveform", waveformToChoiceLabel(bodyLayer->waveform));
         setFloat (processor, "oscBLevel",    bodyLayer->volume);
@@ -352,13 +383,20 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
     }
 
     // ---- Layer 3 noise / air ----
-    if (airLayer != nullptr && airLayer->enabled)
+    if (naturalChoirMode)
+        setFloat(processor, "noiseLevel", 0.0f);
+    else if (airLayer != nullptr && airLayer->enabled)
         setFloat(processor, "noiseLevel", juce::jlimit(0.0f, 0.18f, airLayer->volume * 0.45f));
     else
         setFloat(processor, "noiseLevel", 0.0f);
 
     // ---- Layer 4 shimmer / sub ----
-    if (shimmerLayer != nullptr && shimmerLayer->enabled)
+    if (naturalChoirMode)
+    {
+        setBool (processor, "subOscEnabled", false);
+        setFloat(processor, "subOscLevel",   0.0f);
+    }
+    else if (shimmerLayer != nullptr && shimmerLayer->enabled)
     {
         setBool (processor, "subOscEnabled", true);
         setFloat(processor, "subOscLevel",   shimmerLayer->volume);
@@ -466,10 +504,13 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
     const float wantDelayMix   = p.effects.delayEnabled  ? p.effects.delayMix  : 0.0f;
     const float wantDelayFb    = p.effects.delayFb;
 
-    const float reverbMix  = juce::jlimit(0.0f, caps.reverbMixMax,  wantReverbMix  * scaleSafeMixMul);
+    const float reverbMix  = choirMode ? naturalChoirReverbMix(p)
+                                       : juce::jlimit(0.0f, caps.reverbMixMax,  wantReverbMix  * scaleSafeMixMul);
     const float reverbSize = juce::jlimit(0.0f, caps.reverbSizeMax, wantReverbSize);
-    const float delayMix   = juce::jlimit(0.0f, caps.delayMixMax,   wantDelayMix   * scaleSafeMixMul);
-    const float delayFb    = juce::jlimit(0.0f, juce::jmax(0.0f, caps.delayFbMax + scaleSafeFbBias), wantDelayFb);
+    const float delayMix   = choirMode ? 0.0f
+                                       : juce::jlimit(0.0f, caps.delayMixMax,   wantDelayMix   * scaleSafeMixMul);
+    const float delayFb    = choirMode ? 0.0f
+                                       : juce::jlimit(0.0f, juce::jmax(0.0f, caps.delayFbMax + scaleSafeFbBias), wantDelayFb);
 
     logClamp("reverbMix",  wantReverbMix,  reverbMix,  "scale-safe reverb cap");
     logClamp("reverbSize", wantReverbSize, reverbSize, "scale-safe reverb cap");
@@ -483,8 +524,8 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
     float satMixOut     = wantSatMix;
     if (choirMode)
     {
-        const float chorusCap = choirWide ? 0.20f : caps.chorusMixMax;
-        const float satCap    = caps.satMixMax;
+        const float chorusCap = choirWide ? 0.015f : 0.0f;
+        const float satCap    = 0.0f;
         chorusMixOut = juce::jmin(wantChorusMix, chorusCap);
         satMixOut    = juce::jmin(wantSatMix,    satCap);
         if (std::abs(wantChorusMix - chorusMixOut) > 0.001f)

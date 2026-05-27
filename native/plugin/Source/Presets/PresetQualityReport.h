@@ -131,8 +131,9 @@ inline LoudnessTarget loudnessTargetForCategory(const juce::String& catIn)
     if (c.contains("brass") || c.contains("trumpet") || c.contains("horn")
         || c.contains("sax")  || c.contains("guitar"))
         return { -16.0f,  -8.0f };
-    if (c.contains("string") || c.contains("choir") || c.contains("vox")
-        || c.contains("vocal") || c.contains("pad"))
+    if (c.contains("choir") || c.contains("vox") || c.contains("vocal"))
+        return { -18.0f, -11.0f };
+    if (c.contains("string") || c.contains("pad"))
         return { -20.0f, -10.0f };
     if (c.contains("808") || c.contains("bass") || c.contains("sub"))
         return { -12.0f,  -6.0f };
@@ -208,9 +209,12 @@ inline void report(DiditagainProcessor& proc,
                          || cLow.contains("vocal") || nLow.contains("choir") || up.choirMode;
 
     // --- Layer / partial counts -------------------------------------------
-    int activeLayers = (up.main.enabled ? 1 : 0) + (up.layer2.enabled ? 1 : 0);
+    const bool naturalChoirSampleOnly = choirMode;
+    int activeLayers = (up.main.enabled ? 1 : 0)
+                     + ((up.layer2.enabled && ! naturalChoirSampleOnly) ? 1 : 0);
     int activePartials = 0;
-    for (auto& p : up.partials) if (p.enabled) ++activePartials;
+    if (! naturalChoirSampleOnly)
+        for (auto& p : up.partials) if (p.enabled) ++activePartials;
 
     const juce::String engineType = up.engineType.isNotEmpty() ? up.engineType
                                   : (up.partials.size() > 0 ? juce::String("layered") : juce::String("pcm"));
@@ -352,19 +356,24 @@ inline void report(DiditagainProcessor& proc,
     const bool  choirNoteDensityFxReduction = choirMode && noteDensityFxOn;
 
     // -- Natural choir-mode state (sample-first vocal behavior) -------------
-    const bool  choirNaturalMode             = choirMode;
-    const float effectiveLayer2GainDb        = up.layer2.enabled ? up.layer2.gainDb : -120.0f;
-    const bool  choirSyntheticLayerDisabled  = choirMode
-                                              && (! up.layer2.enabled
-                                                  || effectiveLayer2GainDb <= -36.0f);
+    const bool  choirNaturalMode             = naturalChoirSampleOnly;
+    const float effectiveLayer2GainDb        = naturalChoirSampleOnly ? -120.0f
+                                               : (up.layer2.enabled ? up.layer2.gainDb : -120.0f);
+    const bool  choirSyntheticLayerDisabled  = choirMode && effectiveLayer2GainDb <= -120.0f;
     const float choirLayer2GainDb            = effectiveLayer2GainDb;
     const bool  choirNearestFallbackUsed     = choirMode
                                               && up.source.mappingMode.equalsIgnoreCase("nearest");
     const bool  choirZoneTooFar              = choirNearestFallbackUsed; // best signal we have at load time
     const float choirPitchShiftMaxSemis      = 0.0f; // populated by engine in future; reported for parity
-    const float choirHumanizePitchCents      = juce::jmin(up.advanced.humanizePitchCents, 0.5f);
-    const bool  choirUnisonDisabled          = choirMode; // engine enforces choir unison off via dspForCategory
-    const bool  choirAnalogDriftDisabled     = choirMode; // analog drift not engaged on choir path
+    const float choirHumanizePitchCents      = choirMode ? juce::jmin(up.advanced.humanizePitchCents, 0.25f)
+                                                         : up.advanced.humanizePitchCents;
+    const float choirLayerDetuneCents        = choirMode ? 0.0f : up.main.detuneCents;
+    const float choirOscBDetuneCents         = choirMode ? paramValue(proc, "oscBDetune") : up.layer2.detuneCents;
+    const float choirUnisonDetune            = choirMode ? paramValue(proc, "unisonDetune") : 0.0f;
+    const float choirVintageDriftCents       = choirMode ? paramValue(proc, "vintageAmount") * 2.5f : 0.0f;
+    const bool  choirUnisonDisabled          = choirMode && paramValue(proc, "unisonVoices") <= 1.01f
+                                            && std::abs(choirUnisonDetune) <= 0.0001f;
+    const bool  choirAnalogDriftDisabled     = choirMode && std::abs(choirVintageDriftCents) <= 0.0001f;
 
     if (choirMode)
     {
@@ -378,13 +387,18 @@ inline void report(DiditagainProcessor& proc,
         if (! choirReverbCapApplied) warnings.add("CHOIR_REVERB_CAP_NOT_APPLIED");
 
         // -- Natural-mode (sample-first) warnings --
-        if (up.layer2.enabled && effectiveLayer2GainDb > -36.0f)
+        if (! choirSyntheticLayerDisabled && effectiveLayer2GainDb > -120.0f)
             warnings.add("CHOIR_SYNTH_LAYER_ACTIVE");
         if (finalDb > -10.0f) warnings.add("CHOIR_TOO_HOT");
         if (choirZoneTooFar)  warnings.add("CHOIR_ZONE_TOO_FAR");
-        const float choirChorusCap = (nLow.contains("wide") || nLow.contains("heaven")) ? 0.045f : 0.025f;
+        const float choirChorusCap = (nLow.contains("wide") || nLow.contains("heaven")) ? 0.015f : 0.0f;
         if (chorusMix > choirChorusCap + 0.001f) warnings.add("CHOIR_CHORUS_TOO_HIGH");
-        if (up.advanced.humanizePitchCents > 0.5f) warnings.add("CHOIR_DETUNE_TOO_HIGH");
+        if (std::abs(choirHumanizePitchCents) > 0.25f
+            || std::abs(choirLayerDetuneCents) > 0.25f
+            || std::abs(choirOscBDetuneCents) > 0.25f
+            || std::abs(choirUnisonDetune) > 0.25f
+            || std::abs(choirVintageDriftCents) > 0.25f)
+            warnings.add("CHOIR_DETUNE_TOO_HIGH");
     }
 
     // --- Loudness calibration (suggestion-only) ---------------------------
@@ -519,6 +533,10 @@ inline void report(DiditagainProcessor& proc,
         << " choirNearestFallbackUsed=" << (choirNearestFallbackUsed ? "true" : "false")
         << " choirZoneTooFar=" << (choirZoneTooFar ? "true" : "false")
         << " choirHumanizePitchCents=" << juce::String(choirHumanizePitchCents, 2)
+        << " choirLayerDetuneCents=" << juce::String(choirLayerDetuneCents, 2)
+        << " choirOscBDetuneCents=" << juce::String(choirOscBDetuneCents, 2)
+        << " choirUnisonDetune=" << juce::String(choirUnisonDetune, 3)
+        << " choirVintageDriftCents=" << juce::String(choirVintageDriftCents, 2)
         << " choirUnisonDisabled=" << (choirUnisonDisabled ? "true" : "false")
         << " choirAnalogDriftDisabled=" << (choirAnalogDriftDisabled ? "true" : "false")
         << " layer2Gain=" << fmt(up.layer2.gainDb, 2) << "dB"
@@ -604,6 +622,10 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("choirNearestFallbackUsed",    choirNearestFallbackUsed);
     j->setProperty("choirZoneTooFar",             choirZoneTooFar);
     j->setProperty("choirHumanizePitchCents",     choirHumanizePitchCents);
+    j->setProperty("choirLayerDetuneCents",       choirLayerDetuneCents);
+    j->setProperty("choirOscBDetuneCents",        choirOscBDetuneCents);
+    j->setProperty("choirUnisonDetune",           choirUnisonDetune);
+    j->setProperty("choirVintageDriftCents",      choirVintageDriftCents);
     j->setProperty("choirUnisonDisabled",         choirUnisonDisabled);
     j->setProperty("choirAnalogDriftDisabled",    choirAnalogDriftDisabled);
     j->setProperty("layer2GainDb",           up.layer2.gainDb);
@@ -723,6 +745,10 @@ inline void report(DiditagainProcessor& proc,
               << "choirNearestFallbackUsed: "    << (choirNearestFallbackUsed ? "true" : "false") << "\n"
               << "choirZoneTooFar: "             << (choirZoneTooFar ? "true" : "false") << "\n"
               << "choirHumanizePitchCents: "     << juce::String(choirHumanizePitchCents, 2) << "\n"
+              << "choirLayerDetuneCents: "       << juce::String(choirLayerDetuneCents, 2) << "\n"
+              << "choirOscBDetuneCents: "        << juce::String(choirOscBDetuneCents, 2) << "\n"
+              << "choirUnisonDetune: "           << juce::String(choirUnisonDetune, 3) << "\n"
+              << "choirVintageDriftCents: "      << juce::String(choirVintageDriftCents, 2) << "\n"
               << "choirUnisonDisabled: "         << (choirUnisonDisabled ? "true" : "false") << "\n"
               << "choirAnalogDriftDisabled: "    << (choirAnalogDriftDisabled ? "true" : "false") << "\n"
               << "categoryTargetMinDb: "       << juce::String(target.minDb, 2) << "\n"

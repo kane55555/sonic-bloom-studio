@@ -701,11 +701,20 @@ bool isChoirWidePreset(const UserPreset& p)
 float choirNaturalGainTrimDb(const UserPreset& p)
 {
     const auto n = p.presetName.toLowerCase();
-    if (n.contains("clean playable choir aah")) return -7.0f;
-    if (n.contains("dark controlled choir eeh")) return -9.0f;
-    if (n.contains("wide heaven choir ooh"))    return -4.0f;
+    if (n.contains("clean playable choir aah")) return -2.0f;
+    if (n.contains("dark controlled choir eeh")) return -6.0f;
+    if (n.contains("wide heaven choir ooh"))    return -3.0f;
     // Generic safety trim: choir samples are usually pre-normalised loud.
     return -3.0f;
+}
+
+float choirNaturalReverbMix(const UserPreset& p) noexcept
+{
+    const auto n = p.presetName.toLowerCase();
+    if (n.contains("clean playable choir aah")) return 0.10f;
+    if (n.contains("dark controlled choir eeh")) return 0.11f;
+    if (n.contains("wide heaven choir ooh"))    return 0.15f;
+    return isChoirWidePreset(p) ? 0.15f : 0.11f;
 }
 
 juce::String fxSendReleaseSourceFor(const UserPreset& p, bool choirMode)
@@ -748,8 +757,19 @@ void applyLayerBusCharacter(juce::AudioProcessor& proc, const UserPreset& p, Fam
     const float warmth   = juce::jlimit(0.0f, 1.0f, p.macros.warmth);
     const float width    = juce::jlimit(0.0f, 1.0f, p.macros.width);
     const float movement = juce::jlimit(0.0f, 1.0f, p.macros.movement);
+    const bool naturalChoir = isChoirModePreset(p);
 
     bus.setEnabled(true);
+    if (naturalChoir)
+    {
+        bus.setSaturationDrive(0.0f);
+        bus.setSaturationMix(0.0f);
+        bus.setWidth(juce::jlimit(0.0f, 1.4f, 0.85f * (0.6f + width * 0.5f)));
+        bus.setDriftRate(0.0f);
+        bus.setDriftDepth(0.0f);
+        return;
+    }
+
     // Synth family gets much gentler glue so the shared tanh doesn't pile on
     // top of per-voice saturation. Other families keep their original curve.
     const bool synthFam = (fam == Family::Synth);
@@ -924,37 +944,27 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
         }
     }
 
-    // ---- Choir natural mode: synthetic layer-2 reinforcement is disabled by
-    //      default so vocal samples are heard as recorded, not as a pad. A
-    //      preset that explicitly wants air can still leave layer2 enabled,
-    //      but it must sit at <= -36 dB to stay below the recorded tone.
+    // ---- Choir natural mode: force sample-only playback. Long vocal WAVs
+    //      already contain the tone; oscillator/air support layers turn Eeh/Ooh
+    //      into synth pads, so never allow layer2 in natural choir mode.
     bool   choirSyntheticLayerDisabled = false;
     float  choirLayer2GainDbOut = layer2GainDb;
     bool   effectiveLayer2Enabled = p.layer2.enabled;
-    if (choirMode && p.layer2.enabled)
+    if (choirMode)
     {
-        const auto wf = p.layer2.eqRole.toLowerCase(); // best signal we have here
-        const bool tooLoud = layer2GainDb > -36.0f;
-        if (! p.experimental && tooLoud)
-        {
-            effectiveLayer2Enabled = false;
-            choirSyntheticLayerDisabled = true;
-            choirLayer2GainDbOut = -120.0f;
+        effectiveLayer2Enabled = false;
+        choirSyntheticLayerDisabled = true;
+        choirLayer2GainDbOut = -120.0f;
+        if (p.layer2.enabled || layer2GainDb > -120.0f)
             juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-safety] preset=")
-                + p.presetName + " layer=layer2 reason=natural choir mode disabled synthetic reinforcement"
+                + p.presetName + " layer=layer2 reason=natural choir mode forced sample-only"
                 + " oldGainDb=" + juce::String(layer2GainDb, 2));
-        }
-        else if (tooLoud)
-        {
-            choirLayer2GainDbOut = -36.0f;
-        }
-        juce::ignoreUnused(wf);
     }
 
     setParamById(proc, "oscBLevel",  effectiveLayer2Enabled
         ? juce::Decibels::decibelsToGain(choirLayer2GainDbOut) : 0.0f);
-    setParamById(proc, "oscBOctave", static_cast<float>(p.layer2.octave));
-    setParamById(proc, "oscBSemi",   static_cast<float>(p.layer2.semitone));
+    setParamById(proc, "oscBOctave", choirMode ? 0.0f : static_cast<float>(p.layer2.octave));
+    setParamById(proc, "oscBSemi",   choirMode ? 0.0f : static_cast<float>(p.layer2.semitone));
     setParamById(proc, "oscBDetune", choirMode ? 0.0f : p.layer2.detuneCents);
 
     // ---- eqRole wiring: per-layer carver cutoffs ----
@@ -1009,6 +1019,16 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     setParamById(proc, "oscALevel",    1.0f);
     setParamById(proc, "subOscLevel",  0.0f);
     setParamById(proc, "noiseLevel",   0.0f);
+    if (choirMode)
+    {
+        setParamById(proc, "oscADetune", 0.0f);
+        setParamById(proc, "oscAOctave", 0.0f);
+        setParamById(proc, "oscASemi",   0.0f);
+        setParamById(proc, "unisonVoices", 1.0f);
+        setParamById(proc, "unisonDetune", 0.0f);
+        setParamById(proc, "unisonSpread", 0.0f);
+        setParamById(proc, "vintageAmount", 0.0f);
+    }
     for (auto* param : proc.getParameters())
         if (auto* b = dynamic_cast<juce::AudioParameterBool*>(param))
             if (b->paramID == "subOscEnabled") setParamRaw(b, 0.0f);
@@ -1020,25 +1040,24 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     const float space   = juce::jlimit(0.0f, 1.0f, p.macros.space);
     const float reverbBase = p.reverb.enabled ? p.reverb.mix : 0.0f;
     const bool choirIsWide = choirMode && isChoirWidePreset(p);
-    // Natural choir mode: reverb mix ceiling tightens from 0.22 to 0.16 for
-    // clean/dark variants (0.20 for wide/heaven) so vocal samples stay in a
-    // room rather than swimming in a pad-style wash. Delay stays off.
-    const float reverbCap = choirMode ? (choirIsWide ? 0.20f : 0.16f) : fxL.reverbMax;
+    // Natural choir mode uses fixed room levels per preset so vocal samples
+    // stay realistic; macro space is ignored here to avoid pad-style wash.
+    const float reverbCap = choirMode ? choirNaturalReverbMix(p) : fxL.reverbMax;
     const float delayCap  = choirMode ? 0.00f : fxL.delayMax;
     const float reverbSizeCap = choirMode ? (choirIsWide ? 0.62f : 0.55f) : 1.0f;
     const float delayFeedbackCap = choirMode ? 0.00f : 0.95f;
-    const float reverbMix  = juce::jlimit(0.0f, reverbCap,
-                                          reverbBase * (0.85f + space * 0.30f));
+    const float reverbMix  = choirMode ? reverbCap
+                                       : juce::jlimit(0.0f, reverbCap,
+                                                     reverbBase * (0.85f + space * 0.30f));
     const float delayMix = juce::jlimit(0.0f, delayCap, p.delay.enabled ? p.delay.mix : 0.0f);
     const float delayFeedback = juce::jlimit(0.0f, delayFeedbackCap, p.delay.feedback);
     const float reverbSize = juce::jlimit(0.0f, reverbSizeCap, p.reverb.size);
 
-    // Chorus: choir natural mode tightens this to 0.025 (0.045 for wide/heaven
-    //         variants) so vocal samples don't acquire a synth-pad shimmer.
+    // Chorus: off for natural choir except a barely audible Ooh/Heaven width.
     const float chorusWanted = p.chorus.enabled ? p.chorus.mix : 0.0f;
     float chorusCap = fxL.chorusMax;
     if (choirMode)
-        chorusCap = isChoirWidePreset(p) ? 0.045f : 0.025f;
+        chorusCap = choirIsWide ? 0.015f : 0.0f;
     const float chorusMixOut = juce::jlimit(0.0f, chorusCap, chorusWanted);
     setParamById(proc, "fxChorusMix", chorusMixOut);
     setParamById(proc, "fxDelayMix", delayMix);
@@ -1223,6 +1242,14 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
         dp->getSynthEngine().forEachSynthVoice([&](SynthVoice& v)
         {
             v.clearPartials();
+            if (choirMode)
+            {
+                v.setUnisonRender(1, 0.0f, 0.0f, 0.0f);
+                v.setExciterAmount(0.0f);
+                v.setStereoSpreadAmount(0.0f);
+                return;
+            }
+
             const int count = juce::jmin((int) SynthVoice::kMaxPartials, p.partials.size());
             for (int i = 0; i < count; ++i)
             {
