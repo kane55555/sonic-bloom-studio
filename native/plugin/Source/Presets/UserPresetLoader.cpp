@@ -1029,25 +1029,24 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     const float space   = juce::jlimit(0.0f, 1.0f, p.macros.space);
     const float reverbBase = p.reverb.enabled ? p.reverb.mix : 0.0f;
     const bool choirIsWide = choirMode && isChoirWidePreset(p);
-    // Natural choir mode: reverb mix ceiling tightens from 0.22 to 0.16 for
-    // clean/dark variants (0.20 for wide/heaven) so vocal samples stay in a
-    // room rather than swimming in a pad-style wash. Delay stays off.
-    const float reverbCap = choirMode ? (choirIsWide ? 0.20f : 0.16f) : fxL.reverbMax;
+    // Natural choir mode uses fixed room levels per preset so vocal samples
+    // stay realistic; macro space is ignored here to avoid pad-style wash.
+    const float reverbCap = choirMode ? choirNaturalReverbMix(p) : fxL.reverbMax;
     const float delayCap  = choirMode ? 0.00f : fxL.delayMax;
     const float reverbSizeCap = choirMode ? (choirIsWide ? 0.62f : 0.55f) : 1.0f;
     const float delayFeedbackCap = choirMode ? 0.00f : 0.95f;
-    const float reverbMix  = juce::jlimit(0.0f, reverbCap,
-                                          reverbBase * (0.85f + space * 0.30f));
+    const float reverbMix  = choirMode ? reverbCap
+                                       : juce::jlimit(0.0f, reverbCap,
+                                                     reverbBase * (0.85f + space * 0.30f));
     const float delayMix = juce::jlimit(0.0f, delayCap, p.delay.enabled ? p.delay.mix : 0.0f);
     const float delayFeedback = juce::jlimit(0.0f, delayFeedbackCap, p.delay.feedback);
     const float reverbSize = juce::jlimit(0.0f, reverbSizeCap, p.reverb.size);
 
-    // Chorus: choir natural mode tightens this to 0.025 (0.045 for wide/heaven
-    //         variants) so vocal samples don't acquire a synth-pad shimmer.
+    // Chorus: off for natural choir except a barely audible Ooh/Heaven width.
     const float chorusWanted = p.chorus.enabled ? p.chorus.mix : 0.0f;
     float chorusCap = fxL.chorusMax;
     if (choirMode)
-        chorusCap = isChoirWidePreset(p) ? 0.045f : 0.025f;
+        chorusCap = choirIsWide ? 0.015f : 0.0f;
     const float chorusMixOut = juce::jlimit(0.0f, chorusCap, chorusWanted);
     setParamById(proc, "fxChorusMix", chorusMixOut);
     setParamById(proc, "fxDelayMix", delayMix);
