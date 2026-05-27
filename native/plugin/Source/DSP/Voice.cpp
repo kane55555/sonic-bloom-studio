@@ -1,6 +1,18 @@
 #include "Voice.h"
 #include "VoiceCard.h"
 
+static thread_local juce::AudioBuffer<float>* currentFxSendRenderBuffer = nullptr;
+
+void SynthVoice::beginFxSendRender(juce::AudioBuffer<float>* fxSendBuffer) noexcept
+{
+    currentFxSendRenderBuffer = fxSendBuffer;
+}
+
+void SynthVoice::endFxSendRender() noexcept
+{
+    currentFxSendRenderBuffer = nullptr;
+}
+
 
 SynthVoice::SynthVoice()
 {
@@ -92,10 +104,54 @@ void SynthVoice::reset() noexcept
     oscBPhase = subPhase = fmModPhase = sineFallbackPhase = 0.0;
     fmOp3Phase = fmOp4Phase = 0.0;
     fmFeedbackZ = 0.0f;
+    fxSendLevel = 0.0f;
+    fxSendTarget = 0.0f;
+    fxSendReleaseStep = 0.0f;
+    fxSendReleaseSamples = 0;
+    fxSendReleaseCounter = 0;
+    fxSendActive = false;
+    noteReleasedForFxSend = false;
     pinkB0 = pinkB1 = pinkB2 = 0.0f;
     filter.reset();
     for (auto& slot : partials_)
         if (slot.engine) slot.engine->reset();
+}
+
+void SynthVoice::beginFxSendRelease(float releaseMs) noexcept
+{
+    fxSendTarget = 0.0f;
+    noteReleasedForFxSend = true;
+    fxSendReleaseSamples = juce::jmax(1, (int) std::ceil(juce::jlimit(1.0f, 500.0f, releaseMs)
+                                                       * 0.001 * sampleRate));
+    fxSendReleaseCounter = fxSendReleaseSamples;
+    fxSendReleaseStep = fxSendLevel / (float) fxSendReleaseSamples;
+    fxSendActive = fxSendLevel > 0.000001f;
+}
+
+void SynthVoice::chokeFxSend(float fadeMs) noexcept
+{
+    beginFxSendRelease(fadeMs);
+}
+
+float SynthVoice::nextFxSendGain() noexcept
+{
+    if (! fxSendActive) return 0.0f;
+
+    if (noteReleasedForFxSend || fxSendTarget <= 0.0f)
+    {
+        if (fxSendReleaseCounter > 0)
+        {
+            fxSendLevel = juce::jmax(0.0f, fxSendLevel - fxSendReleaseStep);
+            --fxSendReleaseCounter;
+        }
+        else
+        {
+            fxSendLevel = 0.0f;
+            fxSendActive = false;
+        }
+    }
+
+    return fxSendActive ? fxSendLevel : 0.0f;
 }
 
 
