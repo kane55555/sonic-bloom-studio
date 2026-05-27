@@ -127,8 +127,8 @@ public:
         auto* L = buffer.getWritePointer(0);
         auto* R = nc > 1 ? buffer.getWritePointer(1) : L;
 
-        const float dry = 1.0f - mix;
-        const float wet = mix;
+        const float dry = 1.0f - effectiveMix;
+        const float wet = effectiveMix;
         const float w   = juce::jlimit(0.0f, 1.0f, width);
 
         // Apply silence-watchdog decay: temporarily scale each comb's
