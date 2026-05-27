@@ -199,6 +199,7 @@ bool SynthEngine::setMaxPolyphony(int n)
         v->prepare(getSampleRate(), 0);
         v->setMultisample(activeMultisample);
         v->setFallbackSynthesisEnabled(fallbackSynthesisEnabled);
+        v->setFxSendReleaseMs(currentFxSendReleaseMs);
         addVoice(v);
     }
 
