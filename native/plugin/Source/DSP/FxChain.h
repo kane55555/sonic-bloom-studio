@@ -255,7 +255,12 @@ public:
     {
         reverbDensityWeight = juce::jlimit(0.0f, 1.0f, weight);
     }
-    void setChoirDensityMode(bool enabled) noexcept { choirDensityMode = enabled; }
+    void setChoirDensityMode(bool enabled) noexcept
+    {
+        choirDensityMode = enabled;
+        if (choirDensityMode)
+            applyChoirModeCaps();
+    }
     void setActiveVoiceCountForDensity(int count) noexcept { activeVoiceCountForDensity = juce::jmax(0, count); }
 
     // ---- Global "scale-safe" preset toggle ----
@@ -318,6 +323,21 @@ public:
     }
 
 private:
+    void applyChoirModeCaps() noexcept
+    {
+        delay.setMix(juce::jmin(delay.getMix(), 0.03f));
+        delay.setFeedback(juce::jmin(delay.getFeedback(), 0.08f));
+        delay.setDucking(0.50f, 5.0f, 140.0f);
+        delayActive = delay.getMix() > 0.001f;
+
+        reverb.setMix(juce::jmin(reverb.getMix(), 0.22f));
+        reverb.setSize(juce::jmin(reverb.getSize(), 0.62f));
+        reverb.setInputHighPassHz(300.0f);
+        reverb.setInputLowPassHz(5500.0f);
+        reverb.setDucking(juce::jmax(reverb.getDuckAmount(), 0.28f), 6.0f, 220.0f);
+        reverbActive = reverb.getMix() > 0.001f;
+    }
+
     // Scan the post-master buffer for samples exceeding ~ -1 dB (0.891).
     // Logs at most ~twice per second per chain instance.
     void detectAndLogClipping(juce::AudioBuffer<float>& buffer) noexcept
