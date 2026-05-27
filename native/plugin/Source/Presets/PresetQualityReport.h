@@ -276,7 +276,13 @@ inline void report(DiditagainProcessor& proc,
         warnings.add("SOURCE_PATH_INSIDE_PRESET_FOLDER");
 
     for (auto& w : extraSourceWarningsIn)
+    {
+        // Never propagate SOURCE_MISSING when the active engine does not
+        // require a sample folder (pure synth presets: analog, supersaw,
+        // fm2, fm4, wavetable, ...).
+        if (! needsSource && w == "SOURCE_MISSING") continue;
         if (! warnings.contains(w)) warnings.add(w);
+    }
 
     const auto cLow = effectiveCategory.toLowerCase();
     const bool lowEndCat = cLow.contains("808") || cLow.contains("bass") || cLow.contains("sub");
@@ -368,6 +374,7 @@ inline void report(DiditagainProcessor& proc,
         << " hiddenSourceFolder=" << (hiddenSourceFolder ? "true" : "false")
         << " allowCrossCategorySource=" << (allowCrossCategorySourceIn ? "true" : "false")
         << " sourceFolderWavCount=" << sourceFolderWavCountIn
+        << " sourceRequiredForEngine=" << (needsSource ? "true" : "false")
         << " oscillatorEngineActive=" << (oscillatorEngineActive ? "true" : "false")
         << " wavZones=" << wavZones
         << " activeLayers=" << activeLayers
@@ -408,6 +415,7 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("categoryRaw",            effectiveCategoryIn);
     j->setProperty("engineType",             engineType);
     j->setProperty("oscillatorEngineActive", oscillatorEngineActive);
+    j->setProperty("sourceRequiredForEngine", needsSource);
     j->setProperty("sourceInstrument",       rawPath);
     j->setProperty("sourceInstrumentPathRaw", rawPath);
     j->setProperty("resolvedFolder",         resolvedFolderPath);
@@ -506,6 +514,7 @@ inline void report(DiditagainProcessor& proc,
               << "expectedSourceFolderName: "  << expectedSourceFolderNameIn << "\n"
               << "allowCrossCategorySource: "  << (allowCrossCategorySourceIn ? "true" : "false") << "\n"
               << "sourceFolderWavCount: "      << sourceFolderWavCountIn   << "\n"
+              << "sourceRequiredForEngine: "   << (needsSource ? "true" : "false") << "\n"
               << "wavZones: "                  << wavZones             << "\n"
               << "activeLayers: "              << activeLayers         << "\n"
               << "activePartials: "            << activePartials       << "\n"
