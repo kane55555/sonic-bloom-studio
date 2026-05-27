@@ -781,6 +781,7 @@ void clampEnvelopeForCategory(juce::AudioProcessor& proc, const UserPreset& p, F
 void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
 {
     const Family fam = familyOf(p.category);
+    const bool choirMode = isChoirModePreset(p);
 
     // -- Source / category validation (non-fatal warning only)
     validateSourceForCategory(p);
@@ -965,17 +966,23 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     const auto fxL = fxLimitsFor(fam);
     const float space   = juce::jlimit(0.0f, 1.0f, p.macros.space);
     const float reverbBase = p.reverb.enabled ? p.reverb.mix : 0.0f;
-    const float reverbMix  = juce::jlimit(0.0f, fxL.reverbMax,
+    const float reverbCap = choirMode ? 0.22f : fxL.reverbMax;
+    const float delayCap  = choirMode ? 0.03f : fxL.delayMax;
+    const float reverbSizeCap = choirMode ? 0.62f : 1.0f;
+    const float delayFeedbackCap = choirMode ? 0.08f : 0.95f;
+    const float reverbMix  = juce::jlimit(0.0f, reverbCap,
                                           reverbBase * (0.85f + space * 0.30f));
+    const float delayMix = juce::jlimit(0.0f, delayCap, p.delay.enabled ? p.delay.mix : 0.0f);
+    const float delayFeedback = juce::jlimit(0.0f, delayFeedbackCap, p.delay.feedback);
+    const float reverbSize = juce::jlimit(0.0f, reverbSizeCap, p.reverb.size);
 
     setParamById(proc, "fxChorusMix",
                  juce::jlimit(0.0f, fxL.chorusMax, p.chorus.enabled ? p.chorus.mix : 0.0f));
-    setParamById(proc, "fxDelayMix",
-                 juce::jlimit(0.0f, fxL.delayMax,  p.delay.enabled  ? p.delay.mix  : 0.0f));
+    setParamById(proc, "fxDelayMix", delayMix);
     setParamById(proc, "fxDelayTime",        p.delay.timeMs / 1000.0f);
-    setParamById(proc, "fxDelayFeedback",    p.delay.feedback);
+    setParamById(proc, "fxDelayFeedback",    delayFeedback);
     setParamById(proc, "fxReverbMix",        reverbMix);
-    setParamById(proc, "fxReverbSize",       p.reverb.size);
+    setParamById(proc, "fxReverbSize",       reverbSize);
     const float satDrive = juce::jlimit(0.0f, fxL.satMax,
                                         p.saturation.enabled ? p.saturation.drive : 0.0f);
     setParamById(proc, "fxDistortionAmount", satDrive);
