@@ -214,17 +214,17 @@ inline void report(DiditagainProcessor& proc,
     const bool needsSource = engineRequiresSource(up);
     const bool oscillatorEngineActive = ! needsSource;
 
-    // --- FX mixes (read live from APVTS) ----------------------------------
+    // --- FX mixes (read live from actual DSP blocks) ----------------------
     const float chorusMix = paramValue(proc, "fxChorusMix");
-    const float delayMix  = paramValue(proc, "fxDelayMix");
-    const float reverbMix = paramValue(proc, "fxReverbMix");
-    const float reverbSize = paramValue(proc, "fxReverbSize");
     const float satMix    = paramValue(proc, "fxSaturationMix");
     const int   polyphony = (int) paramValue(proc, "polyphony");
 
     // --- Live FX-chain state for scale-safety report ----------------------
     auto& reverbBlk = fx.getReverb();
     auto& delayBlk  = fx.getDelay();
+    const float delayMix  = delayBlk.getMix();
+    const float reverbMix = reverbBlk.getMix();
+    const float reverbSize = reverbBlk.getSize();
     const float reverbDuckAmount   = reverbBlk.getDuckAmount();
     const bool  reverbDuckEnabled  = reverbDuckAmount > 0.0001f;
     const float reverbInputHpHz    = reverbBlk.getInputHighPassHz();
