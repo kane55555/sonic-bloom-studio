@@ -692,7 +692,7 @@ bool isChoirModePreset(const UserPreset& p)
 juce::String fxSendReleaseSourceFor(const UserPreset& p, bool choirMode)
 {
     if (choirMode) return "choirModeClamp";
-    if (p.fxSend.hasFxSendReleaseMs) return "preset.fxSend.fxSendReleaseMs";
+    if (p.fxSend.hasFxSendReleaseMs) return "presetFxSend";
     if (p.fxSend.hasFxSendReleaseMultiplier) return "ampReleaseFallback";
     return "categoryDefault";
 }
@@ -701,14 +701,13 @@ float resolveFxSendReleaseMs(const UserPreset& p, bool choirMode)
 {
     if (choirMode)
     {
-        const float maxMs = p.safety.hasChoirFxSendReleaseMaxMs
-            ? p.safety.choirFxSendReleaseMaxMs
-            : (p.fxSend.hasFxSendMaximumReleaseMs ? p.fxSend.fxSendMaximumReleaseMs : 180.0f);
         const float requested = p.fxSend.hasFxSendReleaseMs
             ? p.fxSend.fxSendReleaseMs
-            : juce::jmin(maxMs, p.amp.releaseMs * (p.fxSend.hasFxSendReleaseMultiplier
-                ? p.fxSend.fxSendReleaseMultiplier : 0.35f));
-        return juce::jlimit(40.0f, juce::jlimit(40.0f, 180.0f, maxMs), requested);
+            : (p.safety.hasChoirFxSendReleaseMaxMs
+                ? p.safety.choirFxSendReleaseMaxMs
+                : juce::jmin(180.0f, p.amp.releaseMs * (p.fxSend.hasFxSendReleaseMultiplier
+                    ? p.fxSend.fxSendReleaseMultiplier : 0.35f)));
+        return juce::jlimit(40.0f, 180.0f, requested);
     }
 
     if (p.fxSend.hasFxSendReleaseMs)
