@@ -208,9 +208,12 @@ inline void report(DiditagainProcessor& proc,
                          || cLow.contains("vocal") || nLow.contains("choir") || up.choirMode;
 
     // --- Layer / partial counts -------------------------------------------
-    int activeLayers = (up.main.enabled ? 1 : 0) + (up.layer2.enabled ? 1 : 0);
+    const bool naturalChoirSampleOnly = choirMode;
+    int activeLayers = (up.main.enabled ? 1 : 0)
+                     + ((up.layer2.enabled && ! naturalChoirSampleOnly) ? 1 : 0);
     int activePartials = 0;
-    for (auto& p : up.partials) if (p.enabled) ++activePartials;
+    if (! naturalChoirSampleOnly)
+        for (auto& p : up.partials) if (p.enabled) ++activePartials;
 
     const juce::String engineType = up.engineType.isNotEmpty() ? up.engineType
                                   : (up.partials.size() > 0 ? juce::String("layered") : juce::String("pcm"));
@@ -352,19 +355,24 @@ inline void report(DiditagainProcessor& proc,
     const bool  choirNoteDensityFxReduction = choirMode && noteDensityFxOn;
 
     // -- Natural choir-mode state (sample-first vocal behavior) -------------
-    const bool  choirNaturalMode             = choirMode;
-    const float effectiveLayer2GainDb        = up.layer2.enabled ? up.layer2.gainDb : -120.0f;
-    const bool  choirSyntheticLayerDisabled  = choirMode
-                                              && (! up.layer2.enabled
-                                                  || effectiveLayer2GainDb <= -36.0f);
+    const bool  choirNaturalMode             = naturalChoirSampleOnly;
+    const float effectiveLayer2GainDb        = naturalChoirSampleOnly ? -120.0f
+                                               : (up.layer2.enabled ? up.layer2.gainDb : -120.0f);
+    const bool  choirSyntheticLayerDisabled  = choirMode && effectiveLayer2GainDb <= -120.0f;
     const float choirLayer2GainDb            = effectiveLayer2GainDb;
     const bool  choirNearestFallbackUsed     = choirMode
                                               && up.source.mappingMode.equalsIgnoreCase("nearest");
     const bool  choirZoneTooFar              = choirNearestFallbackUsed; // best signal we have at load time
     const float choirPitchShiftMaxSemis      = 0.0f; // populated by engine in future; reported for parity
-    const float choirHumanizePitchCents      = juce::jmin(up.advanced.humanizePitchCents, 0.5f);
-    const bool  choirUnisonDisabled          = choirMode; // engine enforces choir unison off via dspForCategory
-    const bool  choirAnalogDriftDisabled     = choirMode; // analog drift not engaged on choir path
+    const float choirHumanizePitchCents      = choirMode ? juce::jmin(up.advanced.humanizePitchCents, 0.25f)
+                                                         : up.advanced.humanizePitchCents;
+    const float choirLayerDetuneCents        = choirMode ? 0.0f : up.main.detuneCents;
+    const float choirOscBDetuneCents         = choirMode ? paramValue(proc, "oscBDetune") : up.layer2.detuneCents;
+    const float choirUnisonDetune            = choirMode ? paramValue(proc, "unisonDetune") : 0.0f;
+    const float choirVintageDriftCents       = choirMode ? paramValue(proc, "vintageAmount") * 2.5f : 0.0f;
+    const bool  choirUnisonDisabled          = choirMode && paramValue(proc, "unisonVoices") <= 1.01f
+                                            && std::abs(choirUnisonDetune) <= 0.0001f;
+    const bool  choirAnalogDriftDisabled     = choirMode && std::abs(choirVintageDriftCents) <= 0.0001f;
 
     if (choirMode)
     {
