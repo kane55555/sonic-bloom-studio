@@ -504,5 +504,6 @@ private:
     Character character = Character::Studio;
     bool dirty = true;
     int silenceSamples = 0; // input-silence counter for tail watchdog
+    float sendDensityScale = 1.0f;
 };
 
