@@ -57,12 +57,13 @@ public:
         //      what stops scale runs and fast chords from turning into a
         //      muddy reverb/delay cloud.
         updateNoteDensity(buffer);
-        const float densityScale = noteDensityFxReductionEnabled
-            ? juce::jlimit(1.0f - maxDensityReduction, 1.0f,
-                           1.0f - densityEnv * maxDensityReduction)
-            : 1.0f;
-        delay.setSendDensityScale(1.0f - (1.0f - densityScale) * delayDensityWeight);
-        reverb.setSendDensityScale(1.0f - (1.0f - densityScale) * reverbDensityWeight);
+        const float densityReduction = noteDensityFxReductionEnabled
+            ? juce::jlimit(0.0f, maxDensityReduction, densityEnv * maxDensityReduction)
+            : 0.0f;
+        const float choirDelayScale  = (choirDensityMode && activeVoiceCountForDensity >= 8) ? 0.50f : 1.0f;
+        const float choirReverbScale = (choirDensityMode && activeVoiceCountForDensity >= 8) ? 0.65f : 1.0f;
+        delay.setSendDensityScale (choirDelayScale  * (1.0f - densityReduction * delayDensityWeight));
+        reverb.setSendDensityScale(choirReverbScale * (1.0f - densityReduction * reverbDensityWeight));
 
         // 1) Saturation
         if (saturationActive)
@@ -127,12 +128,13 @@ public:
         captureRecentPeak(buffer, fxInRecent);
         updateNoteDensity(buffer);
 
-        const float densityScale = noteDensityFxReductionEnabled
-            ? juce::jlimit(1.0f - maxDensityReduction, 1.0f,
-                           1.0f - densityEnv * maxDensityReduction)
-            : 1.0f;
-        delay.setSendDensityScale(1.0f - (1.0f - densityScale) * delayDensityWeight);
-        reverb.setSendDensityScale(1.0f - (1.0f - densityScale) * reverbDensityWeight);
+        const float densityReduction = noteDensityFxReductionEnabled
+            ? juce::jlimit(0.0f, maxDensityReduction, densityEnv * maxDensityReduction)
+            : 0.0f;
+        const float choirDelayScale  = (choirDensityMode && activeVoiceCountForDensity >= 8) ? 0.50f : 1.0f;
+        const float choirReverbScale = (choirDensityMode && activeVoiceCountForDensity >= 8) ? 0.65f : 1.0f;
+        delay.setSendDensityScale (choirDelayScale  * (1.0f - densityReduction * delayDensityWeight));
+        reverb.setSendDensityScale(choirReverbScale * (1.0f - densityReduction * reverbDensityWeight));
 
         if (saturationActive)
         {
