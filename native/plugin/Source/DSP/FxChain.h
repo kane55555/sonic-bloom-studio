@@ -61,8 +61,8 @@ public:
             ? juce::jlimit(1.0f - maxDensityReduction, 1.0f,
                            1.0f - densityEnv * maxDensityReduction)
             : 1.0f;
-        delay.setSendDensityScale(densityScale);
-        reverb.setSendDensityScale(densityScale);
+        delay.setSendDensityScale(1.0f - (1.0f - densityScale) * delayDensityWeight);
+        reverb.setSendDensityScale(1.0f - (1.0f - densityScale) * reverbDensityWeight);
 
         // 1) Saturation
         if (saturationActive)
@@ -131,8 +131,8 @@ public:
             ? juce::jlimit(1.0f - maxDensityReduction, 1.0f,
                            1.0f - densityEnv * maxDensityReduction)
             : 1.0f;
-        delay.setSendDensityScale(densityScale);
-        reverb.setSendDensityScale(densityScale);
+        delay.setSendDensityScale(1.0f - (1.0f - densityScale) * delayDensityWeight);
+        reverb.setSendDensityScale(1.0f - (1.0f - densityScale) * reverbDensityWeight);
 
         if (saturationActive)
         {
