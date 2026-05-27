@@ -259,6 +259,7 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
     AppliedPresetState out;
     out.preset   = p;
     out.category = p.category;
+    const bool naturalChoirMode = isNaturalChoirPreset(p);
 
     // ---- Locate logical layers ----
     const LayerV2* sampleLayer = nullptr;
