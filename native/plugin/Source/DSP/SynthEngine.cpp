@@ -24,18 +24,28 @@ void SynthEngine::renderBlockWithFx(juce::AudioBuffer<float>& buffer,
                                     const juce::MidiBuffer& midi,
                                     int startSample, int numSamples)
 {
-    renderNextBlock(buffer, midi, startSample, numSamples);
+    dryRenderBuffer.setSize(buffer.getNumChannels(), buffer.getNumSamples(), false, false, true);
+    fxSendBuffer.setSize(buffer.getNumChannels(), buffer.getNumSamples(), false, false, true);
+    dryRenderBuffer.clear();
+    fxSendBuffer.clear();
+
+    SynthVoice::beginFxSendRender(&fxSendBuffer);
+    renderNextBlock(dryRenderBuffer, midi, startSample, numSamples);
+    SynthVoice::endFxSendRender();
     updateHeldNotes(midi);
-    // Shared layer bus glue (saturation + comp + width + drift) BEFORE
-    // the master FX chain — this is what unifies stacked layers into one
-    // cohesive premium-sounding instrument.
-    layerBus.process(buffer);
-    fx.process(buffer);
+    layerBus.process(dryRenderBuffer);
+    fx.processWetSend(fxSendBuffer);
+
+    buffer.makeCopyOf(dryRenderBuffer, true);
+    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        buffer.addFrom(ch, 0, fxSendBuffer, ch, 0, buffer.getNumSamples());
+    fx.finalizeOutput(buffer);
 }
 
 void SynthEngine::resetForPresetChange()
 {
     const juce::ScopedLock callbackLock(lock);
+    chokeAllFxSends(50.0f);
     if (! canSafelyResetVoices())
         return;
 
@@ -56,6 +66,23 @@ void SynthEngine::resetForPresetChange()
         for (int note = 0; note < static_cast<int>(heldNotes[channel].size()); ++note)
             if (heldNotes[channel][note].active)
                 noteOn(channel + 1, note, heldNotes[channel][note].velocity);
+}
+
+void SynthEngine::chokeAllFxSends(float fadeMs) noexcept
+{
+    forEachSynthVoice([fadeMs](SynthVoice& v)
+    {
+        v.chokeFxSend(fadeMs);
+    });
+}
+
+void SynthEngine::setFxSendReleaseMsForAll(float ms) noexcept
+{
+    currentFxSendReleaseMs = juce::jlimit(5.0f, 500.0f, ms);
+    forEachSynthVoice([this](SynthVoice& v)
+    {
+        v.setFxSendReleaseMs(currentFxSendReleaseMs);
+    });
 }
 
 bool SynthEngine::hasHeldNotes() const noexcept

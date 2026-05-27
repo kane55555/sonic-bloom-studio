@@ -33,6 +33,10 @@ public:
                            int startSample, int numSamples);
 
     void resetForPresetChange();
+    void chokeAllFxSends(float fadeMs) noexcept;
+    void setFxSendReleaseMsForAll(float ms) noexcept;
+    float getFxSendReleaseMs() const noexcept { return currentFxSendReleaseMs; }
+    bool hasSeparatedFxSendBus() const noexcept { return true; }
     bool hasHeldNotes() const noexcept;
     bool hasActiveVoices() const noexcept;
     int getHeldNoteCount() const noexcept;
@@ -97,9 +101,12 @@ private:
 
     FxChain fx;
     LayerBusProcessor layerBus;
+    juce::AudioBuffer<float> dryRenderBuffer;
+    juce::AudioBuffer<float> fxSendBuffer;
     std::array<std::array<HeldNote, 128>, 16> heldNotes {};
     bool    monoMode = false;
     bool    fallbackSynthesisEnabled = true;
+    float   currentFxSendReleaseMs = 80.0f;
     std::shared_ptr<const dida::Multisample> activeMultisample;
     juce::String currentInstrumentName;
 };

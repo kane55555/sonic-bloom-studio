@@ -55,8 +55,17 @@ public:
     void controllerMoved(int controllerNumber, int newControllerValue) override;
     void renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int startSample, int numSamples) override;
 
+    // During SynthEngine::renderBlockWithFx the normal JUCE dry render still
+    // writes to outputBuffer, while this context collects a separate post-amp
+    // FX-send bus gated by the voice's own short send envelope.
+    static void beginFxSendRender(juce::AudioBuffer<float>* fxSendBuffer) noexcept;
+    static void endFxSendRender() noexcept;
+
     void prepare(double sampleRate, int samplesPerBlock);
     void resetNote() noexcept { clearCurrentNote(); reset(); }
+    void setFxSendReleaseMs(float ms) noexcept { fxSendReleaseMs = juce::jlimit(5.0f, 500.0f, ms); }
+    float getFxSendReleaseMs() const noexcept { return fxSendReleaseMs; }
+    void chokeFxSend(float fadeMs) noexcept;
 
     void setMultisample(std::shared_ptr<const dida::Multisample> ms) noexcept { multisample = std::move(ms); }
     void setFallbackSynthesisEnabled(bool enabled) noexcept { fallbackSynthesisEnabled = enabled; }
@@ -182,6 +191,8 @@ public:
 private:
     void recalcGlideCoeff() noexcept;
     void reset() noexcept;
+    void beginFxSendRelease(float releaseMs) noexcept;
+    float nextFxSendGain() noexcept;
     void readZone(const dida::SampleZone& z, double readPos, float& outL, float& outR) const noexcept;
 
     float renderOscShape(Oscillator::Waveform w, float phase01, float pw) const noexcept;
@@ -213,6 +224,17 @@ private:
     bool  isActive = false;
     int   pitchOffsetSemis     = 0;
     int   oscBPitchOffsetSemis = 0;
+
+    // Independent post-amp FX-send gate. The dry voice can keep following the
+    // musical amp release, but delay/reverb input is choked quickly after note-off.
+    float fxSendLevel = 0.0f;
+    float fxSendTarget = 0.0f;
+    float fxSendReleaseMs = 80.0f;
+    float fxSendReleaseStep = 0.0f;
+    int   fxSendReleaseSamples = 0;
+    int   fxSendReleaseCounter = 0;
+    bool  fxSendActive = false;
+    bool  noteReleasedForFxSend = false;
 
     // ---- Layer levels ----
     float oscALevel  = 1.0f;

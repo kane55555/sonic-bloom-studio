@@ -204,6 +204,25 @@ public:
         }
     }
 
+    void processWetOnly(juce::AudioBuffer<float>& buffer,
+                        const juce::AudioBuffer<float>& dryInput) noexcept
+    {
+        const float effectiveMix = mix * sendDensityScale;
+        if (effectiveMix <= 0.0001f)
+        {
+            buffer.clear();
+            return;
+        }
+
+        process(buffer);
+
+        const int n = buffer.getNumSamples();
+        const int nc = juce::jmin(buffer.getNumChannels(), dryInput.getNumChannels());
+        const float dryScale = 1.0f - effectiveMix;
+        for (int ch = 0; ch < nc; ++ch)
+            buffer.addFrom(ch, 0, dryInput, ch, 0, n, -dryScale);
+    }
+
     // ---- Back-compat setters --------------------------------------------------
     void setMix    (float m) noexcept { mix     = juce::jlimit(0.0f, 1.0f, m); }
     void setSize   (float s) noexcept { const float v = juce::jlimit(0.0f, 1.0f, s); if (std::abs(v - size) > 0.0001f) { size = v; dirty = true; } }
