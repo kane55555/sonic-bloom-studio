@@ -1242,6 +1242,14 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
         dp->getSynthEngine().forEachSynthVoice([&](SynthVoice& v)
         {
             v.clearPartials();
+            if (choirMode)
+            {
+                v.setUnisonRender(1, 0.0f, 0.0f, 0.0f);
+                v.setExciterAmount(0.0f);
+                v.setStereoSpreadAmount(0.0f);
+                return;
+            }
+
             const int count = juce::jmin((int) SynthVoice::kMaxPartials, p.partials.size());
             for (int i = 0; i < count; ++i)
             {
