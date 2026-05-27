@@ -69,7 +69,8 @@ public:
 
     void process(juce::AudioBuffer<float>& buffer) noexcept
     {
-        if (mix <= 0.0001f)
+        const float effectiveMix = mix * sendDensityScale;
+        if (effectiveMix <= 0.0001f)
         {
             reset();
             return;
