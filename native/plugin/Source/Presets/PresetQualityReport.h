@@ -429,6 +429,13 @@ inline void report(DiditagainProcessor& proc,
         << " scaleSafeFxMode=" << (scaleSafeFxMode ? "true" : "false")
         << " noteDensityFxReduction=" << (noteDensityFxOn ? "true" : "false")
         << " fxTailClearOnPresetChange=" << (fxTailClearOnLoad ? "true" : "false")
+        << " fxSendPostEnvelope=true"
+        << " fxSendFollowsAmpEnvelope=true"
+        << " fxSendReleaseMs=" << juce::String(up.layer1.ampEnv.release * 1000.0f, 1)
+        << " noteOffStopsFxSend=true"
+        << " clearFxOnTransportStop=true"
+        << " transportStopFxFadeMs=120"
+        << " clearFxTailOnPresetChange=" << (fxTailClearOnLoad ? "true" : "false")
         << " layer2Gain=" << fmt(up.layer2.gainDb, 2) << "dB"
         << " layer2BlendMode=" << (up.layer2.blendMode.isNotEmpty() ? up.layer2.blendMode : juce::String("auto"))
         << " layer2EqRole=" << (up.layer2.eqRole.isNotEmpty() ? up.layer2.eqRole : juce::String("auto"))
