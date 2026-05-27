@@ -404,9 +404,22 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
         float reverbDuckRel = 220.0f;
         float delayDuck     = 0.45f;
         float delayDuckRel  = 140.0f;
+        float chorusMixMax  = 1.0f;
+        float satMixMax     = 1.0f;
     };
 
-    auto fxCapsFor = [](const juce::String& catIn) -> FxCaps
+    // -------- Choir mode detection ----------------------------------------
+    // Categories: Choirs, Choirs Ahhh/Ohhh/Ehhh, Choir Aah/Ooh/Eeh, etc.
+    const auto cLowerForChoir = p.category.toLowerCase();
+    const auto nLowerForChoir = p.name.toLowerCase();
+    const bool choirMode = cLowerForChoir.contains("choir")
+                        || cLowerForChoir.contains("vox")
+                        || cLowerForChoir.contains("vocal")
+                        || nLowerForChoir.contains("choir");
+    const bool choirWide = choirMode
+        && (nLowerForChoir.contains("wide") || nLowerForChoir.contains("heaven"));
+
+    auto fxCapsFor = [choirMode, choirWide](const juce::String& catIn) -> FxCaps
     {
         const auto c = catIn.toLowerCase();
         FxCaps k;
@@ -415,7 +428,11 @@ AppliedPresetState HybridPresetApplier::apply(const HybridPresetV2& p,
         else if (c.contains("acoustic"))                                       { k = { 0.22f, 0.55f, 0.08f, 0.22f, 220.0f, 5200.0f, 0.35f, 180.0f, 0.45f, 140.0f }; }
         else if (c.contains("guitar"))                                         { k = { 0.28f, 0.58f, 0.10f, 0.22f, 220.0f, 5200.0f, 0.35f, 180.0f, 0.45f, 140.0f }; }
         else if (c.contains("brass") || c.contains("trumpet") || c.contains("horn") || c.contains("sax")) { k = { 0.16f, 0.45f, 0.06f, 0.12f, 250.0f, 4200.0f, 0.45f, 120.0f, 0.50f, 120.0f }; }
-        else if (c.contains("choir") || c.contains("vox") || c.contains("vocal")) { k = { 0.28f, 0.65f, 0.20f, 0.18f, 180.0f, 7000.0f, 0.25f, 260.0f, 0.45f, 160.0f }; }
+        else if (choirMode || c.contains("choir") || c.contains("vox") || c.contains("vocal"))
+        {
+            // Choir-specific caps: controlled reverb/delay, vowel-friendly band.
+            k = { 0.22f, 0.62f, 0.03f, 0.08f, 250.0f, 5500.0f, 0.30f, 280.0f, 0.50f, 160.0f, 0.08f, 0.06f };
+        }
         else if (c.contains("string") || c.contains("pad") || c.contains("texture") || c.contains("ambient")) { k = { 0.34f, 0.72f, 0.22f, 0.18f, 200.0f, 7200.0f, 0.25f, 260.0f, 0.45f, 160.0f }; }
         else if (c.contains("bell"))                                           { k = { 0.24f, 0.55f, 0.15f, 0.24f, 350.0f, 8000.0f, 0.30f, 200.0f, 0.45f, 140.0f }; }
         else if (c.contains("pluck"))                                          { k = { 0.22f, 0.50f, 0.14f, 0.22f, 260.0f, 8500.0f, 0.32f, 180.0f, 0.45f, 140.0f }; }
