@@ -202,6 +202,10 @@ inline void report(DiditagainProcessor& proc,
     auto& fx     = engine.getFx();
 
     const juce::String effectiveCategory = normalizeCategory(effectiveCategoryIn);
+    const auto cLow = effectiveCategory.toLowerCase();
+    const auto nLow = up.presetName.toLowerCase();
+    const bool choirMode = cLow.contains("choir") || cLow.contains("vox")
+                         || cLow.contains("vocal") || nLow.contains("choir") || up.choirMode;
 
     // --- Layer / partial counts -------------------------------------------
     int activeLayers = (up.main.enabled ? 1 : 0) + (up.layer2.enabled ? 1 : 0);
@@ -214,17 +218,20 @@ inline void report(DiditagainProcessor& proc,
     const bool needsSource = engineRequiresSource(up);
     const bool oscillatorEngineActive = ! needsSource;
 
-    // --- FX mixes (read live from APVTS) ----------------------------------
+    // --- FX mixes ---------------------------------------------------------
     const float chorusMix = paramValue(proc, "fxChorusMix");
-    const float delayMix  = paramValue(proc, "fxDelayMix");
-    const float reverbMix = paramValue(proc, "fxReverbMix");
-    const float reverbSize = paramValue(proc, "fxReverbSize");
+    const float delayMixParam  = paramValue(proc, "fxDelayMix");
+    const float reverbMixParam = paramValue(proc, "fxReverbMix");
+    const float reverbSizeParam = paramValue(proc, "fxReverbSize");
     const float satMix    = paramValue(proc, "fxSaturationMix");
     const int   polyphony = (int) paramValue(proc, "polyphony");
 
     // --- Live FX-chain state for scale-safety report ----------------------
     auto& reverbBlk = fx.getReverb();
     auto& delayBlk  = fx.getDelay();
+    const float delayMix  = choirMode ? delayBlk.getMix() : delayMixParam;
+    const float reverbMix = choirMode ? reverbBlk.getMix() : reverbMixParam;
+    const float reverbSize = choirMode ? reverbBlk.getSize() : reverbSizeParam;
     const float reverbDuckAmount   = reverbBlk.getDuckAmount();
     const bool  reverbDuckEnabled  = reverbDuckAmount > 0.0001f;
     const float reverbInputHpHz    = reverbBlk.getInputHighPassHz();
@@ -299,8 +306,6 @@ inline void report(DiditagainProcessor& proc,
         if (! warnings.contains(w)) warnings.add(w);
     }
 
-    const auto cLow = effectiveCategory.toLowerCase();
-    const auto nLow = up.presetName.toLowerCase();
     const bool lowEndCat = cLow.contains("808") || cLow.contains("bass") || cLow.contains("sub");
     if (lowEndCat && (reverbMix > 0.10f || delayMix > 0.12f))
         warnings.add("TOO_MUCH_LOW_END");
@@ -322,25 +327,27 @@ inline void report(DiditagainProcessor& proc,
         warnings.add("REVERB_LOW_MID_BUILDUP");
 
     // --- Choir-mode safety state + warnings -------------------------------
-    const bool choirMode = cLow.contains("choir") || cLow.contains("vox")
-                         || cLow.contains("vocal") || nLow.contains("choir") || up.choirMode;
     const float fxSendReleaseMsLive = proc.getSynthEngine().getFxSendReleaseMs();
-    const auto choirFxSendCap = up.safety.hasChoirFxSendReleaseMaxMs
-        ? up.safety.choirFxSendReleaseMaxMs
-        : (up.fxSend.hasFxSendMaximumReleaseMs ? up.fxSend.fxSendMaximumReleaseMs : 180.0f);
+    const float choirFxSendRequested = up.fxSend.hasFxSendReleaseMs
+        ? up.fxSend.fxSendReleaseMs
+        : (up.safety.hasChoirFxSendReleaseMaxMs
+            ? up.safety.choirFxSendReleaseMaxMs
+            : juce::jmin(180.0f, up.amp.releaseMs
+                * (up.fxSend.hasFxSendReleaseMultiplier ? up.fxSend.fxSendReleaseMultiplier : 0.35f)));
     const float choirFxSendReleaseMs = choirMode
-        ? juce::jlimit(40.0f, juce::jlimit(40.0f, 180.0f, choirFxSendCap),
-                       up.fxSend.hasFxSendReleaseMs ? up.fxSend.fxSendReleaseMs
-                                                    : juce::jmin(choirFxSendCap, up.amp.releaseMs
-                                                        * (up.fxSend.hasFxSendReleaseMultiplier ? up.fxSend.fxSendReleaseMultiplier : 0.35f)))
+        ? juce::jlimit(40.0f, 180.0f, choirFxSendRequested)
         : fxSendReleaseMsLive;
     const juce::String fxSendReleaseSource = choirMode ? juce::String("choirModeClamp")
-        : up.fxSend.hasFxSendReleaseMs ? juce::String("preset.fxSend.fxSendReleaseMs")
+        : up.fxSend.hasFxSendReleaseMs ? juce::String("presetFxSend")
         : up.fxSend.hasFxSendReleaseMultiplier ? juce::String("ampReleaseFallback")
         : juce::String("categoryDefault");
     const bool  choirAmpReleaseClamped = choirMode && (up.amp.releaseMs > 900.0f);
-    const bool  choirReverbCapApplied  = choirMode && reverbMix >= 0.219f;
-    const bool  choirDelayCapApplied   = choirMode && delayMix  >= 0.029f;
+    const bool  choirReverbCapApplied  = choirMode && reverbMix <= 0.2201f && reverbSize <= 0.6201f
+                                       && reverbDuckEnabled && reverbDuckAmount >= 0.28f
+                                       && reverbInputHpHz >= 250.0f && reverbInputHpHz <= 350.0f
+                                       && reverbInputLpHz >= 5000.0f && reverbInputLpHz <= 6000.0f;
+    const bool  choirDelayCapApplied   = choirMode && delayMix <= 0.0301f && delayFeedback <= 0.0801f
+                                       && delayDuckEnabled && std::abs(delayDuckAmount - 0.50f) < 0.001f;
     const int   choirActiveVoiceCount  = choirMode ? proc.getSynthEngine().getActiveVoiceCount() : 0;
     const bool  choirNoteDensityFxReduction = choirMode && noteDensityFxOn;
     if (choirMode)
@@ -350,6 +357,9 @@ inline void report(DiditagainProcessor& proc,
         if (delayMix  > 0.03f || delayFeedback > 0.08f) warnings.add("CHOIR_DELAY_TOO_HIGH");
         if (choirActiveVoiceCount > 8) warnings.add("CHOIR_TOO_MANY_OVERLAPPING_VOICES");
         if (fxSendReleaseMsLive > 180.0f) warnings.add("CHOIR_FX_SEND_TOO_LONG");
+        if (fxSendReleaseMsLive > 180.0f) warnings.add("CHOIR_FX_SEND_NOT_APPLIED");
+        if (! choirDelayCapApplied) warnings.add("CHOIR_DELAY_CAP_NOT_APPLIED");
+        if (! choirReverbCapApplied) warnings.add("CHOIR_REVERB_CAP_NOT_APPLIED");
     }
 
     // --- Loudness calibration (suggestion-only) ---------------------------

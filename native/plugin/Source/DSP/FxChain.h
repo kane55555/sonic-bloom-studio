@@ -214,12 +214,12 @@ public:
     void setReverbModRate(float hz)    { reverb.setModRate(hz); }
     void setReverbModDepth(float ms)   { reverb.setModDepth(ms); }
     void setReverbSaturation(float a)  { reverb.setSaturation(a); }
-    void setReverbInputHighPassHz(float hz) { reverb.setInputHighPassHz(hz); }
-    void setReverbInputHighPassFloorHz(float hz) { reverb.setInputHighPassFloorHz(hz); }
-    void setReverbInputLowPassHz(float hz)  { reverb.setInputLowPassHz(hz); }
+    void setReverbInputHighPassHz(float hz) { reverb.setInputHighPassHz(choirDensityMode ? juce::jlimit(250.0f, 350.0f, hz) : hz); }
+    void setReverbInputHighPassFloorHz(float hz) { reverb.setInputHighPassFloorHz(choirDensityMode ? juce::jlimit(250.0f, 350.0f, hz) : hz); }
+    void setReverbInputLowPassHz(float hz)  { reverb.setInputLowPassHz(choirDensityMode ? juce::jlimit(5000.0f, 6000.0f, hz) : hz); }
     void setReverbDucking(float amount, float attackMs = 6.0f, float releaseMs = 260.0f)
     {
-        reverb.setDucking(amount, attackMs, releaseMs);
+        reverb.setDucking(choirDensityMode ? juce::jmax(amount, 0.28f) : amount, attackMs, releaseMs);
     }
     void setReverbLowMonoControl(float cutoffHz, float lowWidth)
     {
@@ -238,7 +238,7 @@ public:
     // ---- Delay scale-safety ----
     void setDelayDucking(float amount, float attackMs = 5.0f, float releaseMs = 140.0f)
     {
-        delay.setDucking(amount, attackMs, releaseMs);
+        delay.setDucking(choirDensityMode ? 0.50f : amount, attackMs, releaseMs);
     }
 
     // ---- Note-density-aware send reduction ----
@@ -255,7 +255,12 @@ public:
     {
         reverbDensityWeight = juce::jlimit(0.0f, 1.0f, weight);
     }
-    void setChoirDensityMode(bool enabled) noexcept { choirDensityMode = enabled; }
+    void setChoirDensityMode(bool enabled) noexcept
+    {
+        choirDensityMode = enabled;
+        if (choirDensityMode)
+            applyChoirModeCaps();
+    }
     void setActiveVoiceCountForDensity(int count) noexcept { activeVoiceCountForDensity = juce::jmax(0, count); }
 
     // ---- Global "scale-safe" preset toggle ----
@@ -318,6 +323,21 @@ public:
     }
 
 private:
+    void applyChoirModeCaps() noexcept
+    {
+        delay.setMix(juce::jmin(delay.getMix(), 0.03f));
+        delay.setFeedback(juce::jmin(delay.getFeedback(), 0.08f));
+        delay.setDucking(0.50f, 5.0f, 140.0f);
+        delayActive = delay.getMix() > 0.001f;
+
+        reverb.setMix(juce::jmin(reverb.getMix(), 0.22f));
+        reverb.setSize(juce::jmin(reverb.getSize(), 0.62f));
+        reverb.setInputHighPassHz(300.0f);
+        reverb.setInputLowPassHz(5500.0f);
+        reverb.setDucking(juce::jmax(reverb.getDuckAmount(), 0.28f), 6.0f, 220.0f);
+        reverbActive = reverb.getMix() > 0.001f;
+    }
+
     // Scan the post-master buffer for samples exceeding ~ -1 dB (0.891).
     // Logs at most ~twice per second per chain instance.
     void detectAndLogClipping(juce::AudioBuffer<float>& buffer) noexcept

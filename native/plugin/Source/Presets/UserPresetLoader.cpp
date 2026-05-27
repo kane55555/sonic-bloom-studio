@@ -692,7 +692,7 @@ bool isChoirModePreset(const UserPreset& p)
 juce::String fxSendReleaseSourceFor(const UserPreset& p, bool choirMode)
 {
     if (choirMode) return "choirModeClamp";
-    if (p.fxSend.hasFxSendReleaseMs) return "preset.fxSend.fxSendReleaseMs";
+    if (p.fxSend.hasFxSendReleaseMs) return "presetFxSend";
     if (p.fxSend.hasFxSendReleaseMultiplier) return "ampReleaseFallback";
     return "categoryDefault";
 }
@@ -701,14 +701,13 @@ float resolveFxSendReleaseMs(const UserPreset& p, bool choirMode)
 {
     if (choirMode)
     {
-        const float maxMs = p.safety.hasChoirFxSendReleaseMaxMs
-            ? p.safety.choirFxSendReleaseMaxMs
-            : (p.fxSend.hasFxSendMaximumReleaseMs ? p.fxSend.fxSendMaximumReleaseMs : 180.0f);
         const float requested = p.fxSend.hasFxSendReleaseMs
             ? p.fxSend.fxSendReleaseMs
-            : juce::jmin(maxMs, p.amp.releaseMs * (p.fxSend.hasFxSendReleaseMultiplier
-                ? p.fxSend.fxSendReleaseMultiplier : 0.35f));
-        return juce::jlimit(40.0f, juce::jlimit(40.0f, 180.0f, maxMs), requested);
+            : (p.safety.hasChoirFxSendReleaseMaxMs
+                ? p.safety.choirFxSendReleaseMaxMs
+                : juce::jmin(180.0f, p.amp.releaseMs * (p.fxSend.hasFxSendReleaseMultiplier
+                    ? p.fxSend.fxSendReleaseMultiplier : 0.35f)));
+        return juce::jlimit(40.0f, 180.0f, requested);
     }
 
     if (p.fxSend.hasFxSendReleaseMs)
@@ -1040,6 +1039,7 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
             const float fxSendReleaseMs = resolveFxSendReleaseMs(p, true);
             engine.setFxSendReleaseMsForAll(fxSendReleaseMs);
             auto& pfx = engine.getFx();
+            pfx.setChoirDensityMode(true);
             pfx.setDelayMix(delayMix);
             pfx.setDelayFeedback(delayFeedback);
             pfx.setReverbMix(reverbMix);
@@ -1052,7 +1052,6 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
             pfx.setNoteDensityMaxReduction(0.35f);
             pfx.setDelayDensityWeight(1.0f);
             pfx.setReverbDensityWeight(0.75f);
-            pfx.setChoirDensityMode(true);
             juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-fx-send] preset=") + p.presetName
                 + " fxSendReleaseMs=" + juce::String(fxSendReleaseMs, 1)
                 + " fxSendReleaseSource=" + fxSendReleaseSourceFor(p, true)
