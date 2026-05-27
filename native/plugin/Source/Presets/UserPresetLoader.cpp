@@ -689,6 +689,25 @@ bool isChoirModePreset(const UserPreset& p)
         || c.contains("vocal") || n.contains("choir");
 }
 
+bool isChoirWidePreset(const UserPreset& p)
+{
+    const auto n = p.presetName.toLowerCase();
+    return n.contains("wide") || n.contains("heaven");
+}
+
+// Per-preset gain trim applied on top of preset.amp.gainDb when choir mode
+// is active. Keeps choir presets sitting between -20..-10 dB instead of
+// approaching 0 dBFS on chords.
+float choirNaturalGainTrimDb(const UserPreset& p)
+{
+    const auto n = p.presetName.toLowerCase();
+    if (n.contains("clean playable choir aah")) return -7.0f;
+    if (n.contains("dark controlled choir eeh")) return -9.0f;
+    if (n.contains("wide heaven choir ooh"))    return -4.0f;
+    // Generic safety trim: choir samples are usually pre-normalised loud.
+    return -3.0f;
+}
+
 juce::String fxSendReleaseSourceFor(const UserPreset& p, bool choirMode)
 {
     if (choirMode) return "choirModeClamp";
