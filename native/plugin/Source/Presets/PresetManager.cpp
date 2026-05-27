@@ -907,6 +907,12 @@ void PresetManager::loadPreset(int index)
         requestedSampleRawPath     = rawSourcePath;
         requestedSampleResolvedFrom = resolvedFrom;
         requestedSampleRawInsidePresetsUser = rawIsInsidePresetsUser;
+        requestedPresetFilePath          = file.getFullPathName();
+        requestedPresetCategoryFolder    = presetCategoryFolder.getFullPathName();
+        requestedExpectedSourceFolderName = expectedSourceFolderName;
+        requestedAllowCrossCategorySource = allowCrossCategorySource;
+        requestedSourceFolderWavCount    = 0;
+        requestedExtraSourceWarnings     = extraSourceWarnings;
         macroMapper.clear();
         requestedPresetIsUserDiapreset = true;
         pendingUserDiapreset = up;
