@@ -1019,10 +1019,14 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     const auto fxL = fxLimitsFor(fam);
     const float space   = juce::jlimit(0.0f, 1.0f, p.macros.space);
     const float reverbBase = p.reverb.enabled ? p.reverb.mix : 0.0f;
-    const float reverbCap = choirMode ? 0.22f : fxL.reverbMax;
-    const float delayCap  = choirMode ? 0.03f : fxL.delayMax;
-    const float reverbSizeCap = choirMode ? 0.62f : 1.0f;
-    const float delayFeedbackCap = choirMode ? 0.08f : 0.95f;
+    const bool choirIsWide = choirMode && isChoirWidePreset(p);
+    // Natural choir mode: reverb mix ceiling tightens from 0.22 to 0.16 for
+    // clean/dark variants (0.20 for wide/heaven) so vocal samples stay in a
+    // room rather than swimming in a pad-style wash. Delay stays off.
+    const float reverbCap = choirMode ? (choirIsWide ? 0.20f : 0.16f) : fxL.reverbMax;
+    const float delayCap  = choirMode ? 0.00f : fxL.delayMax;
+    const float reverbSizeCap = choirMode ? (choirIsWide ? 0.62f : 0.55f) : 1.0f;
+    const float delayFeedbackCap = choirMode ? 0.00f : 0.95f;
     const float reverbMix  = juce::jlimit(0.0f, reverbCap,
                                           reverbBase * (0.85f + space * 0.30f));
     const float delayMix = juce::jlimit(0.0f, delayCap, p.delay.enabled ? p.delay.mix : 0.0f);
