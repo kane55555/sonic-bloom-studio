@@ -189,7 +189,13 @@ inline void report(DiditagainProcessor& proc,
                    const juce::String& resolvedFromIn          = {},
                    bool rawPathInsidePresetsUser               = false,
                    const juce::String& browserPresetNameIn     = {},
-                   const juce::String& bankCategoryIn          = {})
+                   const juce::String& bankCategoryIn          = {},
+                   const juce::String& presetFilePathIn        = {},
+                   const juce::String& presetCategoryFolderIn  = {},
+                   const juce::String& expectedSourceFolderNameIn = {},
+                   bool allowCrossCategorySourceIn             = false,
+                   int sourceFolderWavCountIn                  = 0,
+                   const juce::StringArray& extraSourceWarningsIn = {})
 {
     auto& engine = proc.getSynthEngine();
     auto& bus    = engine.getLayerBus();
