@@ -701,11 +701,20 @@ bool isChoirWidePreset(const UserPreset& p)
 float choirNaturalGainTrimDb(const UserPreset& p)
 {
     const auto n = p.presetName.toLowerCase();
-    if (n.contains("clean playable choir aah")) return -7.0f;
-    if (n.contains("dark controlled choir eeh")) return -9.0f;
-    if (n.contains("wide heaven choir ooh"))    return -4.0f;
+    if (n.contains("clean playable choir aah")) return -2.0f;
+    if (n.contains("dark controlled choir eeh")) return -6.0f;
+    if (n.contains("wide heaven choir ooh"))    return -3.0f;
     // Generic safety trim: choir samples are usually pre-normalised loud.
     return -3.0f;
+}
+
+float choirNaturalReverbMix(const UserPreset& p) noexcept
+{
+    const auto n = p.presetName.toLowerCase();
+    if (n.contains("clean playable choir aah")) return 0.10f;
+    if (n.contains("dark controlled choir eeh")) return 0.11f;
+    if (n.contains("wide heaven choir ooh"))    return 0.15f;
+    return isChoirWidePreset(p) ? 0.15f : 0.11f;
 }
 
 juce::String fxSendReleaseSourceFor(const UserPreset& p, bool choirMode)
