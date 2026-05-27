@@ -168,6 +168,44 @@ public:
         reverb.notifyTransportPlaying();
     }
 
+    // ---- Delay scale-safety ----
+    void setDelayDucking(float amount, float attackMs = 5.0f, float releaseMs = 140.0f)
+    {
+        delay.setDucking(amount, attackMs, releaseMs);
+    }
+
+    // ---- Note-density-aware send reduction ----
+    void setNoteDensityFxReductionEnabled(bool enabled) noexcept { noteDensityFxReductionEnabled = enabled; }
+    void setNoteDensityMaxReduction(float amount) noexcept
+    {
+        maxDensityReduction = juce::jlimit(0.0f, 0.6f, amount);
+    }
+
+    // ---- Global "scale-safe" preset toggle ----
+    // When true, FX writes from the preset applier are gently tamed:
+    //  - reverb/delay mix scaled by 0.75
+    //  - delay feedback clamp tightened by -0.05
+    //  - reverb + delay ducking forced on
+    //  - density reduction always enabled
+    void setScaleSafeFxMode(bool on) noexcept { scaleSafeFxMode = on; }
+    bool getScaleSafeFxMode() const noexcept { return scaleSafeFxMode; }
+
+    void setClearFxTailOnPresetChange(bool on) noexcept { clearTailOnPresetChange = on; }
+    bool getClearFxTailOnPresetChange() const noexcept { return clearTailOnPresetChange; }
+
+    // Drains delay + reverb tank. Called by the preset applier when a new
+    // preset is loaded so old reverb tails don't bleed into new instruments.
+    void clearTimeFxTails()
+    {
+        delay.reset();
+        reverb.reset();
+    }
+
+    // Accessors used by the preset-quality reporter.
+    DelayBlock&  getDelay()  noexcept { return delay; }
+    ReverbBlock& getReverb() noexcept { return reverb; }
+    bool getNoteDensityFxReductionEnabled() const noexcept { return noteDensityFxReductionEnabled; }
+
     void setEqLowDb (float db) { eq.setLowDb(db); }
     void setEqMidDb (float db) { eq.setMidDb(db); }
     void setEqHighDb(float db) { eq.setHighDb(db); }
