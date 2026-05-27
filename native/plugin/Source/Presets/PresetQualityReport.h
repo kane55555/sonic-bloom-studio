@@ -479,6 +479,16 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("delayMix",               delayMix);
     j->setProperty("chorusMix",              chorusMix);
     j->setProperty("saturationMix",          satMix);
+    j->setProperty("reverbDuckingEnabled",   reverbDuckEnabled);
+    j->setProperty("reverbDuckingAmount",    reverbDuckAmount);
+    j->setProperty("reverbInputHighpassHz",  reverbInputHpHz);
+    j->setProperty("reverbInputLowpassHz",   reverbInputLpHz);
+    j->setProperty("delayDuckingEnabled",    delayDuckEnabled);
+    j->setProperty("delayDuckingAmount",     delayDuckAmount);
+    j->setProperty("delayFeedback",          delayFeedback);
+    j->setProperty("scaleSafeFxMode",        scaleSafeFxMode);
+    j->setProperty("noteDensityFxReduction", noteDensityFxOn);
+    j->setProperty("fxTailClearOnPresetChange", fxTailClearOnLoad);
     j->setProperty("layer2GainDb",           up.layer2.gainDb);
     j->setProperty("layer2BlendMode",        up.layer2.blendMode.isNotEmpty() ? up.layer2.blendMode : juce::String("auto"));
     j->setProperty("layer2EqRole",           up.layer2.eqRole.isNotEmpty() ? up.layer2.eqRole : juce::String("auto"));
