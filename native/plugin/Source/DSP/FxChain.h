@@ -118,6 +118,61 @@ public:
         captureRecentPeak(buffer, finalRecent);
     }
 
+    // Process only the separated per-voice FX-send bus and leave no dry
+    // pass-through in the returned buffer. SynthEngine adds this wet result
+    // back to the independent dry voice bus.
+    void processWetSend(juce::AudioBuffer<float>& buffer)
+    {
+        meterStage(buffer, "fx-send-in", fxInPeak, fxInFrames);
+        captureRecentPeak(buffer, fxInRecent);
+        updateNoteDensity(buffer);
+
+        const float densityScale = noteDensityFxReductionEnabled
+            ? juce::jlimit(1.0f - maxDensityReduction, 1.0f,
+                           1.0f - densityEnv * maxDensityReduction)
+            : 1.0f;
+        delay.setSendDensityScale(densityScale);
+        reverb.setSendDensityScale(densityScale);
+
+        if (saturationActive)
+        {
+            const int n = buffer.getNumSamples();
+            for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+            {
+                auto* d = buffer.getWritePointer(ch);
+                for (int i = 0; i < n; ++i) d[i] = sat.processSample(d[i]);
+            }
+        }
+
+        chorus.process(buffer);
+
+        if (wetHpHz > 25.0f && (delayActive || reverbActive))
+        {
+            const int n = buffer.getNumSamples();
+            auto* L = buffer.getWritePointer(0);
+            auto* R = buffer.getNumChannels() > 1 ? buffer.getWritePointer(1) : L;
+            for (int i = 0; i < n; ++i)
+            {
+                L[i] = wetHpL.processSample(0, L[i]);
+                R[i] = wetHpR.processSample(0, R[i]);
+            }
+        }
+
+        dryFxScratch.setSize(buffer.getNumChannels(), buffer.getNumSamples(), false, false, true);
+        dryFxScratch.makeCopyOf(buffer, true);
+        delay.processWetOnly(buffer, dryFxScratch);
+        dryFxScratch.makeCopyOf(buffer, true);
+        reverb.processWetOnly(buffer, dryFxScratch);
+
+        eq.process(buffer);
+        comp.process(buffer);
+        masterGain.process(buffer);
+        detectAndLogClipping(buffer);
+        captureRecentPeak(buffer, fxOutRecent);
+        limiter.process(buffer);
+        captureRecentPeak(buffer, finalRecent);
+    }
+
     // ---- Debug/reporting peak accessors (dBFS; -120 if silent) ----
     float getFxInPeakDb()    const noexcept { return toDb(fxInRecent.load(std::memory_order_relaxed)); }
     float getFxOutPeakDb()   const noexcept { return toDb(fxOutRecent.load(std::memory_order_relaxed)); }
@@ -368,6 +423,8 @@ private:
     CompressorBlock  comp;
     LimiterBlock     limiter;
     GainStage        masterGain;
+
+    juce::AudioBuffer<float> dryFxScratch;
 
     juce::dsp::FirstOrderTPTFilter<float> wetHpL, wetHpR;
     float wetHpHz = 80.0f;
