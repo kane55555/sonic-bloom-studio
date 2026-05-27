@@ -531,6 +531,14 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("clearFxOnTransportStop",  true);
     j->setProperty("transportStopFxFadeMs",   120);
     j->setProperty("clearFxTailOnPresetChange", fxTailClearOnLoad);
+    j->setProperty("choirMode",                 choirMode);
+    j->setProperty("choirAmpReleaseClamped",    choirAmpReleaseClamped);
+    j->setProperty("choirFxSendReleaseMs",      fxSendReleaseMsLive);
+    j->setProperty("choirReverbCapApplied",     choirReverbCapApplied);
+    j->setProperty("choirDelayCapApplied",      choirDelayCapApplied);
+    j->setProperty("choirNoteDensityFxReduction", choirNoteDensityFxReduction);
+    j->setProperty("choirActiveVoiceCount",     choirActiveVoiceCount);
+    j->setProperty("choirFxInputAfterNoteOffDb", fxInDb);
     j->setProperty("layer2GainDb",           up.layer2.gainDb);
     j->setProperty("layer2BlendMode",        up.layer2.blendMode.isNotEmpty() ? up.layer2.blendMode : juce::String("auto"));
     j->setProperty("layer2EqRole",           up.layer2.eqRole.isNotEmpty() ? up.layer2.eqRole : juce::String("auto"));
