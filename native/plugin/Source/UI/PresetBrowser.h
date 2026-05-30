@@ -441,9 +441,18 @@ private:
         }
         else
         {
-            selectedGlobal = r.globalIndex;
+            selectedGlobal               = r.globalIndex;
+            selectedVisibleRow           = rowNumber;
+            lastClickedVisibleRow        = rowNumber;
+            lastClickedPresetGlobalIndex = r.globalIndex;
             list.selectRow(rowNumber);
             list.repaint();
+            DBG(juce::String("[DIDITAGAIN browser-nav]")
+                + " clickedRow=" + juce::String(rowNumber)
+                + " clickedPresetIndex=" + juce::String(r.globalIndex)
+                + " stepDelta=0"
+                + " categoryFilter=" + r.category
+                + " searchText=" + searchBox.getText());
             if (onPresetSelected) onPresetSelected(r.globalIndex);
         }
     }
