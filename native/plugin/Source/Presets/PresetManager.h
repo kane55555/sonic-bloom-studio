@@ -79,6 +79,42 @@ public:
         return true;
     }
 
+    // --- Stable-identity accessors used to serialize/restore selection in DAW
+    //     project state. Empty strings when the index is out of range. ---
+    juce::String getPresetFilePath(int index) const
+    {
+        if (index >= 0 && index < (int) presets.size()) return presets[index].filePath;
+        return {};
+    }
+    juce::String getPresetUserFile(int index) const
+    {
+        if (index >= 0 && index < (int) presets.size()) return presets[index].userPresetFile;
+        return {};
+    }
+    bool getPresetIsUserPreset(int index) const
+    {
+        if (index >= 0 && index < (int) presets.size()) return presets[index].isUserPreset;
+        return false;
+    }
+    bool getPresetIsSampleDrop(int index) const
+    {
+        if (index >= 0 && index < (int) presets.size()) return presets[index].isSampleDrop;
+        return false;
+    }
+
+    // Find the first valid Piano preset for the fresh-instance default sound.
+    // Returns -1 when no piano-like preset exists.
+    int findDefaultPianoPresetIndex() const;
+
+    // Resolve a saved selection back to a (possibly re-scanned) preset index by
+    // stable identity: user/preset file path first, then name+category, then a
+    // last-resort fallback to the saved index. Returns -1 if nothing matches.
+    int findPresetIndexByIdentity(const juce::String& userPresetFile,
+                                  const juce::String& filePath,
+                                  const juce::String& name,
+                                  const juce::String& category,
+                                  int fallbackIndex) const;
+
     std::function<void()> onPresetLoaded;
 
     // Most recent instrument folder requested by a preset (empty if none).

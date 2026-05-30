@@ -29,6 +29,9 @@ public:
         searchBox.setColour(juce::TextEditor::textColourId, Theme::getColors().textPrimary);
         searchBox.setColour(juce::TextEditor::outlineColourId, Theme::getColors().border);
         searchBox.onTextChange = [this]() { rebuildRows(); };
+        // Escape unfocuses the search field so the spacebar returns to the host
+        // transport and arrow keys resume stepping presets.
+        searchBox.onEscapeKey = [this]() { list.grabKeyboardFocus(); };
 
         addAndMakeVisible(list);
         list.setModel(this);
@@ -90,7 +93,9 @@ public:
                 // Make sure its category is open and the row is visible.
                 openCategories.insert(rows[r].category);
                 rebuildRows();
-                list.selectRow(rowIndexForPreset(globalIndex));
+                const int rowIdx = rowIndexForPreset(globalIndex);
+                selectedVisibleRow = rowIdx;
+                list.selectRow(rowIdx);
                 return;
             }
         list.repaint();
@@ -99,36 +104,58 @@ public:
     std::function<void(int)> onPresetSelected;
 
     /** Move selection to the next/previous preset row (skips category headers).
-        Opens collapsed categories as needed and fires onPresetSelected. */
+        Steps from the currently selected/clicked preset — never resets to the
+        top, never opens the category dropdown or "All Sounds" section. */
     bool stepSelection(int delta)
     {
         if (rows.isEmpty() || delta == 0) return false;
 
-        // Build a flat list of all presets in display order, opening every
-        // category so arrow-key navigation can flow across category boundaries
-        // even when sections are collapsed.
-        bool anyClosed = false;
-        for (auto& cat : categoryOrder())
-            if (openCategories.find(cat) == openCategories.end()) { openCategories.insert(cat); anyClosed = true; }
-        if (anyClosed) rebuildRows();
-
+        // Flat list of every preset row currently visible, in display order.
         juce::Array<int> presetRowIdx;
         for (int i = 0; i < rows.size(); ++i)
-            if (rows[i].kind == Row::Preset && rows[i].category == "All Sounds")
+            if (rows[i].kind == Row::Preset)
                 presetRowIdx.add(i);
         if (presetRowIdx.isEmpty()) return false;
 
+        const int oldVisibleRow = selectedVisibleRow;
         int curPos = -1;
-        for (int i = 0; i < presetRowIdx.size(); ++i)
-            if (rows[presetRowIdx[i]].globalIndex == selectedGlobal) { curPos = i; break; }
 
-        int next = (curPos < 0) ? (delta > 0 ? 0 : presetRowIdx.size() - 1)
-                                : juce::jlimit(0, presetRowIdx.size() - 1, curPos + delta);
+        // 1) Start from selectedVisibleRow when it still points at a preset.
+        if (selectedVisibleRow >= 0 && selectedVisibleRow < rows.size()
+            && rows[selectedVisibleRow].kind == Row::Preset)
+            curPos = presetRowIdx.indexOf(selectedVisibleRow);
+
+        // 2) Otherwise map selectedGlobal into the current filtered list.
+        if (curPos < 0 && selectedGlobal >= 0)
+            for (int i = 0; i < presetRowIdx.size(); ++i)
+                if (rows[presetRowIdx[i]].globalIndex == selectedGlobal) { curPos = i; break; }
+
+        // 3) Otherwise fall back to the last clicked visible row.
+        if (curPos < 0 && lastClickedVisibleRow >= 0)
+            curPos = presetRowIdx.indexOf(lastClickedVisibleRow);
+
+        // 4) Only default to first/last when nothing has ever been selected.
+        int next;
+        if (curPos < 0) next = (delta > 0) ? 0 : presetRowIdx.size() - 1;
+        else            next = juce::jlimit(0, presetRowIdx.size() - 1, curPos + delta);
+
         const int rowIdx = presetRowIdx[next];
-        selectedGlobal = rows[rowIdx].globalIndex;
+        selectedGlobal     = rows[rowIdx].globalIndex;
+        selectedVisibleRow = rowIdx;
         list.selectRow(rowIdx);
         list.scrollToEnsureRowIsOnscreen(rowIdx);
         list.repaint();
+
+        DBG(juce::String("[DIDITAGAIN browser-nav]")
+            + " clickedRow=" + juce::String(lastClickedVisibleRow)
+            + " clickedPresetIndex=" + juce::String(lastClickedPresetGlobalIndex)
+            + " stepDelta=" + juce::String(delta)
+            + " oldVisibleRow=" + juce::String(oldVisibleRow)
+            + " newVisibleRow=" + juce::String(rowIdx)
+            + " newPresetIndex=" + juce::String(selectedGlobal)
+            + " categoryFilter=" + (rowIdx >= 0 && rowIdx < rows.size() ? rows[rowIdx].category : juce::String())
+            + " searchText=" + searchBox.getText());
+
         if (onPresetSelected) onPresetSelected(selectedGlobal);
         return true;
     }
@@ -414,9 +441,18 @@ private:
         }
         else
         {
-            selectedGlobal = r.globalIndex;
+            selectedGlobal               = r.globalIndex;
+            selectedVisibleRow           = rowNumber;
+            lastClickedVisibleRow        = rowNumber;
+            lastClickedPresetGlobalIndex = r.globalIndex;
             list.selectRow(rowNumber);
             list.repaint();
+            DBG(juce::String("[DIDITAGAIN browser-nav]")
+                + " clickedRow=" + juce::String(rowNumber)
+                + " clickedPresetIndex=" + juce::String(r.globalIndex)
+                + " stepDelta=0"
+                + " categoryFilter=" + r.category
+                + " searchText=" + searchBox.getText());
             if (onPresetSelected) onPresetSelected(r.globalIndex);
         }
     }
@@ -449,5 +485,8 @@ private:
     juce::Array<Item> items;
     juce::Array<Row>  rows;
     std::set<juce::String> openCategories;
-    int selectedGlobal = -1;
+    int selectedGlobal = -1;                // currently selected preset (global index)
+    int selectedVisibleRow = -1;            // its row index in the visible list
+    int lastClickedVisibleRow = -1;         // last row the user clicked
+    int lastClickedPresetGlobalIndex = -1;  // global index of last clicked preset
 };

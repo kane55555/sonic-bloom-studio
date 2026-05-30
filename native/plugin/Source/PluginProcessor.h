@@ -74,6 +74,29 @@ private:
     int clipBlocksSinceLog = 0;
     int stoppedBlocks = 0; // transport-stop counter for FX-tail flush
 
+    // ---- Fresh-instance startup default + DAW project recall ----
+    // hasRestoredState becomes true only when setStateInformation restored a
+    // real saved project, so we never override a user's saved instrument with
+    // the default piano. startupDefaultApplied guards the one-shot default load.
+    bool hasRestoredState = false;
+    bool startupDefaultApplied = false;
+
+    // Selection restored from project state, replayed once the preset library
+    // has scanned (in the audio thread before first render).
+    struct RestoredSelection
+    {
+        bool pending = false;
+        int  presetIndex = -1;
+        juce::String presetName;
+        juce::String presetCategory;
+        juce::String presetFilePath;
+        juce::String userPresetFilePath;
+        bool fallbackSynthesisEnabled = false;
+    };
+    RestoredSelection restoredSelection;
+
+    void applyStartupDefaultIfNeeded();
+
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(DiditagainProcessor)
 };

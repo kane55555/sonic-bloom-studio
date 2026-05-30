@@ -61,6 +61,7 @@ public:
                                const juce::String& presetName,
                                const juce::String& folderPath);
     void setFallbackSynthesisEnabled(bool enabled);
+    bool isFallbackSynthesisEnabled() const noexcept { return fallbackSynthesisEnabled; }
     void setSampleLooping(bool shouldLoop);
     void setSampleCropLoop(float cropStart, float cropEnd,
                            float loopStart, float loopEnd,

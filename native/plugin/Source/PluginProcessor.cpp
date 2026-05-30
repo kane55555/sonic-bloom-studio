@@ -277,11 +277,75 @@ void DiditagainProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     synthEngine.prepare(sampleRate, samplesPerBlock);
     // Ensure MIDI produces sound on a fresh instance before any preset/sample
-    // has been loaded — this is the "test tone" fallback path.
-    synthEngine.setFallbackSynthesisEnabled(true);
+    // has been loaded — this is the "test tone" fallback path. The startup
+    // default below replaces it with a real piano preset when one exists.
+    // Only force the fallback on the very first prepare so a later re-prepare
+    // (e.g. sample-rate change) never clobbers an already-loaded instrument.
+    if (! startupDefaultApplied && ! hasRestoredState)
+        synthEngine.setFallbackSynthesisEnabled(true);
     didaAudioLog(juce::String("prepareToPlay sampleRate=") + juce::String(sampleRate)
         + " blockSize=" + juce::String(samplesPerBlock)
         + " voices=" + juce::String(synthEngine.getNumVoices()));
+
+    // Fresh-instance default sound / DAW project recall. Safe to call here —
+    // the preset library scanned in the PresetManager constructor. This will
+    // not override a restored project (guarded by hasRestoredState).
+    applyStartupDefaultIfNeeded();
+}
+
+void DiditagainProcessor::applyStartupDefaultIfNeeded()
+{
+    // 1) Highest priority: replay a selection restored from DAW project state.
+    if (restoredSelection.pending)
+    {
+        restoredSelection.pending = false;
+        startupDefaultApplied = true;
+
+        // Rescan so user/imported presets created since save are visible, then
+        // resolve the saved selection by stable identity.
+        presetManager.scanPresetDirectory();
+        const int idx = presetManager.findPresetIndexByIdentity(
+            restoredSelection.userPresetFilePath,
+            restoredSelection.presetFilePath,
+            restoredSelection.presetName,
+            restoredSelection.presetCategory,
+            restoredSelection.presetIndex);
+
+        if (idx >= 0)
+        {
+            // Queue the source-folder load exactly like a normal preset click.
+            presetManager.loadPreset(idx);
+            didaPresetLog(juce::String("restored project selection idx=") + juce::String(idx)
+                + " name=" + presetManager.getPresetName(idx));
+        }
+        else
+        {
+            synthEngine.setFallbackSynthesisEnabled(restoredSelection.fallbackSynthesisEnabled);
+            didaPresetLog("restore: saved preset not found, kept fallback="
+                + juce::String(restoredSelection.fallbackSynthesisEnabled ? "true" : "false"));
+        }
+        return;
+    }
+
+    // 2) Only auto-load the default for a truly new plugin instance.
+    if (hasRestoredState || startupDefaultApplied) return;
+    if (presetManager.getNumPresets() <= 0) return;
+
+    startupDefaultApplied = true;
+    const int idx = presetManager.findDefaultPianoPresetIndex();
+    if (idx >= 0)
+    {
+        // Fallback synthesis is disabled automatically by processBlock once the
+        // real sample source from this preset becomes active.
+        presetManager.loadPreset(idx);
+        didaPresetLog(juce::String("startup default piano idx=") + juce::String(idx)
+            + " name=" + presetManager.getPresetName(idx));
+    }
+    else
+    {
+        synthEngine.setFallbackSynthesisEnabled(true);
+        didaPresetLog("startup default: no piano preset found, using fallback synth");
+    }
 }
 
 void DiditagainProcessor::releaseResources()
@@ -733,16 +797,69 @@ void DiditagainProcessor::changeProgramName(int, const juce::String&) {}
 
 void DiditagainProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
+    // Wrapper tree: <DIDITAGAIN_STATE> holds the APVTS snapshot plus a
+    // <PLUGIN_STATE> child carrying the selected preset / source-folder
+    // identity so a DAW project recalls the exact instrument per instance.
+    juce::XmlElement root("DIDITAGAIN_STATE");
+
     auto state = apvts.copyState();
-    std::unique_ptr<juce::XmlElement> xml(state.createXml());
-    copyXmlToBinary(*xml, destData);
+    if (auto* apvtsXml = state.createXml().release())
+        root.addChildElement(apvtsXml); // tag == apvts.state.getType()
+
+    auto* plugin = root.createNewChildElement("PLUGIN_STATE");
+    const int idx = presetManager.getCurrentPresetIndex();
+    plugin->setAttribute("selectedPresetIndex",            idx);
+    plugin->setAttribute("selectedPresetName",             presetManager.getPresetName(idx));
+    plugin->setAttribute("selectedPresetCategory",         presetManager.getPresetCategory(idx));
+    plugin->setAttribute("selectedPresetFilePath",         presetManager.getPresetFilePath(idx));
+    plugin->setAttribute("selectedUserPresetFilePath",     presetManager.getPresetUserFile(idx));
+    plugin->setAttribute("selectedSourceFolderPath",       presetManager.getRequestedSampleFolderPath());
+    plugin->setAttribute("selectedSourceDisplayName",      presetManager.getRequestedSampleDisplayName());
+    plugin->setAttribute("selectedSampleRootMidi",         presetManager.getRequestedSampleRootMidi());
+    plugin->setAttribute("selectedSampleLooping",          presetManager.getRequestedSampleLooping());
+    plugin->setAttribute("fallbackSynthesisEnabled",       synthEngine.isFallbackSynthesisEnabled());
+    plugin->setAttribute("lastLoadedPresetWasUserDiapreset", presetManager.isCurrentPresetUserDiapreset());
+
+    copyXmlToBinary(root, destData);
 }
 
 void DiditagainProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
     std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
-    if (xml && xml->hasTagName(apvts.state.getType()))
+    if (! xml) return;
+
+    if (xml->hasTagName("DIDITAGAIN_STATE"))
+    {
+        // 1) Restore APVTS first.
+        if (auto* apvtsXml = xml->getChildByName(apvts.state.getType()))
+            apvts.replaceState(juce::ValueTree::fromXml(*apvtsXml));
+
+        // 2) Capture the saved selection; it is replayed once the preset
+        //    library has scanned (applyStartupDefaultIfNeeded below).
+        if (auto* plugin = xml->getChildByName("PLUGIN_STATE"))
+        {
+            restoredSelection.pending                  = true;
+            restoredSelection.presetIndex              = plugin->getIntAttribute("selectedPresetIndex", -1);
+            restoredSelection.presetName               = plugin->getStringAttribute("selectedPresetName");
+            restoredSelection.presetCategory           = plugin->getStringAttribute("selectedPresetCategory");
+            restoredSelection.presetFilePath           = plugin->getStringAttribute("selectedPresetFilePath");
+            restoredSelection.userPresetFilePath       = plugin->getStringAttribute("selectedUserPresetFilePath");
+            restoredSelection.fallbackSynthesisEnabled = plugin->getBoolAttribute("fallbackSynthesisEnabled", false);
+        }
+
+        // Mark restored so the startup default piano never overrides project
+        // state, then replay the saved selection now.
+        hasRestoredState = true;
+        applyStartupDefaultIfNeeded();
+        return;
+    }
+
+    // Legacy projects: raw APVTS state only (no wrapper).
+    if (xml->hasTagName(apvts.state.getType()))
+    {
         apvts.replaceState(juce::ValueTree::fromXml(*xml));
+        hasRestoredState = true;
+    }
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
