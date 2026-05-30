@@ -485,5 +485,8 @@ private:
     juce::Array<Item> items;
     juce::Array<Row>  rows;
     std::set<juce::String> openCategories;
-    int selectedGlobal = -1;
+    int selectedGlobal = -1;                // currently selected preset (global index)
+    int selectedVisibleRow = -1;            // its row index in the visible list
+    int lastClickedVisibleRow = -1;         // last row the user clicked
+    int lastClickedPresetGlobalIndex = -1;  // global index of last clicked preset
 };
