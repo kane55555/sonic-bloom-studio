@@ -867,7 +867,9 @@ int PresetManager::findPresetIndexByIdentity(const juce::String& userPresetFile,
     return -1;
 }
 
-
+void PresetManager::loadPreset(int index)
+{
+    if (index < 0 || index >= static_cast<int>(presets.size()))
     {
         juce::String logMessage;
         logMessage << "ignored invalid index=" << index << " count=" << static_cast<int>(presets.size());
