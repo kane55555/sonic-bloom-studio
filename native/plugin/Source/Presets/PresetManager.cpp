@@ -795,9 +795,79 @@ static void applyEnv(juce::AudioProcessor& proc, const juce::var& obj, const cha
     setParam(proc, (pfx + "Release").toRawUTF8(), obj.getProperty("release", 0.5));
 }
 
-void PresetManager::loadPreset(int index)
+int PresetManager::findDefaultPianoPresetIndex() const
 {
-    if (index < 0 || index >= static_cast<int>(presets.size()))
+    const int n = static_cast<int>(presets.size());
+
+    // 1. First non-factory .diapreset in category "Pianos".
+    for (int i = 0; i < n; ++i)
+    {
+        const auto& p = presets[i];
+        if (! p.isFactory && p.isUserPreset && p.category.equalsIgnoreCase("Pianos"))
+            return i;
+    }
+    // 2. First sample-drop preset in category "Pianos".
+    for (int i = 0; i < n; ++i)
+    {
+        const auto& p = presets[i];
+        if (p.isSampleDrop && p.category.equalsIgnoreCase("Pianos"))
+            return i;
+    }
+    // 3. Any preset in category "Pianos".
+    for (int i = 0; i < n; ++i)
+        if (presets[i].category.equalsIgnoreCase("Pianos"))
+            return i;
+    // 4. First preset whose name/category contains "piano".
+    for (int i = 0; i < n; ++i)
+    {
+        if (presets[i].name.containsIgnoreCase("piano")
+            || presets[i].category.containsIgnoreCase("piano"))
+            return i;
+    }
+    return -1;
+}
+
+int PresetManager::findPresetIndexByIdentity(const juce::String& userPresetFile,
+                                             const juce::String& filePath,
+                                             const juce::String& name,
+                                             const juce::String& category,
+                                             int fallbackIndex) const
+{
+    const int n = static_cast<int>(presets.size());
+
+    // 1. Exact .diapreset / user preset file path match.
+    if (userPresetFile.isNotEmpty())
+        for (int i = 0; i < n; ++i)
+            if (presets[i].userPresetFile == userPresetFile)
+                return i;
+
+    // 1b. Exact preset file path match.
+    if (filePath.isNotEmpty())
+        for (int i = 0; i < n; ++i)
+            if (presets[i].filePath == filePath)
+                return i;
+
+    // 2. Exact name + category match.
+    if (name.isNotEmpty())
+        for (int i = 0; i < n; ++i)
+            if (presets[i].name.equalsIgnoreCase(name)
+                && presets[i].category.equalsIgnoreCase(category))
+                return i;
+
+    // 2b. Name only.
+    if (name.isNotEmpty())
+        for (int i = 0; i < n; ++i)
+            if (presets[i].name.equalsIgnoreCase(name))
+                return i;
+
+    // 3. Saved index as last fallback.
+    if (fallbackIndex >= 0 && fallbackIndex < n)
+        return fallbackIndex;
+
+    return -1;
+}
+
+
     {
         juce::String logMessage;
         logMessage << "ignored invalid index=" << index << " count=" << static_cast<int>(presets.size());
