@@ -279,7 +279,10 @@ void DiditagainProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     // Ensure MIDI produces sound on a fresh instance before any preset/sample
     // has been loaded — this is the "test tone" fallback path. The startup
     // default below replaces it with a real piano preset when one exists.
-    synthEngine.setFallbackSynthesisEnabled(true);
+    // Only force the fallback on the very first prepare so a later re-prepare
+    // (e.g. sample-rate change) never clobbers an already-loaded instrument.
+    if (! startupDefaultApplied && ! hasRestoredState)
+        synthEngine.setFallbackSynthesisEnabled(true);
     didaAudioLog(juce::String("prepareToPlay sampleRate=") + juce::String(sampleRate)
         + " blockSize=" + juce::String(samplesPerBlock)
         + " voices=" + juce::String(synthEngine.getNumVoices()));
