@@ -277,11 +277,72 @@ void DiditagainProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     synthEngine.prepare(sampleRate, samplesPerBlock);
     // Ensure MIDI produces sound on a fresh instance before any preset/sample
-    // has been loaded — this is the "test tone" fallback path.
+    // has been loaded — this is the "test tone" fallback path. The startup
+    // default below replaces it with a real piano preset when one exists.
     synthEngine.setFallbackSynthesisEnabled(true);
     didaAudioLog(juce::String("prepareToPlay sampleRate=") + juce::String(sampleRate)
         + " blockSize=" + juce::String(samplesPerBlock)
         + " voices=" + juce::String(synthEngine.getNumVoices()));
+
+    // Fresh-instance default sound / DAW project recall. Safe to call here —
+    // the preset library scanned in the PresetManager constructor. This will
+    // not override a restored project (guarded by hasRestoredState).
+    applyStartupDefaultIfNeeded();
+}
+
+void DiditagainProcessor::applyStartupDefaultIfNeeded()
+{
+    // 1) Highest priority: replay a selection restored from DAW project state.
+    if (restoredSelection.pending)
+    {
+        restoredSelection.pending = false;
+        startupDefaultApplied = true;
+
+        // Rescan so user/imported presets created since save are visible, then
+        // resolve the saved selection by stable identity.
+        presetManager.scanPresetDirectory();
+        const int idx = presetManager.findPresetIndexByIdentity(
+            restoredSelection.userPresetFilePath,
+            restoredSelection.presetFilePath,
+            restoredSelection.presetName,
+            restoredSelection.presetCategory,
+            restoredSelection.presetIndex);
+
+        if (idx >= 0)
+        {
+            // Queue the source-folder load exactly like a normal preset click.
+            presetManager.loadPreset(idx);
+            didaPresetLog(juce::String("restored project selection idx=") + juce::String(idx)
+                + " name=" + presetManager.getPresetName(idx));
+        }
+        else
+        {
+            synthEngine.setFallbackSynthesisEnabled(restoredSelection.fallbackSynthesisEnabled);
+            didaPresetLog("restore: saved preset not found, kept fallback="
+                + juce::String(restoredSelection.fallbackSynthesisEnabled ? "true" : "false"));
+        }
+        return;
+    }
+
+    // 2) Only auto-load the default for a truly new plugin instance.
+    if (hasRestoredState || startupDefaultApplied) return;
+    if (presetManager.getNumPresets() <= 0) return;
+
+    startupDefaultApplied = true;
+    const int idx = presetManager.findDefaultPianoPresetIndex();
+    if (idx >= 0)
+    {
+        // Fallback synthesis is disabled automatically by processBlock once the
+        // real sample source from this preset becomes active.
+        presetManager.loadPreset(idx);
+        didaPresetLog(juce::String("startup default piano idx=") + juce::String(idx)
+            + " name=" + presetManager.getPresetName(idx));
+    }
+    else
+    {
+        synthEngine.setFallbackSynthesisEnabled(true);
+        didaPresetLog("startup default: no piano preset found, using fallback synth");
+    }
 }
 
 void DiditagainProcessor::releaseResources()
