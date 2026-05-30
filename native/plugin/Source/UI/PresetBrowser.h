@@ -29,6 +29,9 @@ public:
         searchBox.setColour(juce::TextEditor::textColourId, Theme::getColors().textPrimary);
         searchBox.setColour(juce::TextEditor::outlineColourId, Theme::getColors().border);
         searchBox.onTextChange = [this]() { rebuildRows(); };
+        // Escape unfocuses the search field so the spacebar returns to the host
+        // transport and arrow keys resume stepping presets.
+        searchBox.onEscapeKey = [this]() { list.grabKeyboardFocus(); };
 
         addAndMakeVisible(list);
         list.setModel(this);
