@@ -1,5 +1,6 @@
 #include "PluginEditor.h"
 #include "UI/Theme.h"
+#include "BinaryData.h"
 
 DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     : AudioProcessorEditor(&p), processor(p)
