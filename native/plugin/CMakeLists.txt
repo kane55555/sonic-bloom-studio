@@ -130,6 +130,21 @@ endif()
 juce_generate_juce_header(DIDITAGAIN_STUDIO)
 
 # ---------------------------------------------------------------------------
+# Embedded binary assets (logo, etc.)
+# Compiles Assets/diditagain_logo.png into BinaryData so the VST3 binary is
+# fully self-contained — no external image file needs to sit next to the plugin.
+# ---------------------------------------------------------------------------
+juce_add_binary_data(DIDITAGAIN_STUDIO_BinaryData
+    SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/Assets/diditagain_logo.png"
+)
+
+target_link_libraries(DIDITAGAIN_STUDIO PRIVATE DIDITAGAIN_STUDIO_BinaryData)
+if(TARGET DIDITAGAIN_STUDIO_SharedCode)
+    target_link_libraries(DIDITAGAIN_STUDIO_SharedCode PRIVATE DIDITAGAIN_STUDIO_BinaryData)
+endif()
+
+# ---------------------------------------------------------------------------
 # Source collection
 # ---------------------------------------------------------------------------
 file(GLOB DIDA_CORE_SOURCES             CONFIGURE_DEPENDS Source/*.cpp)
