@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { Users, CreditCard, Music, Shield, Monitor, Bell, LayoutDashboard, Settings, Scissors, FileAudio, Package, GitBranch, Gift, Layers } from "lucide-react";
-import logo from "@/assets/diditagain-logo.png";
+
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -22,7 +22,7 @@ const navItems = [
 const AdminSidebar = () => (
   <aside className="w-64 min-h-screen bg-sidebar border-r border-sidebar-border flex flex-col">
     <div className="p-4 border-b border-sidebar-border flex flex-col items-center">
-      <img src={logo} alt="DIDITAGAIN Worldwide" className="w-full max-w-[200px] h-auto" />
+      <img src="/diditagain-logo.png" alt="DIDITAGAIN Worldwide" className="w-full max-w-[200px] h-auto" />
       <p className="text-xs text-muted-foreground mt-2 font-mono">STUDIO ADMIN</p>
     </div>
     <nav className="flex-1 p-3 space-y-1">
