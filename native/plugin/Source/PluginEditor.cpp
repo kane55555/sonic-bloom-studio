@@ -90,6 +90,12 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     addChildComponent(overlayClose);
     addChildComponent(overlayTitle);
 
+    // Load the embedded transparent logo (compiled into the binary via
+    // BinaryData). If this fails we fall back to drawing the text title.
+    logoImage = juce::ImageFileFormat::loadFrom(
+        BinaryData::diditagain_logo_png,
+        BinaryData::diditagain_logo_pngSize);
+
     setupTabs();
     switchTab(Tab::Browser);
 
