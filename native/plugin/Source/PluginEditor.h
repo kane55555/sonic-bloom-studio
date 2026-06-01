@@ -44,6 +44,9 @@ private:
     juce::TextButton directMonitorButton{"DIRECT"};
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> directMonitorAttach;
 
+    // Embedded header logo (compiled into the VST3 via BinaryData).
+    juce::Image logoImage;
+
     // Panels (Browser/Layers/FX always visible via tabs; rest opened modally)
     std::unique_ptr<LayerEditor>      layerPanel;
     std::unique_ptr<MacroPanel>       macroPanel;
