@@ -1,5 +1,6 @@
 #include "PluginEditor.h"
 #include "UI/Theme.h"
+#include "BinaryData.h"
 
 DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     : AudioProcessorEditor(&p), processor(p)
@@ -89,6 +90,12 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     overlayTitle.setVisible(false);
     addChildComponent(overlayClose);
     addChildComponent(overlayTitle);
+
+    // Load the embedded transparent logo (compiled into the binary via
+    // BinaryData). If this fails we fall back to drawing the text title.
+    logoImage = juce::ImageFileFormat::loadFrom(
+        BinaryData::diditagain_logo_png,
+        BinaryData::diditagain_logo_pngSize);
 
     setupTabs();
     switchTab(Tab::Browser);
@@ -271,13 +278,29 @@ void DiditagainEditor::paint(juce::Graphics& g)
     g.setColour(C.surface);
     g.fillRect(0, 0, getWidth(), 56);
 
-    // Logo placeholder slot — replace by drawing src/assets/diditagain-logo.* via BinaryData
-    g.setColour(C.accentTeal);
-    g.setFont(Theme::getHeadingFont(20.0f));
-    g.drawText("DIDITAGAIN", 16, 6, 220, 28, juce::Justification::centredLeft);
-    g.setColour(C.textSecondary);
-    g.setFont(Theme::getBodyFont(10.0f));
-    g.drawText("STUDIO  /  Main Logo Asset Here", 16, 32, 280, 16, juce::Justification::centredLeft);
+    // Header logo. Draw the embedded transparent PNG inside a reserved slot
+    // that stays clear of the tabs (which start around x=320). Falls back to
+    // the text title only if the embedded image failed to load.
+    auto logoBounds = juce::Rectangle<int>(16, 6, 260, 44);
+    if (logoImage.isValid())
+    {
+        g.drawImageWithin(
+            logoImage,
+            logoBounds.getX(),
+            logoBounds.getY(),
+            logoBounds.getWidth(),
+            logoBounds.getHeight(),
+            juce::RectanglePlacement::centred | juce::RectanglePlacement::onlyReduceInSize,
+            false);
+    }
+    else
+    {
+        // fallback only
+        g.setColour(C.accentTeal);
+        g.setFont(Theme::getHeadingFont(20.0f));
+        g.drawText("DIDITAGAIN", 16, 6, 220, 28, juce::Justification::centredLeft);
+    }
+
 
     // Active tab underline (teal)
     auto tabUnder = [&](juce::TextButton& b, bool active) {
