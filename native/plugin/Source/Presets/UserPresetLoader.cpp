@@ -1053,7 +1053,11 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     //        reverb mix up to the cap.
     const auto fxL = fxLimitsFor(fam);
     const float space   = juce::jlimit(0.0f, 1.0f, p.macros.space);
-    const float reverbBase = p.reverb.enabled ? p.reverb.mix : 0.0f;
+    // Reverb is silenced when the preset disables it OR explicitly bypasses it.
+    // bypass==true must force the reverb return to absolute silence (-120 dB)
+    // regardless of any mix value the preset ships with.
+    const bool reverbSilenced = (! p.reverb.enabled) || p.reverb.bypass;
+    const float reverbBase = reverbSilenced ? 0.0f : p.reverb.mix;
     const bool choirIsWide = choirMode && isChoirWidePreset(p);
     // Natural choir mode uses fixed room levels per preset so vocal samples
     // stay realistic; macro space is ignored here to avoid pad-style wash.
@@ -1064,8 +1068,10 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     const float reverbMix  = choirMode ? reverbCap
                                        : juce::jlimit(0.0f, reverbCap,
                                                      reverbBase * (0.85f + space * 0.30f));
-    const float delayMix = juce::jlimit(0.0f, delayCap, p.delay.enabled ? p.delay.mix : 0.0f);
-    const float delayFeedback = juce::jlimit(0.0f, delayFeedbackCap, p.delay.feedback);
+    // Delay off => mix AND feedback forced to zero so the delay return reads
+    // -120 dB and no tail can sustain itself through feedback.
+    const float delayMix = p.delay.enabled ? juce::jlimit(0.0f, delayCap, p.delay.mix) : 0.0f;
+    const float delayFeedback = p.delay.enabled ? juce::jlimit(0.0f, delayFeedbackCap, p.delay.feedback) : 0.0f;
     const float reverbSize = juce::jlimit(0.0f, reverbSizeCap, p.reverb.size);
 
     // Chorus: off for natural choir except a barely audible Ooh/Heaven width.
@@ -1163,6 +1169,41 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
             pfx.setNoteDensityMaxReduction(0.32f);
             pfx.setDelayDensityWeight(1.0f);
             pfx.setReverbDensityWeight(1.0f);
+
+            // Task 1: non-choir presets must push their own FX-send release time
+            // so the engine no longer keeps the 80 ms default.
+            const float fxSendReleaseMs = resolveFxSendReleaseMs(p, false);
+            engine.setFxSendReleaseMsForAll(fxSendReleaseMs);
+
+            // Tasks 2/3: mirror the clamped/zeroed mix + feedback onto the live
+            // FX chain. When reverb is disabled/bypassed or delay is off these
+            // are zero, forcing the returns to -120 dB.
+            pfx.setDelayMix(delayMix);
+            pfx.setDelayFeedback(delayFeedback);
+            pfx.setReverbMix(reverbMix);
+            pfx.setReverbSize(reverbSize);
+
+            // Task 4: preset reverb overrides win over the category defaults
+            // that applyReverbCharacterForCategory() just applied above. Only
+            // fields the preset explicitly set (>=0 / hasDucking) are pushed.
+            if (p.reverb.preDelayMs >= 0.0f)      pfx.setReverbPreDelayMs(p.reverb.preDelayMs);
+            if (p.reverb.inputHighpassHz >= 0.0f) pfx.setReverbInputHighPassHz(p.reverb.inputHighpassHz);
+            if (p.reverb.inputLowpassHz >= 0.0f)  pfx.setReverbInputLowPassHz(p.reverb.inputLowpassHz);
+            if (p.reverb.hasDucking)
+            {
+                const float duckAmt = (! p.reverb.duckingEnabled) ? 0.0f
+                                      : (p.reverb.duckingAmount >= 0.0f ? p.reverb.duckingAmount : 0.0f);
+                if (p.reverb.duckingAmount >= 0.0f || ! p.reverb.duckingEnabled)
+                    pfx.setReverbDucking(duckAmt);
+            }
+
+            juce::Logger::writeToLog(juce::String("[DIDITAGAIN fx-send] preset=") + p.presetName
+                + " fxSendReleaseMs=" + juce::String(fxSendReleaseMs, 1)
+                + " fxSendReleaseSource=" + fxSendReleaseSourceFor(p, false)
+                + " reverbMix=" + juce::String(reverbMix, 3)
+                + " reverbSilenced=" + (reverbSilenced ? "true" : "false")
+                + " delayMix=" + juce::String(delayMix, 3)
+                + " delayFeedback=" + juce::String(delayFeedback, 3));
         }
     }
 

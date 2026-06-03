@@ -724,7 +724,12 @@ void PresetManager::applyPendingUserDiapresetAfterSampleLoad()
 
     pendingUserDiapresetApply = false;
     didaPresetManagerLog("applying diapreset sound design after source load: " + pendingUserDiapreset.presetName);
-    dida::userpreset::applyToProcessor(pendingUserDiapreset, processor);
+    didaPresetManagerLog("applying diapreset sound design after source load: " + pendingUserDiapreset.presetName);
+
+    // Task 4: category reverb defaults are applied FIRST so the preset can have
+    // the final say. applyToProcessor() (called below) re-applies the category
+    // character internally and then pushes any explicit preset reverb overrides
+    // on top, so these baseline defaults must not run afterwards.
     if (auto* dp = dynamic_cast<DiditagainProcessor*>(&processor))
     {
         auto& pfx = dp->getSynthEngine().getFx();
@@ -744,6 +749,10 @@ void PresetManager::applyPendingUserDiapresetAfterSampleLoad()
         else
         { pfx.setReverbCharacter(ReverbBlock::Character::Studio); }
     }
+
+    // Preset has the final say: this applies the category character again and
+    // then layers explicit preset reverb/FX overrides on top of the defaults.
+    dida::userpreset::applyToProcessor(pendingUserDiapreset, processor);
     logFinalActivePresetParams(processor, pendingUserDiapreset.presetName);
 
     // Debug: emit one structured preset-quality block per .diapreset load.
