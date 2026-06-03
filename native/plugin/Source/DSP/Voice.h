@@ -63,7 +63,7 @@ public:
 
     void prepare(double sampleRate, int samplesPerBlock);
     void resetNote() noexcept { clearCurrentNote(); reset(); }
-    void setFxSendReleaseMs(float ms) noexcept { fxSendReleaseMs = juce::jlimit(5.0f, 500.0f, ms); }
+    void setFxSendReleaseMs(float ms) noexcept { fxSendReleaseMs = juce::jlimit(1.0f, 500.0f, ms); }
     float getFxSendReleaseMs() const noexcept { return fxSendReleaseMs; }
     void chokeFxSend(float fadeMs) noexcept;
 

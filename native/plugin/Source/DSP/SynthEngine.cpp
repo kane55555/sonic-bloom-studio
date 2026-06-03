@@ -79,7 +79,7 @@ void SynthEngine::chokeAllFxSends(float fadeMs) noexcept
 
 void SynthEngine::setFxSendReleaseMsForAll(float ms) noexcept
 {
-    currentFxSendReleaseMs = juce::jlimit(5.0f, 500.0f, ms);
+    currentFxSendReleaseMs = juce::jlimit(1.0f, 500.0f, ms);
     forEachSynthVoice([this](SynthVoice& v)
     {
         v.setFxSendReleaseMs(currentFxSendReleaseMs);
