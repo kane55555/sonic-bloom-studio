@@ -34,6 +34,9 @@ void SynthEngine::renderBlockWithFx(juce::AudioBuffer<float>& buffer,
     SynthVoice::endFxSendRender();
     updateHeldNotes(midi);
     layerBus.process(dryRenderBuffer);
+    // Task 6/7: capture the dry voice-bus peak BEFORE any FX return is mixed in
+    // so the reporter can tell instrument silence apart from FX silence.
+    fx.captureDryOutputPeak(dryRenderBuffer);
     fx.setActiveVoiceCountForDensity(getActiveVoiceCount());
     fx.processWetSend(fxSendBuffer);
 
