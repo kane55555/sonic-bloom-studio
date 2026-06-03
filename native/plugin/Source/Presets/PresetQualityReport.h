@@ -254,6 +254,13 @@ inline void report(DiditagainProcessor& proc,
     const float finalDb     = fx.getFinalPeakDb();
     const float headroomDb  = juce::jmax(-60.0f, -finalDb);
 
+    // Task 6/7: dedicated dry-bus / isolated wet-return / final-output meters.
+    const float dryOutputDb    = fx.getDryOutputPeakDb();
+    const float reverbReturnDb = fx.getReverbReturnPeakDb();
+    const float delayReturnDb  = fx.getDelayReturnPeakDb();
+    const float finalOutputDb  = fx.getFinalOutputPeakDb();
+
+
     // resolvedFrom — explicit caller value wins; otherwise infer from state.
     juce::String resolvedFrom = resolvedFromIn;
     if (resolvedFrom.isEmpty())
