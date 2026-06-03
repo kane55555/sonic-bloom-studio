@@ -1053,7 +1053,11 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     //        reverb mix up to the cap.
     const auto fxL = fxLimitsFor(fam);
     const float space   = juce::jlimit(0.0f, 1.0f, p.macros.space);
-    const float reverbBase = p.reverb.enabled ? p.reverb.mix : 0.0f;
+    // Reverb is silenced when the preset disables it OR explicitly bypasses it.
+    // bypass==true must force the reverb return to absolute silence (-120 dB)
+    // regardless of any mix value the preset ships with.
+    const bool reverbSilenced = (! p.reverb.enabled) || p.reverb.bypass;
+    const float reverbBase = reverbSilenced ? 0.0f : p.reverb.mix;
     const bool choirIsWide = choirMode && isChoirWidePreset(p);
     // Natural choir mode uses fixed room levels per preset so vocal samples
     // stay realistic; macro space is ignored here to avoid pad-style wash.
