@@ -1258,6 +1258,30 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
         + " macros.warmth=" + juce::String(p.macros.warmth, 2)
         + " macros.space="  + juce::String(p.macros.space, 2));
 
+    // Task 5/9/10: PRESET_APPLIED diagnostic. Surfaces the gain-staging and
+    // layer/partial state that determine whether a preset can make sound, so
+    // "silent" presets (e.g. Clean Tuned Piano) reveal main-layer/amp-gain or
+    // zone-mapping issues directly in the host console.
+    {
+        int enabledPartials = 0;
+        for (auto& pb : p.partials) if (pb.enabled) ++enabledPartials;
+        const float appliedMasterGainDb = paramValueById(proc, "masterGain");
+        didaUserPresetLog("PRESET_APPLIED name=" + p.presetName
+            + " category=" + p.category
+            + " mainLayerEnabled=" + (p.main.enabled ? "true" : "false")
+            + " mainGainDb=" + juce::String(p.main.gainDb, 2)
+            + " layer2Enabled=" + (p.layer2.enabled ? "true" : "false")
+            + " layer2GainDb=" + juce::String(p.layer2.gainDb, 2)
+            + " enabledPartials=" + juce::String(enabledPartials)
+            + " ampGainDb=" + juce::String(p.amp.gainDb, 2)
+            + " appliedMasterGainDb=" + juce::String(appliedMasterGainDb, 2)
+            + " engineType=" + (p.engineType.isNotEmpty() ? p.engineType : juce::String("pcm"))
+            + " sourcePath=" + p.source.path
+            + " reverbEnabled=" + (p.reverb.enabled ? "true" : "false")
+            + " reverbBypass=" + (p.reverb.bypass ? "true" : "false")
+            + " delayEnabled=" + (p.delay.enabled ? "true" : "false"));
+    }
+
     // Engine summary log — makes the active engine list visible in the host
     // console so users can confirm which engine(s) a preset is exercising.
     if (! p.partials.isEmpty() || p.engineType.isNotEmpty())
