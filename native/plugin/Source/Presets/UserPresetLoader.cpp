@@ -168,14 +168,26 @@ bool parseFile(const juce::File& file, UserPreset& out, juce::String& errorOut)
     auto del = fx.getProperty("delay", juce::var());
     out.delay.enabled  = getB(del, "enabled", false);
     out.delay.timeMs   = getF(del, "timeMs",   out.delay.timeMs);
-    out.delay.feedback = getF(del, "feedback", out.delay.feedback);
+    out.delay.hasFeedback = del.isObject() && (del.hasProperty("feedback") || del.hasProperty("delayFeedback"));
+    out.delay.feedback = getF(del, "feedback", getF(del, "delayFeedback", out.delay.feedback));
     out.delay.mix      = getF(del, "mix",      out.delay.mix);
 
     auto rev = fx.getProperty("reverb", juce::var());
     out.reverb.enabled = getB(rev, "enabled", false);
     out.reverb.size    = getF(rev, "size",    out.reverb.size);
     out.reverb.damping = getF(rev, "damping", out.reverb.damping);
-    out.reverb.mix     = getF(rev, "mix",     out.reverb.mix);
+    out.reverb.hasMix  = rev.isObject() && (rev.hasProperty("mix") || rev.hasProperty("reverbMix") || rev.hasProperty("wet"));
+    out.reverb.mix     = getF(rev, "mix", getF(rev, "reverbMix", getF(rev, "wet", out.reverb.mix)));
+    out.reverb.bypass  = getB(rev, "bypass", false);
+    if (rev.isObject() && rev.hasProperty("preDelayMs")) out.reverb.preDelayMs = getF(rev, "preDelayMs", -1.0f);
+    if (rev.isObject() && (rev.hasProperty("duckingEnabled") || rev.hasProperty("duckingAmount")))
+    {
+        out.reverb.hasDucking     = true;
+        out.reverb.duckingEnabled = getB(rev, "duckingEnabled", true);
+        out.reverb.duckingAmount  = getF(rev, "duckingAmount", -1.0f);
+    }
+    if (rev.isObject() && rev.hasProperty("inputHighpassHz")) out.reverb.inputHighpassHz = getF(rev, "inputHighpassHz", -1.0f);
+    if (rev.isObject() && rev.hasProperty("inputLowpassHz"))  out.reverb.inputLowpassHz  = getF(rev, "inputLowpassHz", -1.0f);
 
     auto sat = fx.getProperty("saturation", juce::var());
     out.saturation.enabled = getB(sat, "enabled", false);
