@@ -741,20 +741,23 @@ float resolveFxSendReleaseMs(const UserPreset& p, bool choirMode)
 {
     if (choirMode)
     {
-        const float requested = p.fxSend.hasFxSendReleaseMs
-            ? p.fxSend.fxSendReleaseMs
-            : (p.safety.hasChoirFxSendReleaseMaxMs
+        // Choir clamp may only CAP the maximum (180ms). An explicit, lower
+        // preset value must win — never get raised to a 40ms floor.
+        if (p.fxSend.hasFxSendReleaseMs)
+            return juce::jlimit(1.0f, 180.0f, p.fxSend.fxSendReleaseMs);
+
+        const float requested = p.safety.hasChoirFxSendReleaseMaxMs
                 ? p.safety.choirFxSendReleaseMaxMs
                 : juce::jmin(180.0f, p.amp.releaseMs * (p.fxSend.hasFxSendReleaseMultiplier
-                    ? p.fxSend.fxSendReleaseMultiplier : 0.35f)));
+                    ? p.fxSend.fxSendReleaseMultiplier : 0.35f));
         return juce::jlimit(40.0f, 180.0f, requested);
     }
 
     if (p.fxSend.hasFxSendReleaseMs)
-        return juce::jlimit(5.0f, 500.0f, p.fxSend.fxSendReleaseMs);
+        return juce::jlimit(1.0f, 500.0f, p.fxSend.fxSendReleaseMs);
 
     if (p.fxSend.hasFxSendReleaseMultiplier)
-        return juce::jlimit(5.0f, 500.0f, p.amp.releaseMs * p.fxSend.fxSendReleaseMultiplier);
+        return juce::jlimit(1.0f, 500.0f, p.amp.releaseMs * p.fxSend.fxSendReleaseMultiplier);
 
     return 80.0f;
 }
