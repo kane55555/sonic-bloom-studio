@@ -473,6 +473,11 @@ private:
     std::atomic<float> fxInRecent  { 0.0f };
     std::atomic<float> fxOutRecent { 0.0f };
     std::atomic<float> finalRecent { 0.0f };
+    // Tasks 6/7 dedicated meters.
+    std::atomic<float> dryOutputRecent    { 0.0f };
+    std::atomic<float> reverbReturnRecent { 0.0f };
+    std::atomic<float> delayReturnRecent  { 0.0f };
+    std::atomic<float> finalOutputRecent  { 0.0f };
 
     // Density-aware FX send reduction state.
     float densityFast = 0.0f;
