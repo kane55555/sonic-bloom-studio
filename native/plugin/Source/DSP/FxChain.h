@@ -165,8 +165,14 @@ public:
         dryFxScratch.makeCopyOf(buffer, true);
 
         delay.processWetOnly(buffer, dryFxScratch);
+        // After processWetOnly the buffer holds the DELAY wet-only return.
+        captureRecentPeak(buffer, delayReturnRecent);
+
         reverbWetScratch.makeCopyOf(dryFxScratch, true);
         reverb.processWetOnly(reverbWetScratch, dryFxScratch);
+        // reverbWetScratch now holds the REVERB wet-only return.
+        captureRecentPeak(reverbWetScratch, reverbReturnRecent);
+
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
             buffer.addFrom(ch, 0, reverbWetScratch, ch, 0, buffer.getNumSamples());
 
@@ -183,12 +189,29 @@ public:
         captureRecentPeak(buffer, fxOutRecent);
         limiter.process(buffer);
         captureRecentPeak(buffer, finalRecent);
+        // Mirror the post-limiter peak into the dedicated final-output meter.
+        captureRecentPeak(buffer, finalOutputRecent);
+    }
+
+    // Capture the peak of the dry (pre-FX) voice bus. Called by SynthEngine
+    // with the dry render buffer so the quality reporter can distinguish a
+    // silent instrument from a silent FX return.
+    void captureDryOutputPeak(const juce::AudioBuffer<float>& buffer) noexcept
+    {
+        captureRecentPeak(buffer, dryOutputRecent);
     }
 
     // ---- Debug/reporting peak accessors (dBFS; -120 if silent) ----
     float getFxInPeakDb()    const noexcept { return toDb(fxInRecent.load(std::memory_order_relaxed)); }
     float getFxOutPeakDb()   const noexcept { return toDb(fxOutRecent.load(std::memory_order_relaxed)); }
     float getFinalPeakDb()   const noexcept { return toDb(finalRecent.load(std::memory_order_relaxed)); }
+
+    // Tasks 6/7 metering: dry bus, isolated wet returns, and final output.
+    float getDryOutputPeakDb()    const noexcept { return toDb(dryOutputRecent.load(std::memory_order_relaxed)); }
+    float getReverbReturnPeakDb() const noexcept { return toDb(reverbReturnRecent.load(std::memory_order_relaxed)); }
+    float getDelayReturnPeakDb()  const noexcept { return toDb(delayReturnRecent.load(std::memory_order_relaxed)); }
+    float getFinalOutputPeakDb()  const noexcept { return toDb(finalOutputRecent.load(std::memory_order_relaxed)); }
+
 
     // ---- Setters used by PluginProcessor ----
     void setSaturationDrive(float d) { sat.setDrive(d); saturationActive = d > 0.001f; }
@@ -450,6 +473,11 @@ private:
     std::atomic<float> fxInRecent  { 0.0f };
     std::atomic<float> fxOutRecent { 0.0f };
     std::atomic<float> finalRecent { 0.0f };
+    // Tasks 6/7 dedicated meters.
+    std::atomic<float> dryOutputRecent    { 0.0f };
+    std::atomic<float> reverbReturnRecent { 0.0f };
+    std::atomic<float> delayReturnRecent  { 0.0f };
+    std::atomic<float> finalOutputRecent  { 0.0f };
 
     // Density-aware FX send reduction state.
     float densityFast = 0.0f;

@@ -254,6 +254,13 @@ inline void report(DiditagainProcessor& proc,
     const float finalDb     = fx.getFinalPeakDb();
     const float headroomDb  = juce::jmax(-60.0f, -finalDb);
 
+    // Task 6/7: dedicated dry-bus / isolated wet-return / final-output meters.
+    const float dryOutputDb    = fx.getDryOutputPeakDb();
+    const float reverbReturnDb = fx.getReverbReturnPeakDb();
+    const float delayReturnDb  = fx.getDelayReturnPeakDb();
+    const float finalOutputDb  = fx.getFinalOutputPeakDb();
+
+
     // resolvedFrom — explicit caller value wins; otherwise infer from state.
     juce::String resolvedFrom = resolvedFromIn;
     if (resolvedFrom.isEmpty())
@@ -354,6 +361,56 @@ inline void report(DiditagainProcessor& proc,
                                        && delayDuckEnabled && std::abs(delayDuckAmount - 0.50f) < 0.001f;
     const int   choirActiveVoiceCount  = choirMode ? proc.getSynthEngine().getActiveVoiceCount() : 0;
     const bool  choirNoteDensityFxReduction = choirMode && noteDensityFxOn;
+
+    // --- Preset JSON vs applied engine state (Tasks 6/7/8) ----------------
+    // These expose what the preset asked for next to what the engine actually
+    // applied, and drive the PRESET_VALUE_NOT_APPLIED mismatch warnings.
+    const bool  presetReverbSilenced       = (! up.reverb.enabled) || up.reverb.bypass;
+    const float presetJsonReverbMix        = presetReverbSilenced ? 0.0f : up.reverb.mix;
+    const float appliedReverbMix           = reverbMix;
+    const float presetJsonDelayMix         = up.delay.enabled ? up.delay.mix : 0.0f;
+    const float appliedDelayMix            = delayMix;
+    const float presetJsonDelayFeedback    = up.delay.enabled ? up.delay.feedback : 0.0f;
+    const float appliedDelayFeedback       = delayFeedback;
+    const bool  presetHasFxSendReleaseMs   = up.fxSend.hasFxSendReleaseMs;
+    const float presetJsonFxSendReleaseMs  = up.fxSend.fxSendReleaseMs;
+    // For choir presets the clamp output is the legitimate target; otherwise the
+    // live engine value should match the preset's request.
+    const float appliedFxSendReleaseMs     = fxSendReleaseMsLive;
+    const float expectedFxSendReleaseMs    = choirMode ? choirFxSendReleaseMs
+                                                       : presetJsonFxSendReleaseMs;
+
+    // -- Mismatch detection --
+    const bool reverbReturnNotSilent = reverbReturnDb > -90.0f;
+    const bool delayReturnNotSilent  = delayReturnDb  > -90.0f;
+    const bool fxSendReleaseMismatch = presetHasFxSendReleaseMs
+        && std::abs(appliedFxSendReleaseMs - expectedFxSendReleaseMs)
+             > juce::jmax(1.0f, expectedFxSendReleaseMs * 0.15f);
+
+    bool presetValueNotApplied = false;
+    if (presetReverbSilenced && reverbReturnNotSilent)
+    {
+        warnings.add("REVERB_BYPASS_NOT_SILENT");
+        presetValueNotApplied = true;
+    }
+    if (! up.delay.enabled && delayReturnNotSilent)
+    {
+        warnings.add("DELAY_OFF_NOT_SILENT");
+        presetValueNotApplied = true;
+    }
+    if (fxSendReleaseMismatch)
+    {
+        warnings.add("FX_SEND_RELEASE_NOT_APPLIED");
+        presetValueNotApplied = true;
+    }
+    if (presetValueNotApplied)
+        warnings.add("PRESET_VALUE_NOT_APPLIED");
+
+    // Task 9/10: silence diagnosis. If notes are being played into a non-empty
+    // instrument but the dry bus is silent, the cause is gain/zone-mapping.
+    if (dryOutputDb <= -90.0f && finalDb <= -90.0f && up.main.enabled)
+        warnings.add("DRY_BUS_SILENT");
+
 
     // -- Natural choir-mode state (sample-first vocal behavior) -------------
     const bool  choirNaturalMode             = naturalChoirSampleOnly;
@@ -495,7 +552,19 @@ inline void report(DiditagainProcessor& proc,
         << "dB fxInputPeak=" << juce::String(fxInDb, 2)
         << "dB fxOutputPeak=" << juce::String(fxOutDb, 2)
         << "dB finalPeak=" << juce::String(finalDb, 2)
-        << "dB clampedFields=" << "n/a"
+        << "dB dryOutputPeakDb=" << juce::String(dryOutputDb, 2)
+        << " reverbReturnPeakDb=" << juce::String(reverbReturnDb, 2)
+        << " delayReturnPeakDb=" << juce::String(delayReturnDb, 2)
+        << " finalOutputPeakDb=" << juce::String(finalOutputDb, 2)
+        << " presetJsonReverbMix=" << fmt(presetJsonReverbMix)
+        << " appliedReverbMix=" << fmt(appliedReverbMix)
+        << " presetJsonDelayMix=" << fmt(presetJsonDelayMix)
+        << " appliedDelayMix=" << fmt(appliedDelayMix)
+        << " presetJsonDelayFeedback=" << fmt(presetJsonDelayFeedback)
+        << " appliedDelayFeedback=" << fmt(appliedDelayFeedback)
+        << " presetJsonFxSendReleaseMs=" << juce::String(presetJsonFxSendReleaseMs, 1)
+        << " appliedFxSendReleaseMs=" << juce::String(appliedFxSendReleaseMs, 1)
+        << " clampedFields=" << "n/a"
         << " reverbMix=" << fmt(reverbMix)
         << " delayMix=" << fmt(delayMix)
         << " chorusMix=" << fmt(chorusMix)
@@ -584,6 +653,19 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("fxInputPeakDb",          fxInDb);
     j->setProperty("fxOutputPeakDb",         fxOutDb);
     j->setProperty("finalPeakDb",            finalDb);
+    j->setProperty("dryOutputPeakDb",        dryOutputDb);
+    j->setProperty("reverbReturnPeakDb",     reverbReturnDb);
+    j->setProperty("delayReturnPeakDb",      delayReturnDb);
+    j->setProperty("finalOutputPeakDb",      finalOutputDb);
+    j->setProperty("presetJsonReverbMix",    presetJsonReverbMix);
+    j->setProperty("appliedReverbMix",       appliedReverbMix);
+    j->setProperty("presetJsonDelayMix",     presetJsonDelayMix);
+    j->setProperty("appliedDelayMix",        appliedDelayMix);
+    j->setProperty("presetJsonDelayFeedback", presetJsonDelayFeedback);
+    j->setProperty("appliedDelayFeedback",   appliedDelayFeedback);
+    j->setProperty("presetJsonFxSendReleaseMs", presetJsonFxSendReleaseMs);
+    j->setProperty("appliedFxSendReleaseMs", appliedFxSendReleaseMs);
+    j->setProperty("presetReverbSilenced",   presetReverbSilenced);
     j->setProperty("clampedFields",          "n/a");
     j->setProperty("reverbMix",              reverbMix);
     j->setProperty("delayMix",               delayMix);
@@ -712,6 +794,19 @@ inline void report(DiditagainProcessor& proc,
               << "fxInputPeakDb: "             << juce::String(fxInDb, 2)    << "\n"
               << "fxOutputPeakDb: "            << juce::String(fxOutDb, 2)   << "\n"
               << "finalPeakDb: "               << juce::String(finalDb, 2)   << "\n"
+              << "dryOutputPeakDb: "           << juce::String(dryOutputDb, 2) << "\n"
+              << "reverbReturnPeakDb: "        << juce::String(reverbReturnDb, 2) << "\n"
+              << "delayReturnPeakDb: "         << juce::String(delayReturnDb, 2) << "\n"
+              << "finalOutputPeakDb: "         << juce::String(finalOutputDb, 2) << "\n"
+              << "presetJsonReverbMix: "       << juce::String(presetJsonReverbMix, 3) << "\n"
+              << "appliedReverbMix: "          << juce::String(appliedReverbMix, 3) << "\n"
+              << "presetJsonDelayMix: "        << juce::String(presetJsonDelayMix, 3) << "\n"
+              << "appliedDelayMix: "           << juce::String(appliedDelayMix, 3) << "\n"
+              << "presetJsonDelayFeedback: "   << juce::String(presetJsonDelayFeedback, 3) << "\n"
+              << "appliedDelayFeedback: "      << juce::String(appliedDelayFeedback, 3) << "\n"
+              << "presetJsonFxSendReleaseMs: " << juce::String(presetJsonFxSendReleaseMs, 1) << "\n"
+              << "appliedFxSendReleaseMs: "    << juce::String(appliedFxSendReleaseMs, 1) << "\n"
+              << "presetReverbSilenced: "      << (presetReverbSilenced ? "true" : "false") << "\n"
               << "reverbDuckingEnabled: "      << (reverbDuckEnabled ? "true" : "false") << "\n"
               << "reverbDuckingAmount: "       << juce::String(reverbDuckAmount, 3) << "\n"
               << "reverbInputHighpassHz: "     << juce::String(reverbInputHpHz, 1) << "\n"
