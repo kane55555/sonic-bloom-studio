@@ -165,8 +165,14 @@ public:
         dryFxScratch.makeCopyOf(buffer, true);
 
         delay.processWetOnly(buffer, dryFxScratch);
+        // After processWetOnly the buffer holds the DELAY wet-only return.
+        captureRecentPeak(buffer, delayReturnRecent);
+
         reverbWetScratch.makeCopyOf(dryFxScratch, true);
         reverb.processWetOnly(reverbWetScratch, dryFxScratch);
+        // reverbWetScratch now holds the REVERB wet-only return.
+        captureRecentPeak(reverbWetScratch, reverbReturnRecent);
+
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
             buffer.addFrom(ch, 0, reverbWetScratch, ch, 0, buffer.getNumSamples());
 
