@@ -1068,8 +1068,10 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     const float reverbMix  = choirMode ? reverbCap
                                        : juce::jlimit(0.0f, reverbCap,
                                                      reverbBase * (0.85f + space * 0.30f));
-    const float delayMix = juce::jlimit(0.0f, delayCap, p.delay.enabled ? p.delay.mix : 0.0f);
-    const float delayFeedback = juce::jlimit(0.0f, delayFeedbackCap, p.delay.feedback);
+    // Delay off => mix AND feedback forced to zero so the delay return reads
+    // -120 dB and no tail can sustain itself through feedback.
+    const float delayMix = p.delay.enabled ? juce::jlimit(0.0f, delayCap, p.delay.mix) : 0.0f;
+    const float delayFeedback = p.delay.enabled ? juce::jlimit(0.0f, delayFeedbackCap, p.delay.feedback) : 0.0f;
     const float reverbSize = juce::jlimit(0.0f, reverbSizeCap, p.reverb.size);
 
     // Chorus: off for natural choir except a barely audible Ooh/Heaven width.
