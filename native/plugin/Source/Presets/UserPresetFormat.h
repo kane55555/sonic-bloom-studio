@@ -79,8 +79,22 @@ struct LayerBlock
 };
 
 struct FxChorusBlock   { bool enabled=false; float rateHz=0.4f; float depth=0.25f; float mix=0.0f; };
-struct FxDelayBlock    { bool enabled=false; float timeMs=300.0f; float feedback=0.3f; float mix=0.0f; };
-struct FxReverbBlock   { bool enabled=false; float size=0.5f; float damping=0.4f; float mix=0.0f; };
+struct FxDelayBlock    { bool enabled=false; float timeMs=300.0f; float feedback=0.3f; float mix=0.0f; bool hasFeedback=false; };
+struct FxReverbBlock
+{
+    bool  enabled  = false;
+    float size     = 0.5f;
+    float damping  = 0.4f;
+    float mix      = 0.0f;
+    bool  hasMix   = false;             // any of mix/reverbMix/wet present
+    bool  bypass   = false;            // bypass==true forces reverb output to silence
+    float preDelayMs       = -1.0f;    // <0 => not set by preset
+    bool  hasDucking       = false;
+    bool  duckingEnabled   = true;
+    float duckingAmount    = -1.0f;    // <0 => not set by preset
+    float inputHighpassHz  = -1.0f;    // <0 => not set by preset
+    float inputLowpassHz   = -1.0f;    // <0 => not set by preset
+};
 struct FxSatBlock      { bool enabled=false; float drive=0.0f; float mix=0.0f; };
 
 struct FxSendBlock
@@ -92,6 +106,11 @@ struct FxSendBlock
     bool  hasFxSendReleaseMultiplier = false;
     float fxSendReleaseMultiplier = 0.35f;
     bool  noteOffStopsFxSend = true;
+    bool  fxSendFollowsAmpEnvelope = true;
+    // Send-level aliases. sendGainDb / reverbSendDb both control the reverb
+    // send; delaySendDb controls the delay send.
+    bool  hasReverbSendDb = false; float reverbSendDb = 0.0f;
+    bool  hasDelaySendDb  = false; float delaySendDb  = 0.0f;
 };
 
 struct SafetyBlock
