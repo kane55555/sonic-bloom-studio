@@ -362,6 +362,56 @@ inline void report(DiditagainProcessor& proc,
     const int   choirActiveVoiceCount  = choirMode ? proc.getSynthEngine().getActiveVoiceCount() : 0;
     const bool  choirNoteDensityFxReduction = choirMode && noteDensityFxOn;
 
+    // --- Preset JSON vs applied engine state (Tasks 6/7/8) ----------------
+    // These expose what the preset asked for next to what the engine actually
+    // applied, and drive the PRESET_VALUE_NOT_APPLIED mismatch warnings.
+    const bool  presetReverbSilenced       = (! up.reverb.enabled) || up.reverb.bypass;
+    const float presetJsonReverbMix        = presetReverbSilenced ? 0.0f : up.reverb.mix;
+    const float appliedReverbMix           = reverbMix;
+    const float presetJsonDelayMix         = up.delay.enabled ? up.delay.mix : 0.0f;
+    const float appliedDelayMix            = delayMix;
+    const float presetJsonDelayFeedback    = up.delay.enabled ? up.delay.feedback : 0.0f;
+    const float appliedDelayFeedback       = delayFeedback;
+    const bool  presetHasFxSendReleaseMs   = up.fxSend.hasFxSendReleaseMs;
+    const float presetJsonFxSendReleaseMs  = up.fxSend.fxSendReleaseMs;
+    // For choir presets the clamp output is the legitimate target; otherwise the
+    // live engine value should match the preset's request.
+    const float appliedFxSendReleaseMs     = fxSendReleaseMsLive;
+    const float expectedFxSendReleaseMs    = choirMode ? choirFxSendReleaseMs
+                                                       : presetJsonFxSendReleaseMs;
+
+    // -- Mismatch detection --
+    const bool reverbReturnNotSilent = reverbReturnDb > -90.0f;
+    const bool delayReturnNotSilent  = delayReturnDb  > -90.0f;
+    const bool fxSendReleaseMismatch = presetHasFxSendReleaseMs
+        && std::abs(appliedFxSendReleaseMs - expectedFxSendReleaseMs)
+             > juce::jmax(1.0f, expectedFxSendReleaseMs * 0.15f);
+
+    bool presetValueNotApplied = false;
+    if (presetReverbSilenced && reverbReturnNotSilent)
+    {
+        warnings.add("REVERB_BYPASS_NOT_SILENT");
+        presetValueNotApplied = true;
+    }
+    if (! up.delay.enabled && delayReturnNotSilent)
+    {
+        warnings.add("DELAY_OFF_NOT_SILENT");
+        presetValueNotApplied = true;
+    }
+    if (fxSendReleaseMismatch)
+    {
+        warnings.add("FX_SEND_RELEASE_NOT_APPLIED");
+        presetValueNotApplied = true;
+    }
+    if (presetValueNotApplied)
+        warnings.add("PRESET_VALUE_NOT_APPLIED");
+
+    // Task 9/10: silence diagnosis. If notes are being played into a non-empty
+    // instrument but the dry bus is silent, the cause is gain/zone-mapping.
+    if (dryOutputDb <= -90.0f && finalDb <= -90.0f && up.main.enabled)
+        warnings.add("DRY_BUS_SILENT");
+
+
     // -- Natural choir-mode state (sample-first vocal behavior) -------------
     const bool  choirNaturalMode             = naturalChoirSampleOnly;
     const float effectiveLayer2GainDb        = naturalChoirSampleOnly ? -120.0f
