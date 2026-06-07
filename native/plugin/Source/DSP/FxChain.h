@@ -494,6 +494,7 @@ private:
     std::atomic<float> finalRecent { 0.0f };
     // Tasks 6/7 dedicated meters.
     std::atomic<float> dryOutputRecent    { 0.0f };
+    std::atomic<float> dryRawRecent       { 0.0f };
     std::atomic<float> reverbReturnRecent { 0.0f };
     std::atomic<float> delayReturnRecent  { 0.0f };
     std::atomic<float> finalOutputRecent  { 0.0f };
