@@ -1150,6 +1150,12 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
             engine.setFxSendReleaseMsForAll(fxSendReleaseMs);
             auto& pfx = engine.getFx();
             pfx.setChoirDensityMode(true);
+            // BUG 3: latch hard-bypass BEFORE pushing mixes and drain tails so
+            // the per-block macro re-apply can't revive a silenced FX, and no
+            // stale reverb tail bleeds into the new preset.
+            pfx.clearTimeFxTails();
+            pfx.setReverbHardBypass(reverbSilenced || reverbMix <= 0.0001f);
+            pfx.setDelayHardBypass(! p.delay.enabled || delayMix <= 0.0001f);
             pfx.setDelayMix(delayMix);
             pfx.setDelayFeedback(delayFeedback);
             pfx.setReverbMix(reverbMix);
