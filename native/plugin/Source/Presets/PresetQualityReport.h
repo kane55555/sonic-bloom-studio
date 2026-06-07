@@ -608,6 +608,7 @@ inline void report(DiditagainProcessor& proc,
         << " appliedDelayFeedback=" << fmt(appliedDelayFeedback)
         << " presetJsonFxSendReleaseMs=" << juce::String(presetJsonFxSendReleaseMs, 1)
         << " appliedFxSendReleaseMs=" << juce::String(appliedFxSendReleaseMs, 1)
+        << " presetValueMismatchFields=[" << presetValueMismatchFields.joinIntoString(",") << "]"
         << " clampedFields=" << "n/a"
         << " reverbMix=" << fmt(reverbMix)
         << " delayMix=" << fmt(delayMix)
