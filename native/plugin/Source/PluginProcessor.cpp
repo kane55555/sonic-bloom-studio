@@ -270,6 +270,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createP
         juce::StringArray{"I", "II", "I+II"}, 0));
 
 
+    // Global oversampling quality (anti-aliasing for the synthesis engines).
+    // Off is bit-identical to the legacy render path; 2x/4x reduce oscillator
+    // aliasing at the cost of CPU + a little latency.
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{"oversample", 1}, "Oversampling",
+        juce::StringArray{"Off", "2x", "4x"}, 0));
+
     return { params.begin(), params.end() };
 }
 
