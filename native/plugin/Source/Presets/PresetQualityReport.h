@@ -710,6 +710,11 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("appliedDelayFeedback",   appliedDelayFeedback);
     j->setProperty("presetJsonFxSendReleaseMs", presetJsonFxSendReleaseMs);
     j->setProperty("appliedFxSendReleaseMs", appliedFxSendReleaseMs);
+    {
+        juce::Array<juce::var> mmVar;
+        for (auto& f : presetValueMismatchFields) mmVar.add(f);
+        j->setProperty("presetValueMismatchFields", mmVar);
+    }
     j->setProperty("presetReverbSilenced",   presetReverbSilenced);
     j->setProperty("clampedFields",          "n/a");
     j->setProperty("reverbMix",              reverbMix);
