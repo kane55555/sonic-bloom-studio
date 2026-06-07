@@ -390,20 +390,51 @@ inline void report(DiditagainProcessor& proc,
         && std::abs(appliedFxSendReleaseMs - expectedFxSendReleaseMs)
              > juce::jmax(1.0f, expectedFxSendReleaseMs * 0.15f);
 
+    // Per-field list of exactly which preset JSON values did not reach the
+    // engine. A category cap legitimately LOWERS a value, so we only flag a
+    // field when the applied value EXCEEDS what the preset asked for (the
+    // "stuck at old default / category override" failure mode), or when a
+    // silenced effect is still audible at its return.
+    juce::StringArray presetValueMismatchFields;
+    auto appliedExceeds = [](float applied, float jsonVal) {
+        return applied > jsonVal + juce::jmax(0.01f, std::abs(jsonVal) * 0.15f);
+    };
+
     bool presetValueNotApplied = false;
     if (presetReverbSilenced && reverbReturnNotSilent)
     {
         warnings.add("REVERB_BYPASS_NOT_SILENT");
+        presetValueMismatchFields.addIfNotAlreadyThere("reverbMix");
+        presetValueNotApplied = true;
+    }
+    else if (! presetReverbSilenced && appliedExceeds(appliedReverbMix, presetJsonReverbMix))
+    {
+        presetValueMismatchFields.addIfNotAlreadyThere("reverbMix");
         presetValueNotApplied = true;
     }
     if (! up.delay.enabled && delayReturnNotSilent)
     {
         warnings.add("DELAY_OFF_NOT_SILENT");
+        presetValueMismatchFields.addIfNotAlreadyThere("delayMix");
         presetValueNotApplied = true;
+    }
+    else if (up.delay.enabled)
+    {
+        if (appliedExceeds(appliedDelayMix, presetJsonDelayMix))
+        {
+            presetValueMismatchFields.addIfNotAlreadyThere("delayMix");
+            presetValueNotApplied = true;
+        }
+        if (appliedExceeds(appliedDelayFeedback, presetJsonDelayFeedback))
+        {
+            presetValueMismatchFields.addIfNotAlreadyThere("delayFeedback");
+            presetValueNotApplied = true;
+        }
     }
     if (fxSendReleaseMismatch)
     {
         warnings.add("FX_SEND_RELEASE_NOT_APPLIED");
+        presetValueMismatchFields.addIfNotAlreadyThere("fxSendReleaseMs");
         presetValueNotApplied = true;
     }
     if (presetValueNotApplied)
@@ -413,6 +444,16 @@ inline void report(DiditagainProcessor& proc,
     // instrument but the dry bus is silent, the cause is gain/zone-mapping.
     if (dryOutputDb <= -90.0f && finalDb <= -90.0f && up.main.enabled)
         warnings.add("DRY_BUS_SILENT");
+
+    // FINAL_BUS_METER_MISMATCH: with every FX silenced the final output must
+    // track the (master-gain-scaled) dry bus within ~3 dB. A larger gap means
+    // the final gain stage or the metering is misrouted (BUG 1 regression).
+    const bool allFxOff = presetReverbSilenced && ! up.delay.enabled
+                       && chorusMix <= 0.001f && satMix <= 0.001f;
+    if (allFxOff && dryOutputDb > -90.0f && finalOutputDb > -90.0f
+        && std::abs(finalOutputDb - dryOutputDb) > 3.0f)
+        warnings.add("FINAL_BUS_METER_MISMATCH");
+
 
 
     // -- Natural choir-mode state (sample-first vocal behavior) -------------
