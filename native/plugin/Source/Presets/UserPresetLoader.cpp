@@ -1186,6 +1186,15 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
             const float fxSendReleaseMs = resolveFxSendReleaseMs(p, false);
             engine.setFxSendReleaseMsForAll(fxSendReleaseMs);
 
+            // Non-choir latch wiring: apply the same hard-bypass + tail-drain
+            // discipline as the choir branch. Latch BEFORE pushing mixes so the
+            // per-block macro re-apply in processBlock cannot revive a silenced
+            // reverb/delay, and clear stale tails from the previous preset so a
+            // disabled/bypassed effect reads -120 dB at its return (BUG 3/6).
+            pfx.clearTimeFxTails();
+            pfx.setReverbHardBypass(reverbSilenced || reverbMix <= 0.0001f);
+            pfx.setDelayHardBypass(! p.delay.enabled || delayMix <= 0.0001f);
+
             // Tasks 2/3: mirror the clamped/zeroed mix + feedback onto the live
             // FX chain. When reverb is disabled/bypassed or delay is off these
             // are zero, forcing the returns to -120 dB.
