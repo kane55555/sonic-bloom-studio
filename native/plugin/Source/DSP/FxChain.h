@@ -186,20 +186,38 @@ public:
         comp.process(buffer);
         masterGain.process(buffer);
         detectAndLogClipping(buffer);
-        captureRecentPeak(buffer, fxOutRecent);
+        // NOTE: do NOT overwrite fxOutRecent here. fxOutRecent must reflect
+        // ONLY the isolated FX-return bus captured in processWetSend(); writing
+        // the full (dry+wet) pre-limiter buffer here made fxOutputPeakDb read
+        // hotter than the dry bus even when reverb/delay were off (BUG 6).
         limiter.process(buffer);
         captureRecentPeak(buffer, finalRecent);
         // Mirror the post-limiter peak into the dedicated final-output meter.
         captureRecentPeak(buffer, finalOutputRecent);
     }
 
-    // Capture the peak of the dry (pre-FX) voice bus. Called by SynthEngine
-    // with the dry render buffer so the quality reporter can distinguish a
-    // silent instrument from a silent FX return.
+    // Capture the peak of the dry (pre-FX) voice bus, scaled by the live master
+    // gain so dryOutputPeakDb is metered at the SAME output stage as
+    // finalOutputPeakDb. With FX off this keeps the two meters within ~0-3 dB
+    // (EQ/comp/limiter residual) instead of the master-gain trim showing up as
+    // a phantom "final bus collapse" (BUG 1). Silence (0) still maps to -120.
     void captureDryOutputPeak(const juce::AudioBuffer<float>& buffer) noexcept
     {
-        captureRecentPeak(buffer, dryOutputRecent);
+        float p = 0.0f;
+        const int n = buffer.getNumSamples();
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        {
+            const auto* d = buffer.getReadPointer(ch);
+            for (int i = 0; i < n; ++i) { const float a = std::fabs(d[i]); if (a > p) p = a; }
+        }
+        p *= masterGain.getTargetGainLinear();
+        dryOutputRecent.store(p, std::memory_order_relaxed);
     }
+
+    // Raw (pre-master-gain) dry voice-bus peak — used purely for silence
+    // detection so a low master trim never masks a real DRY_BUS_SILENT.
+    float getDryVoiceRawPeakDb() const noexcept { return toDb(dryRawRecent.load(std::memory_order_relaxed)); }
+    float getMasterGainDb()      const noexcept { return masterGain.getTargetGainDb(); }
 
     // ---- Debug/reporting peak accessors (dBFS; -120 if silent) ----
     float getFxInPeakDb()    const noexcept { return toDb(fxInRecent.load(std::memory_order_relaxed)); }
