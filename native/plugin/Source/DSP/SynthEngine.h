@@ -47,6 +47,17 @@ public:
     bool setMaxPolyphony(int n);
     bool setMonoMode(bool mono);
 
+    // Global oversampling for the synthesis engines (anti-aliasing). factorLog2:
+    //   0 = off (1x, bit-identical to the legacy path),
+    //   1 = 2x, 2 = 4x.
+    // Changing this re-prepares the voices at the oversampled rate and rebuilds
+    // the half-band IIR up/down samplers. Off by default so existing presets
+    // sound identical unless the user opts in. Voices render at the oversampled
+    // rate; the FX chain stays at the host rate and runs on the decimated bus.
+    void setOversamplingFactor(int factorLog2);
+    int  getOversamplingFactorLog2() const noexcept { return oversampleFactorLog2; }
+    int  getOversamplingFactor()     const noexcept { return 1 << oversampleFactorLog2; }
+
     FxChain&  getFx()       noexcept { return fx; }
     LayerBusProcessor& getLayerBus() noexcept { return layerBus; }
 
@@ -108,6 +119,15 @@ private:
     bool    monoMode = false;
     bool    fallbackSynthesisEnabled = true;
     float   currentFxSendReleaseMs = 80.0f;
+
+    // ---- Oversampling state ----
+    void rebuildOversampling();
+    double baseSampleRate       = 44100.0;
+    int    preparedBlockSize    = 512;
+    int    oversampleFactorLog2 = 0;   // 0=off, 1=2x, 2=4x
+    std::unique_ptr<juce::dsp::Oversampling<float>> oversamplerDry;
+    std::unique_ptr<juce::dsp::Oversampling<float>> oversamplerSend;
+    juce::MidiBuffer scaledMidi;       // reused across blocks (no per-block alloc)
     std::shared_ptr<const dida::Multisample> activeMultisample;
     juce::String currentInstrumentName;
 };
