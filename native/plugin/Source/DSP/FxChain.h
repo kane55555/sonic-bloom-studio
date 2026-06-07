@@ -242,12 +242,22 @@ public:
     void setChorusMode(int m) { chorus.setMode(m); }
 
 
-    void setDelayMix(float m) { const float v = choirDensityMode ? juce::jmin(m, 0.03f) : m; delay.setMix(v); delayActive = v > 0.001f; }
+    void setDelayMix(float m) { const float v = delayHardBypass ? 0.0f : (choirDensityMode ? juce::jmin(m, 0.03f) : m); delay.setMix(v); delayActive = v > 0.001f; }
     void setDelayTime(float s) { delay.setTimeSeconds(s); }
-    void setDelayFeedback(float f) { delay.setFeedback(choirDensityMode ? juce::jmin(f, 0.08f) : f); }
+    void setDelayFeedback(float f) { delay.setFeedback(delayHardBypass ? 0.0f : (choirDensityMode ? juce::jmin(f, 0.08f) : f)); }
 
-    void setReverbMix(float m) { const float v = choirDensityMode ? juce::jmin(m, 0.22f) : m; reverb.setMix(v); reverbActive = v > 0.001f; }
+    void setReverbMix(float m) { const float v = reverbHardBypass ? 0.0f : (choirDensityMode ? juce::jmin(m, 0.22f) : m); reverb.setMix(v); reverbActive = v > 0.001f; }
     void setReverbSize(float s) { reverb.setSize(choirDensityMode ? juce::jmin(s, 0.62f) : s); }
+
+    // Hard-bypass latches. Once a preset declares the reverb/delay silenced
+    // (disabled, bypassed, or mix 0), the per-block parameter re-application in
+    // PluginProcessor::processBlock (which adds macro modulation) can no longer
+    // revive it: the mix is forced to 0 and the tail is drained, so the wet
+    // returns read -120 dB (BUG 3 / BUG 6). Cleared when a preset re-enables FX.
+    void setReverbHardBypass(bool b) { reverbHardBypass = b; if (b) { reverb.setMix(0.0f); reverbActive = false; reverb.reset(); } }
+    void setDelayHardBypass(bool b)  { delayHardBypass  = b; if (b) { delay.setMix(0.0f);  delayActive  = false; delay.reset();  } }
+    bool getReverbHardBypass() const noexcept { return reverbHardBypass; }
+    bool getDelayHardBypass()  const noexcept { return delayHardBypass; }
     void setReverbDamping(float d) { reverb.setDamping(d); }
     void setReverbWidth(float w) { reverb.setWidth(w); }
     void setReverbCharacter(ReverbBlock::Character c) { reverb.setCharacter(c); }
