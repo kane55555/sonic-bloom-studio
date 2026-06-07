@@ -367,11 +367,14 @@ inline void report(DiditagainProcessor& proc,
     // applied, and drive the PRESET_VALUE_NOT_APPLIED mismatch warnings.
     const bool  presetReverbSilenced       = (! up.reverb.enabled) || up.reverb.bypass;
     const float presetJsonReverbMix        = presetReverbSilenced ? 0.0f : up.reverb.mix;
-    const float appliedReverbMix           = reverbMix;
+    // appliedReverb/DelayMix now read directly from the live FX-chain DSP block
+    // (not the APVTS parameter), so the report reflects what the engine is
+    // actually rendering after hard-bypass latches and choir caps are applied.
+    const float appliedReverbMix           = reverbBlk.getMix();
     const float presetJsonDelayMix         = up.delay.enabled ? up.delay.mix : 0.0f;
-    const float appliedDelayMix            = delayMix;
+    const float appliedDelayMix            = delayBlk.getMix();
     const float presetJsonDelayFeedback    = up.delay.enabled ? up.delay.feedback : 0.0f;
-    const float appliedDelayFeedback       = delayFeedback;
+    const float appliedDelayFeedback       = delayBlk.getFeedback();
     const bool  presetHasFxSendReleaseMs   = up.fxSend.hasFxSendReleaseMs;
     const float presetJsonFxSendReleaseMs  = up.fxSend.fxSendReleaseMs;
     // For choir presets the clamp output is the legitimate target; otherwise the
