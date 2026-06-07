@@ -270,6 +270,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createP
         juce::StringArray{"I", "II", "I+II"}, 0));
 
 
+    // Global oversampling quality (anti-aliasing for the synthesis engines).
+    // Off is bit-identical to the legacy render path; 2x/4x reduce oscillator
+    // aliasing at the cost of CPU + a little latency.
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{"oversample", 1}, "Oversampling",
+        juce::StringArray{"Off", "2x", "4x"}, 0));
+
     return { params.begin(), params.end() };
 }
 
@@ -368,6 +375,12 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 
     const bool mono     = getF("monoMode") > 0.5f;
     const int  polyWant = juce::jlimit(1, 16, static_cast<int>(getF("polyphony")));
+
+    // Apply oversampling selection (Off/2x/4x -> log2 factor 0/1/2). Rebuild
+    // only happens when the user changes it, never per-block in steady state.
+    const int osLog2 = juce::jlimit(0, 2, static_cast<int>(getF("oversample")));
+    if (osLog2 != synthEngine.getOversamplingFactorLog2())
+        synthEngine.setOversamplingFactor(osLog2);
 
     const int latestPresetSerial = presetLoadSerial.load(std::memory_order_acquire);
     const bool newPresetLoaded = presetLoadRequested.exchange(false, std::memory_order_acq_rel)
