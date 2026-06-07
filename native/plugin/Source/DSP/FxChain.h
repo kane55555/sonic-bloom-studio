@@ -542,4 +542,6 @@ private:
     bool saturationActive = false;
     bool delayActive      = false;
     bool reverbActive     = false;
+    bool reverbHardBypass = false;
+    bool delayHardBypass  = false;
 };
