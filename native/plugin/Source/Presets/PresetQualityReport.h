@@ -367,11 +367,14 @@ inline void report(DiditagainProcessor& proc,
     // applied, and drive the PRESET_VALUE_NOT_APPLIED mismatch warnings.
     const bool  presetReverbSilenced       = (! up.reverb.enabled) || up.reverb.bypass;
     const float presetJsonReverbMix        = presetReverbSilenced ? 0.0f : up.reverb.mix;
-    const float appliedReverbMix           = reverbMix;
+    // appliedReverb/DelayMix now read directly from the live FX-chain DSP block
+    // (not the APVTS parameter), so the report reflects what the engine is
+    // actually rendering after hard-bypass latches and choir caps are applied.
+    const float appliedReverbMix           = reverbBlk.getMix();
     const float presetJsonDelayMix         = up.delay.enabled ? up.delay.mix : 0.0f;
-    const float appliedDelayMix            = delayMix;
+    const float appliedDelayMix            = delayBlk.getMix();
     const float presetJsonDelayFeedback    = up.delay.enabled ? up.delay.feedback : 0.0f;
-    const float appliedDelayFeedback       = delayFeedback;
+    const float appliedDelayFeedback       = delayBlk.getFeedback();
     const bool  presetHasFxSendReleaseMs   = up.fxSend.hasFxSendReleaseMs;
     const float presetJsonFxSendReleaseMs  = up.fxSend.fxSendReleaseMs;
     // For choir presets the clamp output is the legitimate target; otherwise the
@@ -387,20 +390,51 @@ inline void report(DiditagainProcessor& proc,
         && std::abs(appliedFxSendReleaseMs - expectedFxSendReleaseMs)
              > juce::jmax(1.0f, expectedFxSendReleaseMs * 0.15f);
 
+    // Per-field list of exactly which preset JSON values did not reach the
+    // engine. A category cap legitimately LOWERS a value, so we only flag a
+    // field when the applied value EXCEEDS what the preset asked for (the
+    // "stuck at old default / category override" failure mode), or when a
+    // silenced effect is still audible at its return.
+    juce::StringArray presetValueMismatchFields;
+    auto appliedExceeds = [](float applied, float jsonVal) {
+        return applied > jsonVal + juce::jmax(0.01f, std::abs(jsonVal) * 0.15f);
+    };
+
     bool presetValueNotApplied = false;
     if (presetReverbSilenced && reverbReturnNotSilent)
     {
         warnings.add("REVERB_BYPASS_NOT_SILENT");
+        presetValueMismatchFields.addIfNotAlreadyThere("reverbMix");
+        presetValueNotApplied = true;
+    }
+    else if (! presetReverbSilenced && appliedExceeds(appliedReverbMix, presetJsonReverbMix))
+    {
+        presetValueMismatchFields.addIfNotAlreadyThere("reverbMix");
         presetValueNotApplied = true;
     }
     if (! up.delay.enabled && delayReturnNotSilent)
     {
         warnings.add("DELAY_OFF_NOT_SILENT");
+        presetValueMismatchFields.addIfNotAlreadyThere("delayMix");
         presetValueNotApplied = true;
+    }
+    else if (up.delay.enabled)
+    {
+        if (appliedExceeds(appliedDelayMix, presetJsonDelayMix))
+        {
+            presetValueMismatchFields.addIfNotAlreadyThere("delayMix");
+            presetValueNotApplied = true;
+        }
+        if (appliedExceeds(appliedDelayFeedback, presetJsonDelayFeedback))
+        {
+            presetValueMismatchFields.addIfNotAlreadyThere("delayFeedback");
+            presetValueNotApplied = true;
+        }
     }
     if (fxSendReleaseMismatch)
     {
         warnings.add("FX_SEND_RELEASE_NOT_APPLIED");
+        presetValueMismatchFields.addIfNotAlreadyThere("fxSendReleaseMs");
         presetValueNotApplied = true;
     }
     if (presetValueNotApplied)
@@ -410,6 +444,16 @@ inline void report(DiditagainProcessor& proc,
     // instrument but the dry bus is silent, the cause is gain/zone-mapping.
     if (dryOutputDb <= -90.0f && finalDb <= -90.0f && up.main.enabled)
         warnings.add("DRY_BUS_SILENT");
+
+    // FINAL_BUS_METER_MISMATCH: with every FX silenced the final output must
+    // track the (master-gain-scaled) dry bus within ~3 dB. A larger gap means
+    // the final gain stage or the metering is misrouted (BUG 1 regression).
+    const bool allFxOff = presetReverbSilenced && ! up.delay.enabled
+                       && chorusMix <= 0.001f && satMix <= 0.001f;
+    if (allFxOff && dryOutputDb > -90.0f && finalOutputDb > -90.0f
+        && std::abs(finalOutputDb - dryOutputDb) > 3.0f)
+        warnings.add("FINAL_BUS_METER_MISMATCH");
+
 
 
     // -- Natural choir-mode state (sample-first vocal behavior) -------------
@@ -564,6 +608,7 @@ inline void report(DiditagainProcessor& proc,
         << " appliedDelayFeedback=" << fmt(appliedDelayFeedback)
         << " presetJsonFxSendReleaseMs=" << juce::String(presetJsonFxSendReleaseMs, 1)
         << " appliedFxSendReleaseMs=" << juce::String(appliedFxSendReleaseMs, 1)
+        << " presetValueMismatchFields=[" << presetValueMismatchFields.joinIntoString(",") << "]"
         << " clampedFields=" << "n/a"
         << " reverbMix=" << fmt(reverbMix)
         << " delayMix=" << fmt(delayMix)
@@ -665,6 +710,11 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("appliedDelayFeedback",   appliedDelayFeedback);
     j->setProperty("presetJsonFxSendReleaseMs", presetJsonFxSendReleaseMs);
     j->setProperty("appliedFxSendReleaseMs", appliedFxSendReleaseMs);
+    {
+        juce::Array<juce::var> mmVar;
+        for (auto& f : presetValueMismatchFields) mmVar.add(f);
+        j->setProperty("presetValueMismatchFields", mmVar);
+    }
     j->setProperty("presetReverbSilenced",   presetReverbSilenced);
     j->setProperty("clampedFields",          "n/a");
     j->setProperty("reverbMix",              reverbMix);
@@ -806,6 +856,7 @@ inline void report(DiditagainProcessor& proc,
               << "appliedDelayFeedback: "      << juce::String(appliedDelayFeedback, 3) << "\n"
               << "presetJsonFxSendReleaseMs: " << juce::String(presetJsonFxSendReleaseMs, 1) << "\n"
               << "appliedFxSendReleaseMs: "    << juce::String(appliedFxSendReleaseMs, 1) << "\n"
+              << "presetValueMismatchFields: " << (presetValueMismatchFields.isEmpty() ? juce::String("none") : presetValueMismatchFields.joinIntoString(",")) << "\n"
               << "presetReverbSilenced: "      << (presetReverbSilenced ? "true" : "false") << "\n"
               << "reverbDuckingEnabled: "      << (reverbDuckEnabled ? "true" : "false") << "\n"
               << "reverbDuckingAmount: "       << juce::String(reverbDuckAmount, 3) << "\n"

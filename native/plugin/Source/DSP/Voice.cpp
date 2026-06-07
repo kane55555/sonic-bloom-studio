@@ -280,6 +280,32 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
     for (auto& slot : partials_)
         if (slot.enabled && slot.engine)
             slot.engine->noteOn(static_cast<int>(targetMidiNote), velocity);
+
+    // BUG 4 diagnostic: VOICE_STARTED surfaces the per-voice state that decides
+    // whether a note can make sound — sample/zone mapping, fallback synthesis,
+    // partial engines, and the amp-envelope target. "Silent" presets (e.g.
+    // Clean Tuned Piano) reveal their root cause here: no zone selected with
+    // fallback synthesis off and no active partials means nothing can sound.
+    {
+        int activePartials = 0;
+        for (auto& slot : partials_)
+            if (slot.enabled && slot.engine) ++activePartials;
+        const bool hasSample = multisample != nullptr && ! multisample->isEmpty();
+        const bool sampleVoice = hasSample && loZone != nullptr;
+        const bool willProduceSound = sampleVoice || fallbackSynthesisEnabled || activePartials > 0;
+        juce::String vs;
+        vs << "VOICE_STARTED note=" << midiToNoteName(midiNoteNumber)
+           << " midi=" << midiNoteNumber
+           << " velocity=" << juce::String(velocity, 3)
+           << " hasMultisample=" << (hasSample ? "true" : "false")
+           << " zoneSelected=" << (loZone != nullptr ? "true" : "false")
+           << " zoneFile=" << (loZone != nullptr ? loZone->fileName : juce::String("none"))
+           << " fallbackSynthesisEnabled=" << (fallbackSynthesisEnabled ? "true" : "false")
+           << " activePartials=" << activePartials
+           << " ampStage=" << (int) ampEnv.getStage()
+           << " willProduceSound=" << (willProduceSound ? "true" : "false");
+        multisampleDebugLog(vs);
+    }
 }
 
 void SynthVoice::stopNote(float, bool allowTailOff)
