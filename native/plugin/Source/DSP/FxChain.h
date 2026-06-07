@@ -210,6 +210,7 @@ public:
             const auto* d = buffer.getReadPointer(ch);
             for (int i = 0; i < n; ++i) { const float a = std::fabs(d[i]); if (a > p) p = a; }
         }
+        dryRawRecent.store(p, std::memory_order_relaxed);
         p *= masterGain.getTargetGainLinear();
         dryOutputRecent.store(p, std::memory_order_relaxed);
     }
