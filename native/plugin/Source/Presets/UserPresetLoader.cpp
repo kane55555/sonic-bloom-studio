@@ -1065,9 +1065,14 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     const float delayCap  = choirMode ? 0.00f : fxL.delayMax;
     const float reverbSizeCap = choirMode ? (choirIsWide ? 0.62f : 0.55f) : 1.0f;
     const float delayFeedbackCap = choirMode ? 0.00f : 0.95f;
-    const float reverbMix  = choirMode ? reverbCap
-                                       : juce::jlimit(0.0f, reverbCap,
-                                                     reverbBase * (0.85f + space * 0.30f));
+    // Choir natural reverb is a CAP/default only — it may never RAISE an
+    // explicit (lower) preset reverb mix, and a silenced/bypassed preset reverb
+    // must stay at 0 (BUG 2). For non-choir presets the macro "space" nudge is
+    // still allowed up to the category cap.
+    const float reverbMix  = reverbSilenced ? 0.0f
+                           : (choirMode ? juce::jmin(reverbBase, reverbCap)
+                                        : juce::jlimit(0.0f, reverbCap,
+                                                       reverbBase * (0.85f + space * 0.30f)));
     // Delay off => mix AND feedback forced to zero so the delay return reads
     // -120 dB and no tail can sustain itself through feedback.
     const float delayMix = p.delay.enabled ? juce::jlimit(0.0f, delayCap, p.delay.mix) : 0.0f;
