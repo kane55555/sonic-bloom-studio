@@ -1065,9 +1065,14 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     const float delayCap  = choirMode ? 0.00f : fxL.delayMax;
     const float reverbSizeCap = choirMode ? (choirIsWide ? 0.62f : 0.55f) : 1.0f;
     const float delayFeedbackCap = choirMode ? 0.00f : 0.95f;
-    const float reverbMix  = choirMode ? reverbCap
-                                       : juce::jlimit(0.0f, reverbCap,
-                                                     reverbBase * (0.85f + space * 0.30f));
+    // Choir natural reverb is a CAP/default only — it may never RAISE an
+    // explicit (lower) preset reverb mix, and a silenced/bypassed preset reverb
+    // must stay at 0 (BUG 2). For non-choir presets the macro "space" nudge is
+    // still allowed up to the category cap.
+    const float reverbMix  = reverbSilenced ? 0.0f
+                           : (choirMode ? juce::jmin(reverbBase, reverbCap)
+                                        : juce::jlimit(0.0f, reverbCap,
+                                                       reverbBase * (0.85f + space * 0.30f)));
     // Delay off => mix AND feedback forced to zero so the delay return reads
     // -120 dB and no tail can sustain itself through feedback.
     const float delayMix = p.delay.enabled ? juce::jlimit(0.0f, delayCap, p.delay.mix) : 0.0f;
@@ -1145,6 +1150,12 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
             engine.setFxSendReleaseMsForAll(fxSendReleaseMs);
             auto& pfx = engine.getFx();
             pfx.setChoirDensityMode(true);
+            // BUG 3: latch hard-bypass BEFORE pushing mixes and drain tails so
+            // the per-block macro re-apply can't revive a silenced FX, and no
+            // stale reverb tail bleeds into the new preset.
+            pfx.clearTimeFxTails();
+            pfx.setReverbHardBypass(reverbSilenced || reverbMix <= 0.0001f);
+            pfx.setDelayHardBypass(! p.delay.enabled || delayMix <= 0.0001f);
             pfx.setDelayMix(delayMix);
             pfx.setDelayFeedback(delayFeedback);
             pfx.setReverbMix(reverbMix);

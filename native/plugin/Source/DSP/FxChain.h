@@ -186,20 +186,39 @@ public:
         comp.process(buffer);
         masterGain.process(buffer);
         detectAndLogClipping(buffer);
-        captureRecentPeak(buffer, fxOutRecent);
+        // NOTE: do NOT overwrite fxOutRecent here. fxOutRecent must reflect
+        // ONLY the isolated FX-return bus captured in processWetSend(); writing
+        // the full (dry+wet) pre-limiter buffer here made fxOutputPeakDb read
+        // hotter than the dry bus even when reverb/delay were off (BUG 6).
         limiter.process(buffer);
         captureRecentPeak(buffer, finalRecent);
         // Mirror the post-limiter peak into the dedicated final-output meter.
         captureRecentPeak(buffer, finalOutputRecent);
     }
 
-    // Capture the peak of the dry (pre-FX) voice bus. Called by SynthEngine
-    // with the dry render buffer so the quality reporter can distinguish a
-    // silent instrument from a silent FX return.
+    // Capture the peak of the dry (pre-FX) voice bus, scaled by the live master
+    // gain so dryOutputPeakDb is metered at the SAME output stage as
+    // finalOutputPeakDb. With FX off this keeps the two meters within ~0-3 dB
+    // (EQ/comp/limiter residual) instead of the master-gain trim showing up as
+    // a phantom "final bus collapse" (BUG 1). Silence (0) still maps to -120.
     void captureDryOutputPeak(const juce::AudioBuffer<float>& buffer) noexcept
     {
-        captureRecentPeak(buffer, dryOutputRecent);
+        float p = 0.0f;
+        const int n = buffer.getNumSamples();
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        {
+            const auto* d = buffer.getReadPointer(ch);
+            for (int i = 0; i < n; ++i) { const float a = std::fabs(d[i]); if (a > p) p = a; }
+        }
+        dryRawRecent.store(p, std::memory_order_relaxed);
+        p *= masterGain.getTargetGainLinear();
+        dryOutputRecent.store(p, std::memory_order_relaxed);
     }
+
+    // Raw (pre-master-gain) dry voice-bus peak — used purely for silence
+    // detection so a low master trim never masks a real DRY_BUS_SILENT.
+    float getDryVoiceRawPeakDb() const noexcept { return toDb(dryRawRecent.load(std::memory_order_relaxed)); }
+    float getMasterGainDb()      const noexcept { return masterGain.getTargetGainDb(); }
 
     // ---- Debug/reporting peak accessors (dBFS; -120 if silent) ----
     float getFxInPeakDb()    const noexcept { return toDb(fxInRecent.load(std::memory_order_relaxed)); }
@@ -223,12 +242,22 @@ public:
     void setChorusMode(int m) { chorus.setMode(m); }
 
 
-    void setDelayMix(float m) { const float v = choirDensityMode ? juce::jmin(m, 0.03f) : m; delay.setMix(v); delayActive = v > 0.001f; }
+    void setDelayMix(float m) { const float v = delayHardBypass ? 0.0f : (choirDensityMode ? juce::jmin(m, 0.03f) : m); delay.setMix(v); delayActive = v > 0.001f; }
     void setDelayTime(float s) { delay.setTimeSeconds(s); }
-    void setDelayFeedback(float f) { delay.setFeedback(choirDensityMode ? juce::jmin(f, 0.08f) : f); }
+    void setDelayFeedback(float f) { delay.setFeedback(delayHardBypass ? 0.0f : (choirDensityMode ? juce::jmin(f, 0.08f) : f)); }
 
-    void setReverbMix(float m) { const float v = choirDensityMode ? juce::jmin(m, 0.22f) : m; reverb.setMix(v); reverbActive = v > 0.001f; }
+    void setReverbMix(float m) { const float v = reverbHardBypass ? 0.0f : (choirDensityMode ? juce::jmin(m, 0.22f) : m); reverb.setMix(v); reverbActive = v > 0.001f; }
     void setReverbSize(float s) { reverb.setSize(choirDensityMode ? juce::jmin(s, 0.62f) : s); }
+
+    // Hard-bypass latches. Once a preset declares the reverb/delay silenced
+    // (disabled, bypassed, or mix 0), the per-block parameter re-application in
+    // PluginProcessor::processBlock (which adds macro modulation) can no longer
+    // revive it: the mix is forced to 0 and the tail is drained, so the wet
+    // returns read -120 dB (BUG 3 / BUG 6). Cleared when a preset re-enables FX.
+    void setReverbHardBypass(bool b) { reverbHardBypass = b; if (b) { reverb.setMix(0.0f); reverbActive = false; reverb.reset(); } }
+    void setDelayHardBypass(bool b)  { delayHardBypass  = b; if (b) { delay.setMix(0.0f);  delayActive  = false; delay.reset();  } }
+    bool getReverbHardBypass() const noexcept { return reverbHardBypass; }
+    bool getDelayHardBypass()  const noexcept { return delayHardBypass; }
     void setReverbDamping(float d) { reverb.setDamping(d); }
     void setReverbWidth(float w) { reverb.setWidth(w); }
     void setReverbCharacter(ReverbBlock::Character c) { reverb.setCharacter(c); }
@@ -475,6 +504,7 @@ private:
     std::atomic<float> finalRecent { 0.0f };
     // Tasks 6/7 dedicated meters.
     std::atomic<float> dryOutputRecent    { 0.0f };
+    std::atomic<float> dryRawRecent       { 0.0f };
     std::atomic<float> reverbReturnRecent { 0.0f };
     std::atomic<float> delayReturnRecent  { 0.0f };
     std::atomic<float> finalOutputRecent  { 0.0f };
@@ -512,4 +542,6 @@ private:
     bool saturationActive = false;
     bool delayActive      = false;
     bool reverbActive     = false;
+    bool reverbHardBypass = false;
+    bool delayHardBypass  = false;
 };

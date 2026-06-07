@@ -19,6 +19,12 @@ public:
         smoothed.setTargetValue(targetGain);
     }
 
+    // Current master-gain target as a linear multiplier. Used by FxChain to
+    // meter the dry voice bus at the SAME output gain as the final buffer so
+    // dryOutputPeakDb and finalOutputPeakDb are directly comparable.
+    float getTargetGainLinear() const noexcept { return targetGain; }
+    float getTargetGainDb()     const noexcept { return juce::Decibels::gainToDecibels(targetGain); }
+
     void process(juce::AudioBuffer<float>& buffer) noexcept
     {
         const int n = buffer.getNumSamples();
