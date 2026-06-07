@@ -11,13 +11,66 @@ SynthEngine::SynthEngine()
 
 void SynthEngine::prepare(double sampleRate, int samplesPerBlock)
 {
-    setCurrentPlaybackSampleRate(sampleRate);
-    forEachSynthVoice([sampleRate, samplesPerBlock](SynthVoice& v)
+    baseSampleRate    = sampleRate > 0 ? sampleRate : 44100.0;
+    preparedBlockSize = juce::jmax(1, samplesPerBlock);
+
+    // FX + layer bus always run at the host rate on the decimated bus.
+    layerBus.prepare(baseSampleRate, preparedBlockSize);
+    fx.prepare(baseSampleRate, preparedBlockSize);
+
+    // (Re)build the oversamplers and prepare the voices at the effective rate.
+    rebuildOversampling();
+}
+
+void SynthEngine::rebuildOversampling()
+{
+    const int    factor  = 1 << oversampleFactorLog2;
+    const double effRate  = baseSampleRate * factor;
+    const int    effBlock = preparedBlockSize * factor;
+
+    // The JUCE Synthesiser + every voice must run at the oversampled rate so the
+    // engines render anti-aliased; the result is decimated back to host rate.
+    setCurrentPlaybackSampleRate(effRate);
+    forEachSynthVoice([effRate, effBlock](SynthVoice& v)
     {
-        v.prepare(sampleRate, samplesPerBlock);
+        v.prepare(effRate, effBlock);
     });
-    layerBus.prepare(sampleRate, samplesPerBlock);
-    fx.prepare(sampleRate, samplesPerBlock);
+
+    if (oversampleFactorLog2 <= 0)
+    {
+        oversamplerDry.reset();
+        oversamplerSend.reset();
+        return;
+    }
+
+    auto makeOs = [this]() -> std::unique_ptr<juce::dsp::Oversampling<float>>
+    {
+        auto os = std::make_unique<juce::dsp::Oversampling<float>>(
+            (size_t) 2,
+            (size_t) oversampleFactorLog2,
+            juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR,
+            /*isMaximumQuality*/ true,
+            /*useIntegerLatency*/ false);
+        os->initProcessing((size_t) preparedBlockSize);
+        os->reset();
+        return os;
+    };
+
+    oversamplerDry  = makeOs();
+    oversamplerSend = makeOs();
+}
+
+void SynthEngine::setOversamplingFactor(int factorLog2)
+{
+    factorLog2 = juce::jlimit(0, 2, factorLog2);
+    if (factorLog2 == oversampleFactorLog2)
+        return;
+
+    // Re-build happens only on a user-driven change (not per audio block), so
+    // the steady-state render path performs no allocations.
+    const juce::ScopedLock sl(lock);
+    oversampleFactorLog2 = factorLog2;
+    rebuildOversampling();
 }
 
 void SynthEngine::renderBlockWithFx(juce::AudioBuffer<float>& buffer,
@@ -29,9 +82,61 @@ void SynthEngine::renderBlockWithFx(juce::AudioBuffer<float>& buffer,
     dryRenderBuffer.clear();
     fxSendBuffer.clear();
 
-    SynthVoice::beginFxSendRender(&fxSendBuffer);
-    renderNextBlock(dryRenderBuffer, midi, startSample, numSamples);
-    SynthVoice::endFxSendRender();
+    const int factor = 1 << oversampleFactorLog2;
+    const bool useOversampling = factor > 1
+                                 && oversamplerDry != nullptr
+                                 && oversamplerSend != nullptr
+                                 && numSamples > 0
+                                 && numSamples <= preparedBlockSize;
+
+    if (! useOversampling)
+    {
+        // Legacy / bit-identical path: voices render straight at host rate.
+        SynthVoice::beginFxSendRender(&fxSendBuffer);
+        renderNextBlock(dryRenderBuffer, midi, startSample, numSamples);
+        SynthVoice::endFxSendRender();
+    }
+    else
+    {
+        // Up-sample the (silent) host-rate blocks to obtain high-rate scratch
+        // blocks owned by the oversamplers, render the voices into them at the
+        // oversampled rate, then decimate back into the host-rate buffers.
+        juce::dsp::AudioBlock<float> dryBase (dryRenderBuffer);
+        juce::dsp::AudioBlock<float> sendBase(fxSendBuffer);
+        auto drySub  = dryBase.getSubBlock ((size_t) startSample, (size_t) numSamples);
+        auto sendSub = sendBase.getSubBlock((size_t) startSample, (size_t) numSamples);
+
+        auto dryHiBlk  = oversamplerDry->processSamplesUp(drySub);    // silent, numSamples*factor
+        auto sendHiBlk = oversamplerSend->processSamplesUp(sendSub);  // silent
+
+        const int hiN = (int) dryHiBlk.getNumSamples();
+        const int nch = juce::jmin((int) dryHiBlk.getNumChannels(), 8);
+        float* dryPtrs [8] = { nullptr };
+        float* sendPtrs[8] = { nullptr };
+        for (int ch = 0; ch < nch; ++ch)
+        {
+            dryPtrs [ch] = dryHiBlk.getChannelPointer ((size_t) ch);
+            sendPtrs[ch] = sendHiBlk.getChannelPointer((size_t) ch);
+        }
+        juce::AudioBuffer<float> dryHi (dryPtrs,  nch, hiN);
+        juce::AudioBuffer<float> sendHi(sendPtrs, nch, hiN);
+
+        // Scale MIDI timestamps into the oversampled timebase so note events
+        // keep their position within the block.
+        scaledMidi.clear();
+        for (const auto meta : midi)
+            scaledMidi.addEvent(meta.getMessage(),
+                                (meta.samplePosition - startSample) * factor);
+
+        SynthVoice::beginFxSendRender(&sendHi);
+        renderNextBlock(dryHi, scaledMidi, 0, hiN);
+        SynthVoice::endFxSendRender();
+
+        // Decimate the high-rate synthesis back into the host-rate buffers.
+        oversamplerDry->processSamplesDown(drySub);
+        oversamplerSend->processSamplesDown(sendSub);
+    }
+
     updateHeldNotes(midi);
     layerBus.process(dryRenderBuffer);
     // Task 6/7: capture the dry voice-bus peak BEFORE any FX return is mixed in
