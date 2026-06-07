@@ -856,6 +856,7 @@ inline void report(DiditagainProcessor& proc,
               << "appliedDelayFeedback: "      << juce::String(appliedDelayFeedback, 3) << "\n"
               << "presetJsonFxSendReleaseMs: " << juce::String(presetJsonFxSendReleaseMs, 1) << "\n"
               << "appliedFxSendReleaseMs: "    << juce::String(appliedFxSendReleaseMs, 1) << "\n"
+              << "presetValueMismatchFields: " << (presetValueMismatchFields.isEmpty() ? juce::String("none") : presetValueMismatchFields.joinIntoString(",")) << "\n"
               << "presetReverbSilenced: "      << (presetReverbSilenced ? "true" : "false") << "\n"
               << "reverbDuckingEnabled: "      << (reverbDuckEnabled ? "true" : "false") << "\n"
               << "reverbDuckingAmount: "       << juce::String(reverbDuckAmount, 3) << "\n"
