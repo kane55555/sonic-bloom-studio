@@ -1005,12 +1005,21 @@ void PresetManager::loadPreset(int index)
                         didaPresetManagerLog("diapreset using absolute source path=" + resolved.getFullPathName());
                     }
                 }
-                else if (! allowCrossCategorySource)
+                else if (! allowCrossCategorySource && ! resolved.isDirectory())
                 {
+                    // Only a real routing failure: STEP A did NOT already find a
+                    // valid in-category source folder, yet the absolute path
+                    // points outside this category (BUG 6). When STEP A resolved
+                    // a good folder the foreign absolute path is harmless.
                     extraSourceWarnings.add("WRONG_CATEGORY_SOURCE_FOLDER");
                     didaPresetManagerLog(juce::String("diapreset REJECTED cross-category source")
+                        + " presetName=" + up.presetName
+                        + " category=" + effectiveCategory
+                        + " presetFilePath=" + file.getFullPathName()
+                        + " sourceInstrumentPathRaw=" + rawSourcePath
                         + " presetCategoryFolder=" + presetCategoryFolder.getFullPathName()
                         + " attemptedResolvedFolder=" + abs.getFullPathName()
+                        + " expectedSourceFolderName=" + expectedSourceFolderName
                         + " reason=rejectedCrossCategorySource");
                 }
             }

@@ -164,14 +164,35 @@ public:
         reverbWetScratch.setSize(buffer.getNumChannels(), buffer.getNumSamples(), false, false, true);
         dryFxScratch.makeCopyOf(buffer, true);
 
-        delay.processWetOnly(buffer, dryFxScratch);
-        // After processWetOnly the buffer holds the DELAY wet-only return.
-        captureRecentPeak(buffer, delayReturnRecent);
+        // Delay wet-only return. When the delay is hard-bypassed (preset off /
+        // mix 0) force the return buffer + meter to absolute silence instead of
+        // running the tank on stale memory (BUG 2).
+        if (delayHardBypass || ! delayActive)
+        {
+            buffer.clear();
+            delayReturnRecent.store(0.0f, std::memory_order_relaxed);
+        }
+        else
+        {
+            delay.processWetOnly(buffer, dryFxScratch);
+            // After processWetOnly the buffer holds the DELAY wet-only return.
+            captureRecentPeak(buffer, delayReturnRecent);
+        }
 
-        reverbWetScratch.makeCopyOf(dryFxScratch, true);
-        reverb.processWetOnly(reverbWetScratch, dryFxScratch);
-        // reverbWetScratch now holds the REVERB wet-only return.
-        captureRecentPeak(reverbWetScratch, reverbReturnRecent);
+        // Reverb wet-only return. Same discipline: a silenced/bypassed reverb
+        // must read -120 dB at its return, never a leaked tail (BUG 2).
+        if (reverbHardBypass || ! reverbActive)
+        {
+            reverbWetScratch.clear();
+            reverbReturnRecent.store(0.0f, std::memory_order_relaxed);
+        }
+        else
+        {
+            reverbWetScratch.makeCopyOf(dryFxScratch, true);
+            reverb.processWetOnly(reverbWetScratch, dryFxScratch);
+            // reverbWetScratch now holds the REVERB wet-only return.
+            captureRecentPeak(reverbWetScratch, reverbReturnRecent);
+        }
 
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
             buffer.addFrom(ch, 0, reverbWetScratch, ch, 0, buffer.getNumSamples());
