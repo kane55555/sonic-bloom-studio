@@ -1304,7 +1304,8 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
             + " layer2GainDb=" + juce::String(p.layer2.gainDb, 2)
             + " enabledPartials=" + juce::String(enabledPartials)
             + " ampGainDb=" + juce::String(p.amp.gainDb, 2)
-            + " appliedMasterGainDb=" + juce::String(appliedMasterGainDb, 2)
+            + " appliedAmpGainDb=" + juce::String(appliedAmpGainDb, 2)
+            + " appliedMasterGainDb=0.00"
             + " engineType=" + (p.engineType.isNotEmpty() ? p.engineType : juce::String("pcm"))
             + " sourcePath=" + p.source.path
             + " reverbEnabled=" + (p.reverb.enabled ? "true" : "false")
