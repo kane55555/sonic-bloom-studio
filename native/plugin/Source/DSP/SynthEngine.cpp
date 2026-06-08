@@ -138,13 +138,20 @@ void SynthEngine::renderBlockWithFx(juce::AudioBuffer<float>& buffer,
     }
 
     updateHeldNotes(midi);
-    // BUG 3: probe the RAW voice bus BEFORE the layer-bus glue stage so the
-    // reporter can tell "no voice output" apart from a layer-bus collapse.
+    // Report 78 gain-staging: capture the NATURAL voice level first, then apply
+    // the amp-gain stage (the preset's PRIMARY loudness) to BOTH the dry and the
+    // FX-send buses. amp.gainDb is no longer dumped onto the master trim, so the
+    // master gain and amp gain can never fight each other.
+    fx.captureDryVoicePreAmpPeak(dryRenderBuffer);
+    fx.applyAmpGain(dryRenderBuffer);
+    fx.applyAmpGain(fxSendBuffer);
+    // BUG 3: probe the (post-amp) voice bus BEFORE the layer-bus glue stage so
+    // the reporter can tell "no voice output" apart from a layer-bus collapse.
     fx.captureDryVoicePreLayerPeak(dryRenderBuffer);
     layerBus.process(dryRenderBuffer);
     // Task 6/7: capture the dry voice-bus peak (post-layer, pre-master) BEFORE
     // any FX return is mixed in so the reporter can tell instrument silence
-    // apart from FX silence.
+    // apart from FX silence. dryOutput = dryRaw * masterTrim (small, default 0).
     fx.captureDryOutputPeak(dryRenderBuffer);
     fx.setActiveVoiceCountForDensity(getActiveVoiceCount());
     fx.processWetSend(fxSendBuffer);

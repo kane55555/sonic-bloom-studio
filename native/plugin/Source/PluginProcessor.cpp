@@ -42,10 +42,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createP
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    // Master — default -6 dB for safe headroom on chords/layered presets.
+    // Master — a SMALL final trim only (Report 78). Default 0 dB, clamped to a
+    // safe ±6 dB range. Per-preset loudness lives in amp.gainDb (the ampGain
+    // stage), never here, so master can no longer collapse/overboost the bus.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{"masterGain", 1}, "Master Gain",
-        juce::NormalisableRange<float>(-60.0f, 12.0f, 0.1f), -6.0f));
+        juce::NormalisableRange<float>(-6.0f, 6.0f, 0.1f), 0.0f));
+
+    // Amp gain — the PRIMARY per-preset loudness calibration (amp.gainDb).
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"ampGain", 1}, "Amp Gain",
+        juce::NormalisableRange<float>(-60.0f, 24.0f, 0.1f), 0.0f));
 
     // Engine
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
@@ -689,6 +696,7 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     fx.setWetHighPassHz(getF("fxWetHighPass"));
     fx.setReverbInputHighPassFloorHz(getF("fxWetHighPass"));
     fx.setMasterGainDb(getF("masterGain"));
+    fx.setAmpGainDb(getF("ampGain"));
 
     if (! presetMacrosActive)
     {

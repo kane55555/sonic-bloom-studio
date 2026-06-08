@@ -207,6 +207,9 @@ public:
         comp.process(buffer);
         masterGain.process(buffer);
         detectAndLogClipping(buffer);
+        // Capture the pre-limiter peak so the reporter can express headroom as
+        // limiterGainReductionDb instead of attributing it to master gain.
+        captureRecentPeak(buffer, preLimiterRecent);
         // NOTE: do NOT overwrite fxOutRecent here. fxOutRecent must reflect
         // ONLY the isolated FX-return bus captured in processWetSend(); writing
         // the full (dry+wet) pre-limiter buffer here made fxOutputPeakDb read
@@ -397,7 +400,74 @@ public:
     void setCompRatio(float r)             { comp.setRatio(r); }
 
     void setLimiterCeilingDb(float db)     { limiter.setCeilingDb(db); }
-    void setMasterGainDb(float db)         { masterGain.setGainDb(db); }
+
+    // Report 78 gain-staging: master gain is a SMALL final trim only. Any value
+    // outside ±kMasterTrimMaxDb is a stale/over-aggressive preset correction and
+    // is clamped here so it can never collapse (-60) or overboost (+12) the bus.
+    // The raw requested value is recorded for the quality reporter so a clamp /
+    // unintentional-mute can be surfaced explicitly.
+    static constexpr float kMasterTrimMaxDb = 6.0f;
+    void setMasterGainDb(float db)
+    {
+        masterGain.setGainDb(juce::jlimit(-kMasterTrimMaxDb, kMasterTrimMaxDb, db));
+    }
+    // Called by preset loaders with the value the preset ASKED for (pre-clamp),
+    // so the report can show requested-vs-applied master trim.
+    void noteRequestedMasterGainDb(float raw) noexcept
+    {
+        masterGainRequestedDb = raw;
+        masterGainClamped = raw < (-kMasterTrimMaxDb - 0.01f) || raw > (kMasterTrimMaxDb + 0.01f);
+    }
+    float getMasterGainRequestedDb() const noexcept { return masterGainRequestedDb; }
+    bool  wasMasterGainClamped()     const noexcept { return masterGainClamped; }
+
+    // Report 78 gain-staging: amp.gainDb is the PRIMARY per-preset loudness and
+    // is applied here as its OWN stage on the dry voice bus (and the FX-send bus)
+    // BEFORE any dry metering — it is no longer dumped onto the master trim. This
+    // stops master gain and amp gain from fighting each other.
+    void setAmpGainDb(float db) noexcept
+    {
+        ampGainDbApplied = juce::jlimit(-60.0f, 24.0f, db);
+        ampGainLinear    = juce::Decibels::decibelsToGain(ampGainDbApplied);
+    }
+    float getAmpGainDb() const noexcept { return ampGainDbApplied; }
+    // Plain (un-smoothed) multiply — amp gain only changes on preset load while
+    // voices are choked/reset, so there is no audible zipper.
+    void applyAmpGain(juce::AudioBuffer<float>& buffer) const noexcept
+    {
+        if (std::abs(ampGainLinear - 1.0f) < 1.0e-6f) return;
+        const int n = buffer.getNumSamples();
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        {
+            auto* d = buffer.getWritePointer(ch);
+            for (int i = 0; i < n; ++i) d[i] *= ampGainLinear;
+        }
+    }
+
+    // Natural voice level BEFORE the amp-gain stage — lets the reporter tell a
+    // genuinely silent voice apart from an amp-gain collapse.
+    void captureDryVoicePreAmpPeak(const juce::AudioBuffer<float>& buffer) noexcept
+    {
+        float p = 0.0f;
+        const int n = buffer.getNumSamples();
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        {
+            const auto* d = buffer.getReadPointer(ch);
+            for (int i = 0; i < n; ++i) { const float a = std::fabs(d[i]); if (a > p) p = a; }
+        }
+        voicePreAmpRecent.store(p, std::memory_order_relaxed);
+    }
+    float getDryVoicePreAmpPeakDb() const noexcept { return toDb(voicePreAmpRecent.load(std::memory_order_relaxed)); }
+
+    // Approximate master limiter gain reduction (pre-limiter peak minus the
+    // post-limiter peak). Reported so headroom shows up as limiter GR, never as
+    // a phantom master-gain change.
+    float getLimiterGainReductionDb() const noexcept
+    {
+        const float pre  = toDb(preLimiterRecent.load(std::memory_order_relaxed));
+        const float post = getFinalPeakDb();
+        return (pre > -120.0f && post > -120.0f) ? juce::jmax(0.0f, pre - post) : 0.0f;
+    }
 
     void setWetHighPassHz(float hz)
     {
@@ -548,10 +618,18 @@ private:
     // Tasks 6/7 dedicated meters.
     std::atomic<float> dryOutputRecent    { 0.0f };
     std::atomic<float> voicePreLayerRecent { 0.0f };  // BUG 3: raw voice, pre-layer-bus
+    std::atomic<float> voicePreAmpRecent  { 0.0f };   // Report 78: natural voice, pre-amp-gain
     std::atomic<float> dryRawRecent       { 0.0f };   // post-layer, pre-master
     std::atomic<float> reverbReturnRecent { 0.0f };
     std::atomic<float> delayReturnRecent  { 0.0f };
     std::atomic<float> finalOutputRecent  { 0.0f };
+    std::atomic<float> preLimiterRecent   { 0.0f };   // Report 78: pre-limiter peak for GR
+
+    // Report 78 gain-staging state.
+    float ampGainLinear      = 1.0f;
+    float ampGainDbApplied   = 0.0f;
+    float masterGainRequestedDb = 0.0f;
+    bool  masterGainClamped     = false;
 
     // Density-aware FX send reduction state.
     float densityFast = 0.0f;

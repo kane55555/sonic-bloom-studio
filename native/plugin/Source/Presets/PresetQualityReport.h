@@ -486,17 +486,43 @@ inline void report(DiditagainProcessor& proc,
     const float voicePreLayerDb = fx.getDryVoicePreLayerPeakDb(); // raw voice, pre-layerBus
     const float postLayerDb     = fx.getDryVoiceRawPeakDb();      // post-layer, pre-master
     const float dryRawPeakDb    = postLayerDb;                    // (alias kept for fields below)
-    const float masterGainDb    = fx.getMasterGainDb();
-    // amp.gainDb is routed straight to the master gain stage in UserPresetLoader
-    // (masterGain = amp.gainDb + choirNaturalGainTrimDb). So the "amp gain" and
-    // the "master gain" are the SAME stage — masterGainDb is the applied value
-    // and ampGainDb is what the preset JSON asked for. A divergence means a
-    // choir trim (or other override) adjusted it.
-    const float ampGainDb           = up.amp.gainDb;
+    const float masterGainDb    = fx.getMasterGainDb();           // applied master TRIM (±6)
+    // Report 78 gain-staging: amp.gainDb is now its OWN stage (ampGain) applied
+    // upstream of the dry meters, so dryRawPeakDb already reflects preset
+    // loudness and master is only a small final trim. amp and master no longer
+    // share a stage and cannot fight each other.
+    const float presetJsonAmpGainDb    = up.amp.gainDb;                     // requested by preset JSON
+    const float appliedAmpGainDb       = fx.getAmpGainDb();                 // applied amp-gain stage
+    const float presetJsonMasterGainDb = fx.getMasterGainRequestedDb();    // requested master (pre-clamp)
+    const float appliedMasterGainDb    = masterGainDb;                      // applied master (post-clamp)
+    const float autoNormalizeGainDb    = 0.0f;                             // no auto-normalization: report observes only
+    const float limiterGainReductionDb = fx.getLimiterGainReductionDb();
+    const bool  intentionalMute        = false;                            // no preset mute field yet
+    const juce::String masterGainSource = fx.wasMasterGainClamped() ? juce::String("safetyClamp")
+                                        : (std::abs(appliedMasterGainDb) < 0.01f ? juce::String("default")
+                                                                                 : juce::String("preset"));
+    const juce::String ampGainSource    = std::abs(presetJsonAmpGainDb) < 0.01f ? juce::String("default")
+                                                                                : juce::String("preset");
+    const float ampGainDb           = presetJsonAmpGainDb;        // (alias kept for existing fields)
     const float mainLayerGainDb     = up.main.gainDb;
     const float layer2GainStageDb   = up.layer2.enabled ? up.layer2.gainDb : -120.0f;
     const float masterMinusAmpDb    = masterGainDb - ampGainDb;
     const bool  masterGainMatchesAmp = std::abs(masterMinusAmpDb) <= 0.5f;
+    const float voicePreAmpDb       = fx.getDryVoicePreAmpPeakDb();
+    // Gain-stage accounting: dryOutput is metered as dryRaw * masterTrim, so the
+    // expected value is exactly dryRaw + masterTrim. A divergence > 3 dB means a
+    // metering/gain-stage bug rather than intentional gain.
+    const float dryOutputExpectedDb = dryRawPeakDb + masterGainDb;
+    // MASTER_GAIN_CLAMPED / UNINTENTIONAL_MASTER_MUTE surface presets that tried
+    // to use master gain as a big loudness correction (now refused).
+    if (fx.wasMasterGainClamped())
+        warnings.add("MASTER_GAIN_CLAMPED");
+    if (presetJsonMasterGainDb <= -40.0f && ! intentionalMute)
+        warnings.add("UNINTENTIONAL_MASTER_MUTE");
+    // GAIN_STAGE_ACCOUNTING_MISMATCH: dryOutput must equal dryRaw + masterTrim.
+    if (dryRawPeakDb > -100.0f && dryOutputDb > -100.0f
+        && std::abs(dryOutputDb - dryOutputExpectedDb) > 3.0f)
+        warnings.add("GAIN_STAGE_ACCOUNTING_MISMATCH");
     // BUG 4: probe a test note that always lands on a real zone (covering zone
     // for C4, else nearest zone root) so a root-only sample map never reports a
     // false NO_ZONE_FOR_TEST_NOTE.
@@ -731,6 +757,17 @@ inline void report(DiditagainProcessor& proc,
         << " layer2GainStageDb=" << juce::String(layer2GainStageDb, 2)
         << " masterMinusAmpDb=" << juce::String(masterMinusAmpDb, 2)
         << " masterGainMatchesAmp=" << (masterGainMatchesAmp ? "true" : "false")
+        << " presetJsonAmpGainDb=" << juce::String(presetJsonAmpGainDb, 2)
+        << " appliedAmpGainDb=" << juce::String(appliedAmpGainDb, 2)
+        << " presetJsonMasterGainDb=" << juce::String(presetJsonMasterGainDb, 2)
+        << " appliedMasterGainDb=" << juce::String(appliedMasterGainDb, 2)
+        << " autoNormalizeGainDb=" << juce::String(autoNormalizeGainDb, 2)
+        << " limiterGainReductionDb=" << juce::String(limiterGainReductionDb, 2)
+        << " masterGainSource=" << masterGainSource
+        << " ampGainSource=" << ampGainSource
+        << " intentionalMute=" << (intentionalMute ? "true" : "false")
+        << " voicePreAmpPeakDb=" << juce::String(voicePreAmpDb, 2)
+        << " dryOutputExpectedDb=" << juce::String(dryOutputExpectedDb, 2)
         << " silenceTestNote=" << silenceTestNote
         << " firstZoneRoot=" << firstZoneRoot
         << " lastZoneRoot=" << lastZoneRoot
@@ -854,6 +891,17 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("layer2GainStageDb",      layer2GainStageDb);
     j->setProperty("masterMinusAmpDb",       masterMinusAmpDb);
     j->setProperty("masterGainMatchesAmp",   masterGainMatchesAmp);
+    j->setProperty("presetJsonAmpGainDb",    presetJsonAmpGainDb);
+    j->setProperty("appliedAmpGainDb",       appliedAmpGainDb);
+    j->setProperty("presetJsonMasterGainDb", presetJsonMasterGainDb);
+    j->setProperty("appliedMasterGainDb",    appliedMasterGainDb);
+    j->setProperty("autoNormalizeGainDb",    autoNormalizeGainDb);
+    j->setProperty("limiterGainReductionDb", limiterGainReductionDb);
+    j->setProperty("masterGainSource",       masterGainSource);
+    j->setProperty("ampGainSource",          ampGainSource);
+    j->setProperty("intentionalMute",        intentionalMute);
+    j->setProperty("voicePreAmpPeakDb",      voicePreAmpDb);
+    j->setProperty("dryOutputExpectedDb",    dryOutputExpectedDb);
     j->setProperty("silenceTestNote",        silenceTestNote);
     j->setProperty("firstZoneRoot",          firstZoneRoot);
     j->setProperty("lastZoneRoot",           lastZoneRoot);
@@ -1028,6 +1076,17 @@ inline void report(DiditagainProcessor& proc,
               << "layer2GainStageDb: "         << juce::String(layer2GainStageDb, 2) << "\n"
               << "masterMinusAmpDb: "          << juce::String(masterMinusAmpDb, 2) << "\n"
               << "masterGainMatchesAmp: "      << (masterGainMatchesAmp ? "true" : "false") << "\n"
+              << "presetJsonAmpGainDb: "       << juce::String(presetJsonAmpGainDb, 2) << "\n"
+              << "appliedAmpGainDb: "          << juce::String(appliedAmpGainDb, 2) << "\n"
+              << "presetJsonMasterGainDb: "    << juce::String(presetJsonMasterGainDb, 2) << "\n"
+              << "appliedMasterGainDb: "       << juce::String(appliedMasterGainDb, 2) << "\n"
+              << "autoNormalizeGainDb: "       << juce::String(autoNormalizeGainDb, 2) << "\n"
+              << "limiterGainReductionDb: "    << juce::String(limiterGainReductionDb, 2) << "\n"
+              << "masterGainSource: "          << masterGainSource << "\n"
+              << "ampGainSource: "             << ampGainSource << "\n"
+              << "intentionalMute: "           << (intentionalMute ? "true" : "false") << "\n"
+              << "voicePreAmpPeakDb: "         << juce::String(voicePreAmpDb, 2) << "\n"
+              << "dryOutputExpectedDb: "       << juce::String(dryOutputExpectedDb, 2) << "\n"
               << "drySilenceReason: "          << (drySilenceReason.isNotEmpty() ? drySilenceReason : juce::String("none")) << "\n"
               << "firstZoneRoot: "             << firstZoneRoot << "\n"
               << "lastZoneRoot: "              << lastZoneRoot << "\n"
