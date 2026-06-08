@@ -79,6 +79,31 @@ public:
                            float crossfadeMs, bool oneShot, bool pitchTracking);
     const juce::String& getInstrumentName() const noexcept { return currentInstrumentName; }
 
+    // ---- Zone diagnostics for the preset-quality reporter (Report 71) ----
+    // Lets the reporter tell instrument silence (no zone for the played note,
+    // empty sample map) apart from a gain-stage collapse, so DRY_BUS_SILENT can
+    // emit an exact root cause instead of a bare warning.
+    int getActiveZoneCount() const noexcept
+    {
+        return activeMultisample != nullptr ? (int) activeMultisample->zones.size() : 0;
+    }
+
+    // 0 = no zones loaded, 1 = an exact hard key-zone covers the note,
+    // 2 = only a nearest-root fallback would play (note outside every range).
+    int classifyZoneCoverageForNote(int midi, int velocity = 100) const noexcept
+    {
+        if (activeMultisample == nullptr || activeMultisample->zones.empty())
+            return 0;
+        for (const auto& z : activeMultisample->zones)
+            if (velocity >= z.loVel && velocity <= z.hiVel
+                && midi >= z.lowKey && midi <= z.highKey)
+                return 1;
+        for (const auto& z : activeMultisample->zones)
+            if (midi >= z.lowKey && midi <= z.highKey)
+                return 1;
+        return 2;
+    }
+
     // Drops the cached instrument identity so the next setInstrument/
     // setSampleSource/setMultisampleSources/loadMultisamplePreset call is
     // forced to re-read sample data from disk instead of reusing the
