@@ -757,6 +757,17 @@ inline void report(DiditagainProcessor& proc,
         << " layer2GainStageDb=" << juce::String(layer2GainStageDb, 2)
         << " masterMinusAmpDb=" << juce::String(masterMinusAmpDb, 2)
         << " masterGainMatchesAmp=" << (masterGainMatchesAmp ? "true" : "false")
+        << " presetJsonAmpGainDb=" << juce::String(presetJsonAmpGainDb, 2)
+        << " appliedAmpGainDb=" << juce::String(appliedAmpGainDb, 2)
+        << " presetJsonMasterGainDb=" << juce::String(presetJsonMasterGainDb, 2)
+        << " appliedMasterGainDb=" << juce::String(appliedMasterGainDb, 2)
+        << " autoNormalizeGainDb=" << juce::String(autoNormalizeGainDb, 2)
+        << " limiterGainReductionDb=" << juce::String(limiterGainReductionDb, 2)
+        << " masterGainSource=" << masterGainSource
+        << " ampGainSource=" << ampGainSource
+        << " intentionalMute=" << (intentionalMute ? "true" : "false")
+        << " voicePreAmpPeakDb=" << juce::String(voicePreAmpDb, 2)
+        << " dryOutputExpectedDb=" << juce::String(dryOutputExpectedDb, 2)
         << " silenceTestNote=" << silenceTestNote
         << " firstZoneRoot=" << firstZoneRoot
         << " lastZoneRoot=" << lastZoneRoot
