@@ -254,8 +254,8 @@ public:
     // PluginProcessor::processBlock (which adds macro modulation) can no longer
     // revive it: the mix is forced to 0 and the tail is drained, so the wet
     // returns read -120 dB (BUG 3 / BUG 6). Cleared when a preset re-enables FX.
-    void setReverbHardBypass(bool b) { reverbHardBypass = b; if (b) { reverb.setMix(0.0f); reverbActive = false; reverb.reset(); } }
-    void setDelayHardBypass(bool b)  { delayHardBypass  = b; if (b) { delay.setMix(0.0f);  delayActive  = false; delay.reset();  } }
+    void setReverbHardBypass(bool b) { reverbHardBypass = b; if (b) { reverb.setMix(0.0f); reverbActive = false; reverb.reset(); reverbReturnRecent.store(0.0f, std::memory_order_relaxed); } }
+    void setDelayHardBypass(bool b)  { delayHardBypass  = b; if (b) { delay.setMix(0.0f);  delayActive  = false; delay.reset();  delayReturnRecent.store(0.0f, std::memory_order_relaxed); } }
     bool getReverbHardBypass() const noexcept { return reverbHardBypass; }
     bool getDelayHardBypass()  const noexcept { return delayHardBypass; }
     void setReverbDamping(float d) { reverb.setDamping(d); }
