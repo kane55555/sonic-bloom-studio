@@ -509,10 +509,12 @@ inline void report(DiditagainProcessor& proc,
     {
         if (needsSource && zoneCount == 0)
             drySilenceReason = "NO_ZONES_LOADED";
-        else if (needsSource && zoneCoverage == 2)
-            drySilenceReason = "NO_ZONE_FOR_TEST_NOTE";
         else if (! oscillatorEngineActive && zoneCount == 0 && activePartials == 0)
             drySilenceReason = "NO_SOUND_SOURCE";
+        // NOTE (BUG 4): a nearest-root fallback (zoneCoverage == 2) is a VALID
+        // selection — the probe always lands on a real sample when zones exist —
+        // so it is NEVER reported as NO_ZONE_FOR_TEST_NOTE. A silent dry bus with
+        // zones present is a gain/metering issue, attributed below.
         else if (voicePreLayerDb <= -60.0f)
             // Nothing came out of the voices at all — not a gain-stage problem.
             drySilenceReason = (mainLayerGainDb <= -40.0f) ? juce::String("MAIN_LAYER_GAIN_TOO_LOW")
