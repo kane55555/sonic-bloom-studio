@@ -431,9 +431,11 @@ inline void report(DiditagainProcessor& proc,
     const bool reverbBothZero = presetJsonReverbMix <= 0.0011f && appliedReverbMix <= 0.0011f;
     if (presetReverbSilenced && reverbReturnNotSilent)
     {
+        // BUG 2: a leaking reverb tail is an engine routing fault, NOT a preset
+        // value mismatch. Only flag the leak — do not add reverbMix to the
+        // mismatch list and do not raise PRESET_VALUE_NOT_APPLIED when the
+        // preset and applied reverb mix are both zero.
         warnings.add("REVERB_BYPASS_NOT_SILENT");
-        presetValueMismatchFields.addIfNotAlreadyThere("reverbMix");
-        presetValueNotApplied = true;
     }
     else if (! presetReverbSilenced && ! reverbBothZero
              && appliedExceeds(appliedReverbMix, presetJsonReverbMix))
@@ -476,9 +478,13 @@ inline void report(DiditagainProcessor& proc,
     // report tells us why instead of just that it happened.
     const float dryRawPeakDb  = fx.getDryVoiceRawPeakDb();   // pre-master-gain
     const float masterGainDb  = fx.getMasterGainDb();
-    const int   silenceTestNote = 60;                        // canonical C4 probe
+    // BUG 4: probe a test note that always lands on a real zone (covering zone
+    // for C4, else nearest zone root) so a root-only sample map never reports a
+    // false NO_ZONE_FOR_TEST_NOTE.
+    const auto  zoneProbe       = engine.probeReportZone(60, 100);
+    const int   silenceTestNote = zoneProbe.testMidiNote >= 0 ? zoneProbe.testMidiNote : 60;
     const int   zoneCount       = engine.getActiveZoneCount();
-    const int   zoneCoverage    = engine.classifyZoneCoverageForNote(silenceTestNote, 100);
+    const int   zoneCoverage    = zoneCount == 0 ? 0 : (zoneProbe.usedNearest ? 2 : 1);
     juce::String drySilenceReason;
     if (dryOutputDb <= -60.0f && up.main.enabled)
     {
@@ -563,8 +569,9 @@ inline void report(DiditagainProcessor& proc,
         if (choirActiveVoiceCount > 8) warnings.add("CHOIR_TOO_MANY_OVERLAPPING_VOICES");
         if (fxSendReleaseMsLive > 180.0f) warnings.add("CHOIR_FX_SEND_TOO_LONG");
         if (fxSendReleaseMsLive > 180.0f) warnings.add("CHOIR_FX_SEND_NOT_APPLIED");
-        if (! choirDelayCapApplied) warnings.add("CHOIR_DELAY_CAP_NOT_APPLIED");
-        if (! choirReverbCapApplied) warnings.add("CHOIR_REVERB_CAP_NOT_APPLIED");
+        // BUG 5: a cap that did not need to fire is NOT a problem, so the old
+        // CHOIR_*_CAP_NOT_APPLIED warnings are removed. choirReverbCapApplied /
+        // choirDelayCapApplied now report only real before/after caps.
 
         // -- Natural-mode (sample-first) warnings --
         if (! choirSyntheticLayerDisabled && effectiveLayer2GainDb > -120.0f)
