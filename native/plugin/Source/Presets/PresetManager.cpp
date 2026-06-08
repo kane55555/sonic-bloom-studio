@@ -1007,20 +1007,41 @@ void PresetManager::loadPreset(int index)
                 }
                 else if (! allowCrossCategorySource && ! resolved.isDirectory())
                 {
-                    // Only a real routing failure: STEP A did NOT already find a
-                    // valid in-category source folder, yet the absolute path
-                    // points outside this category (BUG 6). When STEP A resolved
-                    // a good folder the foreign absolute path is harmless.
-                    extraSourceWarnings.add("WRONG_CATEGORY_SOURCE_FOLDER");
-                    didaPresetManagerLog(juce::String("diapreset REJECTED cross-category source")
-                        + " presetName=" + up.presetName
-                        + " category=" + effectiveCategory
-                        + " presetFilePath=" + file.getFullPathName()
-                        + " sourceInstrumentPathRaw=" + rawSourcePath
-                        + " presetCategoryFolder=" + presetCategoryFolder.getFullPathName()
-                        + " attemptedResolvedFolder=" + abs.getFullPathName()
-                        + " expectedSourceFolderName=" + expectedSourceFolderName
-                        + " reason=rejectedCrossCategorySource");
+                    // BUG 6: before declaring a cross-category routing failure,
+                    // accept the absolute folder when its OWN category normalises
+                    // to the same alias as this preset's category (e.g. a
+                    // "Saxaphone" folder for a "Saxophone" preset). Folder
+                    // structure is not changed — only the matching is alias-aware.
+                    const auto absCatRaw = abs.getParentDirectory().getFileName();
+                    const bool sameAliasCategory =
+                        normalizeCategoryAlias(absCatRaw).equalsIgnoreCase(effectiveCategory)
+                        || normalizeCategoryAlias(abs.getFileName()).equalsIgnoreCase(effectiveCategory);
+                    if (sameAliasCategory)
+                    {
+                        resolved = abs;
+                        resolvedFrom = "aliasCategorySourceFolder";
+                        didaPresetManagerLog(juce::String("diapreset accepted alias-category source")
+                            + " presetName=" + up.presetName
+                            + " category=" + effectiveCategory
+                            + " resolvedFolder=" + abs.getFullPathName()
+                            + " reason=categoryAliasMatch");
+                    }
+                    else
+                    {
+                        // Only a real routing failure: STEP A did NOT already find
+                        // a valid in-category source folder, and the absolute path
+                        // points outside this category under a different alias.
+                        extraSourceWarnings.add("WRONG_CATEGORY_SOURCE_FOLDER");
+                        didaPresetManagerLog(juce::String("diapreset REJECTED cross-category source")
+                            + " presetName=" + up.presetName
+                            + " category=" + effectiveCategory
+                            + " presetFilePath=" + file.getFullPathName()
+                            + " sourceInstrumentPathRaw=" + rawSourcePath
+                            + " presetCategoryFolder=" + presetCategoryFolder.getFullPathName()
+                            + " attemptedResolvedFolder=" + abs.getFullPathName()
+                            + " expectedSourceFolderName=" + expectedSourceFolderName
+                            + " reason=rejectedCrossCategorySource");
+                    }
                 }
             }
         }
