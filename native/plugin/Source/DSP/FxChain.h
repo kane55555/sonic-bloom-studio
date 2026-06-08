@@ -164,14 +164,35 @@ public:
         reverbWetScratch.setSize(buffer.getNumChannels(), buffer.getNumSamples(), false, false, true);
         dryFxScratch.makeCopyOf(buffer, true);
 
-        delay.processWetOnly(buffer, dryFxScratch);
-        // After processWetOnly the buffer holds the DELAY wet-only return.
-        captureRecentPeak(buffer, delayReturnRecent);
+        // Delay wet-only return. When the delay is hard-bypassed (preset off /
+        // mix 0) force the return buffer + meter to absolute silence instead of
+        // running the tank on stale memory (BUG 2).
+        if (delayHardBypass || ! delayActive)
+        {
+            buffer.clear();
+            delayReturnRecent.store(0.0f, std::memory_order_relaxed);
+        }
+        else
+        {
+            delay.processWetOnly(buffer, dryFxScratch);
+            // After processWetOnly the buffer holds the DELAY wet-only return.
+            captureRecentPeak(buffer, delayReturnRecent);
+        }
 
-        reverbWetScratch.makeCopyOf(dryFxScratch, true);
-        reverb.processWetOnly(reverbWetScratch, dryFxScratch);
-        // reverbWetScratch now holds the REVERB wet-only return.
-        captureRecentPeak(reverbWetScratch, reverbReturnRecent);
+        // Reverb wet-only return. Same discipline: a silenced/bypassed reverb
+        // must read -120 dB at its return, never a leaked tail (BUG 2).
+        if (reverbHardBypass || ! reverbActive)
+        {
+            reverbWetScratch.clear();
+            reverbReturnRecent.store(0.0f, std::memory_order_relaxed);
+        }
+        else
+        {
+            reverbWetScratch.makeCopyOf(dryFxScratch, true);
+            reverb.processWetOnly(reverbWetScratch, dryFxScratch);
+            // reverbWetScratch now holds the REVERB wet-only return.
+            captureRecentPeak(reverbWetScratch, reverbReturnRecent);
+        }
 
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
             buffer.addFrom(ch, 0, reverbWetScratch, ch, 0, buffer.getNumSamples());
@@ -254,8 +275,8 @@ public:
     // PluginProcessor::processBlock (which adds macro modulation) can no longer
     // revive it: the mix is forced to 0 and the tail is drained, so the wet
     // returns read -120 dB (BUG 3 / BUG 6). Cleared when a preset re-enables FX.
-    void setReverbHardBypass(bool b) { reverbHardBypass = b; if (b) { reverb.setMix(0.0f); reverbActive = false; reverb.reset(); } }
-    void setDelayHardBypass(bool b)  { delayHardBypass  = b; if (b) { delay.setMix(0.0f);  delayActive  = false; delay.reset();  } }
+    void setReverbHardBypass(bool b) { reverbHardBypass = b; if (b) { reverb.setMix(0.0f); reverbActive = false; reverb.reset(); reverbReturnRecent.store(0.0f, std::memory_order_relaxed); } }
+    void setDelayHardBypass(bool b)  { delayHardBypass  = b; if (b) { delay.setMix(0.0f);  delayActive  = false; delay.reset();  delayReturnRecent.store(0.0f, std::memory_order_relaxed); } }
     bool getReverbHardBypass() const noexcept { return reverbHardBypass; }
     bool getDelayHardBypass()  const noexcept { return delayHardBypass; }
     void setReverbDamping(float d) { reverb.setDamping(d); }

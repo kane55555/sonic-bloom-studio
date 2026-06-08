@@ -104,6 +104,76 @@ public:
         return 2;
     }
 
+    // ---- Report test-note probe (Report 72 / BUG 4) ----------------------
+    // The quality reporter must always test a MIDI note that lands on a real
+    // zone. A bare C4 probe can fall outside a root-only sample map (e.g. a
+    // 36-zone piano whose zones are single-key roots), producing a false
+    // NO_ZONE_FOR_TEST_NOTE. This picks the covering zone for the preferred
+    // note, or the nearest zone root, and reports exactly what it chose.
+    struct ReportZoneProbe
+    {
+        int          firstZoneRoot   = -1;
+        int          lastZoneRoot    = -1;
+        int          testMidiNote    = -1;
+        int          selectedZoneRoot = -1;
+        juce::String selectedZoneFile;
+        bool         hasZone     = false;   // a real zone backs testMidiNote
+        bool         usedNearest = false;   // had to fall back to nearest root
+    };
+
+    ReportZoneProbe probeReportZone(int preferredMidi = 60, int velocity = 100) const noexcept
+    {
+        ReportZoneProbe r;
+        if (activeMultisample == nullptr || activeMultisample->zones.empty())
+            return r;
+
+        const auto& zones = activeMultisample->zones;
+        int minRoot = 1000, maxRoot = -1;
+        for (const auto& z : zones)
+        {
+            minRoot = juce::jmin(minRoot, z.rootMidi);
+            maxRoot = juce::jmax(maxRoot, z.rootMidi);
+        }
+        r.firstZoneRoot = minRoot;
+        r.lastZoneRoot  = maxRoot;
+
+        // 1) Prefer a zone whose hard key-range covers the preferred note,
+        //    clamped into the actual zone span first.
+        const int test = juce::jlimit(minRoot, maxRoot, preferredMidi);
+        for (const auto& z : zones)
+            if (test >= z.lowKey && test <= z.highKey
+                && velocity >= z.loVel && velocity <= z.hiVel)
+            {
+                r.testMidiNote = test; r.selectedZoneRoot = z.rootMidi;
+                r.selectedZoneFile = z.fileName; r.hasZone = true;
+                return r;
+            }
+        for (const auto& z : zones)
+            if (test >= z.lowKey && test <= z.highKey)
+            {
+                r.testMidiNote = test; r.selectedZoneRoot = z.rootMidi;
+                r.selectedZoneFile = z.fileName; r.hasZone = true;
+                return r;
+            }
+
+        // 2) No covering zone — test the nearest zone ROOT so the probe always
+        //    lands on a real sample.
+        const SampleZone* nearest = &zones.front();
+        int bestDist = 1 << 30;
+        for (const auto& z : zones)
+        {
+            const int d = std::abs(z.rootMidi - preferredMidi);
+            if (d < bestDist) { bestDist = d; nearest = &z; }
+        }
+        r.testMidiNote = nearest->rootMidi;
+        r.selectedZoneRoot = nearest->rootMidi;
+        r.selectedZoneFile = nearest->fileName;
+        r.hasZone = true;
+        r.usedNearest = true;
+        return r;
+    }
+
+
     // Drops the cached instrument identity so the next setInstrument/
     // setSampleSource/setMultisampleSources/loadMultisamplePreset call is
     // forced to re-read sample data from disk instead of reusing the
