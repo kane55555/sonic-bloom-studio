@@ -207,6 +207,9 @@ public:
         comp.process(buffer);
         masterGain.process(buffer);
         detectAndLogClipping(buffer);
+        // Capture the pre-limiter peak so the reporter can express headroom as
+        // limiterGainReductionDb instead of attributing it to master gain.
+        captureRecentPeak(buffer, preLimiterRecent);
         // NOTE: do NOT overwrite fxOutRecent here. fxOutRecent must reflect
         // ONLY the isolated FX-return bus captured in processWetSend(); writing
         // the full (dry+wet) pre-limiter buffer here made fxOutputPeakDb read
