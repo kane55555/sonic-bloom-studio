@@ -844,10 +844,15 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     // -- Source / category validation (non-fatal warning only)
     validateSourceForCategory(p);
 
-    // -- Master gain (choir natural mode applies a per-preset trim so vocal
-    //    samples sit at -20..-10 dB instead of slamming the bus).
+    // -- Gain staging (Report 78): amp.gainDb is the PRIMARY preset loudness and
+    //    is routed to the dedicated ampGain stage. The master trim is reset to a
+    //    neutral 0 dB on EVERY load (never inherited, never used as a loudness
+    //    correction). The choir natural-mode trim rides on the amp stage too.
     const float choirGainTrimDb = choirMode ? choirNaturalGainTrimDb(p) : 0.0f;
-    setParamById(proc, "masterGain", p.amp.gainDb + choirGainTrimDb);
+    setParamById(proc, "ampGain",    p.amp.gainDb + choirGainTrimDb);
+    setParamById(proc, "masterGain", 0.0f);
+    if (auto* dp = dynamic_cast<DiditagainProcessor*>(&proc))
+        dp->getSynthEngine().getFx().noteRequestedMasterGainDb(0.0f);
     if (choirMode && std::abs(choirGainTrimDb) > 0.001f)
         juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-safety] preset=")
             + p.presetName + " effect=ampGain"
