@@ -83,7 +83,10 @@ static int extractNoteFromToken(const juce::String& token)
     if (accPos > 0)
     {
         const auto c = token[accPos - 1];
-        if (c == '#' || c == 'b') --accPos;
+        // Accept '#'/'b' AND the 's'/'S' sharp alias (e.g. "Cs3" inside a
+        // larger token like "nylonpluckCs3") so sharp-named files are not
+        // discarded during zone building.
+        if (c == '#' || c == 's' || c == 'S' || c == 'b') --accPos;
     }
     if (accPos == 0) return -1;
     const auto letter = juce::CharacterFunctions::toUpperCase(token[accPos - 1]);

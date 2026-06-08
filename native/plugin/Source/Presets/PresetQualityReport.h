@@ -504,6 +504,16 @@ inline void report(DiditagainProcessor& proc,
     const int   silenceTestNote = zoneProbe.testMidiNote >= 0 ? zoneProbe.testMidiNote : 60;
     const int   zoneCount       = engine.getActiveZoneCount();
     const int   zoneCoverage    = zoneCount == 0 ? 0 : (zoneProbe.usedNearest ? 2 : 1);
+    // BUG 4/5: surface the EXACT zone the probe landed on so a "no zone" report
+    // is always backed by the real first/last/selected roots and the file used.
+    const int   firstZoneRoot         = zoneProbe.firstZoneRoot;
+    const int   lastZoneRoot          = zoneProbe.lastZoneRoot;
+    const int   selectedZoneRoot      = zoneProbe.selectedZoneRoot;
+    const juce::String selectedZoneFile = zoneProbe.selectedZoneFile;
+    const bool  zoneFallbackUsed      = zoneProbe.usedNearest;
+    const int   zoneDistanceSemitones = (zoneProbe.hasZone && zoneProbe.selectedZoneRoot >= 0)
+                                        ? std::abs(zoneProbe.selectedZoneRoot - silenceTestNote)
+                                        : -1;
     juce::String drySilenceReason;
     if (dryOutputDb <= -60.0f && up.main.enabled)
     {
@@ -722,6 +732,12 @@ inline void report(DiditagainProcessor& proc,
         << " masterMinusAmpDb=" << juce::String(masterMinusAmpDb, 2)
         << " masterGainMatchesAmp=" << (masterGainMatchesAmp ? "true" : "false")
         << " silenceTestNote=" << silenceTestNote
+        << " firstZoneRoot=" << firstZoneRoot
+        << " lastZoneRoot=" << lastZoneRoot
+        << " selectedZoneRoot=" << selectedZoneRoot
+        << " selectedZoneFile=" << (selectedZoneFile.isNotEmpty() ? selectedZoneFile : juce::String("none"))
+        << " zoneFallbackUsed=" << (zoneFallbackUsed ? "true" : "false")
+        << " zoneDistanceSemitones=" << zoneDistanceSemitones
         << " activeZoneCount=" << zoneCount
         << " testNoteZoneCoverage=" << (zoneCoverage == 0 ? "none"
                                         : zoneCoverage == 1 ? "exact" : "nearestFallback")
@@ -839,6 +855,12 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("masterMinusAmpDb",       masterMinusAmpDb);
     j->setProperty("masterGainMatchesAmp",   masterGainMatchesAmp);
     j->setProperty("silenceTestNote",        silenceTestNote);
+    j->setProperty("firstZoneRoot",          firstZoneRoot);
+    j->setProperty("lastZoneRoot",           lastZoneRoot);
+    j->setProperty("selectedZoneRoot",       selectedZoneRoot);
+    j->setProperty("selectedZoneFile",       selectedZoneFile.isNotEmpty() ? selectedZoneFile : juce::String("none"));
+    j->setProperty("zoneFallbackUsed",       zoneFallbackUsed);
+    j->setProperty("zoneDistanceSemitones",  zoneDistanceSemitones);
     j->setProperty("activeZoneCount",        zoneCount);
     j->setProperty("testNoteZoneCoverage",   zoneCoverage == 0 ? "none"
                                              : zoneCoverage == 1 ? "exact" : "nearestFallback");
@@ -954,7 +976,10 @@ inline void report(DiditagainProcessor& proc,
         auto dir = f.getParentDirectory();
         if (! dir.isDirectory()) dir.createDirectory();
         if (! f.replaceWithText(jsonPretty))
-            DBG("[DIDITAGAIN preset-quality] latest write FAILED file=" << f.getFullPathName());
+        {
+            juce::Logger::writeToLog("[DIDITAGAIN preset-quality] latest write FAILED file="
+                                     + f.getFullPathName());
+        }
     }
 
     // 2) preset_quality_session.jsonl — append one line per load.
@@ -1004,6 +1029,12 @@ inline void report(DiditagainProcessor& proc,
               << "masterMinusAmpDb: "          << juce::String(masterMinusAmpDb, 2) << "\n"
               << "masterGainMatchesAmp: "      << (masterGainMatchesAmp ? "true" : "false") << "\n"
               << "drySilenceReason: "          << (drySilenceReason.isNotEmpty() ? drySilenceReason : juce::String("none")) << "\n"
+              << "firstZoneRoot: "             << firstZoneRoot << "\n"
+              << "lastZoneRoot: "              << lastZoneRoot << "\n"
+              << "selectedZoneRoot: "          << selectedZoneRoot << "\n"
+              << "selectedZoneFile: "          << (selectedZoneFile.isNotEmpty() ? selectedZoneFile : juce::String("none")) << "\n"
+              << "zoneFallbackUsed: "          << (zoneFallbackUsed ? "true" : "false") << "\n"
+              << "zoneDistanceSemitones: "     << zoneDistanceSemitones << "\n"
               << "presetJsonReverbMix: "       << juce::String(presetJsonReverbMix, 3) << "\n"
               << "appliedReverbMix: "          << juce::String(appliedReverbMix, 3) << "\n"
               << "presetJsonDelayMix: "        << juce::String(presetJsonDelayMix, 3) << "\n"
