@@ -703,8 +703,16 @@ inline void report(DiditagainProcessor& proc,
         << " reverbReturnPeakDb=" << juce::String(reverbReturnDb, 2)
         << " delayReturnPeakDb=" << juce::String(delayReturnDb, 2)
         << " finalOutputPeakDb=" << juce::String(finalOutputDb, 2)
+        << " dryVoicePreLayerPeakDb=" << juce::String(voicePreLayerDb, 2)
+        << " postLayerPeakDb=" << juce::String(postLayerDb, 2)
         << " dryRawPeakDb=" << juce::String(dryRawPeakDb, 2)
         << " masterGainDb=" << juce::String(masterGainDb, 2)
+        << " ampGainDb=" << juce::String(ampGainDb, 2)
+        << " mainLayerGainDb=" << juce::String(mainLayerGainDb, 2)
+        << " layer2GainStageDb=" << juce::String(layer2GainStageDb, 2)
+        << " masterMinusAmpDb=" << juce::String(masterMinusAmpDb, 2)
+        << " masterGainMatchesAmp=" << (masterGainMatchesAmp ? "true" : "false")
+        << " silenceTestNote=" << silenceTestNote
         << " activeZoneCount=" << zoneCount
         << " testNoteZoneCoverage=" << (zoneCoverage == 0 ? "none"
                                         : zoneCoverage == 1 ? "exact" : "nearestFallback")
