@@ -731,8 +731,11 @@ float choirNaturalReverbMix(const UserPreset& p) noexcept
 
 juce::String fxSendReleaseSourceFor(const UserPreset& p, bool choirMode)
 {
-    if (choirMode) return "choirModeClamp";
+    // BUG 1/7: a preset-supplied value is ALWAYS presetFxSend, even in choir
+    // mode. choirModeClamp only describes the case where the choir cap actually
+    // had to LOWER an over-long release the preset did not explicitly request.
     if (p.fxSend.hasFxSendReleaseMs) return "presetFxSend";
+    if (choirMode) return "choirModeClamp";
     if (p.fxSend.hasFxSendReleaseMultiplier) return "ampReleaseFallback";
     return "categoryDefault";
 }
@@ -750,7 +753,9 @@ float resolveFxSendReleaseMs(const UserPreset& p, bool choirMode)
                 ? p.safety.choirFxSendReleaseMaxMs
                 : juce::jmin(180.0f, p.amp.releaseMs * (p.fxSend.hasFxSendReleaseMultiplier
                     ? p.fxSend.fxSendReleaseMultiplier : 0.35f));
-        return juce::jlimit(40.0f, 180.0f, requested);
+        // BUG 1: the choir clamp is an UPPER cap only. The 40ms floor is gone —
+        // a short requested release stays short (never raised to 40ms).
+        return juce::jlimit(1.0f, 180.0f, requested);
     }
 
     if (p.fxSend.hasFxSendReleaseMs)
