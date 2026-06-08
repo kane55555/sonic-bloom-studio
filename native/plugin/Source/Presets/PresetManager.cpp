@@ -1288,7 +1288,17 @@ void PresetManager::loadPresetFromFile(const juce::File& file)
                 if (c->paramID == "engineMode")
                     setParamRaw(c, c->convertTo0to1(static_cast<float>(idx)));
     }
-    if (json.hasProperty(key::masterGain)) setParam(processor, "masterGain", json.getProperty(key::masterGain, 0.0));
+    {
+        // Report 78: master gain is a SMALL final trim only. Legacy presets
+        // stored huge loudness corrections here (-60/+12) — clamp them into the
+        // safe ±6 dB range so they can never collapse or overboost the dry bus,
+        // and record the raw requested value so the reporter can flag the clamp.
+        const double rawMaster = json.hasProperty(key::masterGain)
+                                   ? (double) json.getProperty(key::masterGain, 0.0) : 0.0;
+        if (auto* dp = dynamic_cast<DiditagainProcessor*>(&processor))
+            dp->getSynthEngine().getFx().noteRequestedMasterGainDb((float) rawMaster);
+        setParam(processor, "masterGain", juce::jlimit(-6.0, 6.0, rawMaster));
+    }
     if (json.hasProperty(key::polyphony))  setParam(processor, "polyphony",  json.getProperty(key::polyphony, 8));
     if (json.hasProperty(key::mono))       setParam(processor, "monoMode",   json.getProperty(key::mono, false));
     if (json.hasProperty(key::playMode))
