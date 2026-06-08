@@ -486,17 +486,39 @@ inline void report(DiditagainProcessor& proc,
     const float voicePreLayerDb = fx.getDryVoicePreLayerPeakDb(); // raw voice, pre-layerBus
     const float postLayerDb     = fx.getDryVoiceRawPeakDb();      // post-layer, pre-master
     const float dryRawPeakDb    = postLayerDb;                    // (alias kept for fields below)
-    const float masterGainDb    = fx.getMasterGainDb();
-    // amp.gainDb is routed straight to the master gain stage in UserPresetLoader
-    // (masterGain = amp.gainDb + choirNaturalGainTrimDb). So the "amp gain" and
-    // the "master gain" are the SAME stage — masterGainDb is the applied value
-    // and ampGainDb is what the preset JSON asked for. A divergence means a
-    // choir trim (or other override) adjusted it.
-    const float ampGainDb           = up.amp.gainDb;
+    const float masterGainDb    = fx.getMasterGainDb();           // applied master TRIM (±6)
+    // Report 78 gain-staging: amp.gainDb is now its OWN stage (ampGain) applied
+    // upstream of the dry meters, so dryRawPeakDb already reflects preset
+    // loudness and master is only a small final trim. amp and master no longer
+    // share a stage and cannot fight each other.
+    const float presetJsonAmpGainDb    = up.amp.gainDb;                     // requested by preset JSON
+    const float appliedAmpGainDb       = fx.getAmpGainDb();                 // applied amp-gain stage
+    const float presetJsonMasterGainDb = fx.getMasterGainRequestedDb();    // requested master (pre-clamp)
+    const float appliedMasterGainDb    = masterGainDb;                      // applied master (post-clamp)
+    const float autoNormalizeGainDb    = 0.0f;                             // no auto-normalization: report observes only
+    const float limiterGainReductionDb = fx.getLimiterGainReductionDb();
+    const bool  intentionalMute        = false;                            // no preset mute field yet
+    const juce::String masterGainSource = fx.wasMasterGainClamped() ? juce::String("safetyClamp")
+                                        : (std::abs(appliedMasterGainDb) < 0.01f ? juce::String("default")
+                                                                                 : juce::String("preset"));
+    const juce::String ampGainSource    = std::abs(presetJsonAmpGainDb) < 0.01f ? juce::String("default")
+                                                                                : juce::String("preset");
+    const float ampGainDb           = presetJsonAmpGainDb;        // (alias kept for existing fields)
     const float mainLayerGainDb     = up.main.gainDb;
     const float layer2GainStageDb   = up.layer2.enabled ? up.layer2.gainDb : -120.0f;
     const float masterMinusAmpDb    = masterGainDb - ampGainDb;
     const bool  masterGainMatchesAmp = std::abs(masterMinusAmpDb) <= 0.5f;
+    const float voicePreAmpDb       = fx.getDryVoicePreAmpPeakDb();
+    // Gain-stage accounting: dryOutput is metered as dryRaw * masterTrim, so the
+    // expected value is exactly dryRaw + masterTrim. A divergence > 3 dB means a
+    // metering/gain-stage bug rather than intentional gain.
+    const float dryOutputExpectedDb = dryRawPeakDb + masterGainDb;
+    // MASTER_GAIN_CLAMPED / UNINTENTIONAL_MASTER_MUTE surface presets that tried
+    // to use master gain as a big loudness correction (now refused).
+    if (fx.wasMasterGainClamped())
+        warnings.add("MASTER_GAIN_CLAMPED");
+    if (presetJsonMasterGainDb <= -40.0f && ! intentionalMute)
+        warnings.add("UNINTENTIONAL_MASTER_MUTE");
     // BUG 4: probe a test note that always lands on a real zone (covering zone
     // for C4, else nearest zone root) so a root-only sample map never reports a
     // false NO_ZONE_FOR_TEST_NOTE.
