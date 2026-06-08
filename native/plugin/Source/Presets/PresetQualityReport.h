@@ -256,9 +256,16 @@ inline void report(DiditagainProcessor& proc,
 
     // Task 6/7: dedicated dry-bus / isolated wet-return / final-output meters.
     const float dryOutputDb    = fx.getDryOutputPeakDb();
-    const float reverbReturnDb = fx.getReverbReturnPeakDb();
-    const float delayReturnDb  = fx.getDelayReturnPeakDb();
     const float finalOutputDb  = fx.getFinalOutputPeakDb();
+    // BUG 2: the report runs at preset-load time with NO fresh audition render,
+    // so the live return meters can hold a stale tail from the previous preset.
+    // When the engine has latched reverb/delay silent (hard-bypass or the
+    // resolved mix is 0), the return is DEFINITIONALLY silent — report -120
+    // (linear 0) instead of trusting a possibly-stale meter.
+    const bool reverbLatchedSilent = fx.getReverbHardBypass();
+    const bool delayLatchedSilent  = fx.getDelayHardBypass();
+    const float reverbReturnDb = reverbLatchedSilent ? -120.0f : fx.getReverbReturnPeakDb();
+    const float delayReturnDb  = delayLatchedSilent  ? -120.0f : fx.getDelayReturnPeakDb();
 
 
     // resolvedFrom — explicit caller value wins; otherwise infer from state.
