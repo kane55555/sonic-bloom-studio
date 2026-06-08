@@ -954,7 +954,10 @@ inline void report(DiditagainProcessor& proc,
         auto dir = f.getParentDirectory();
         if (! dir.isDirectory()) dir.createDirectory();
         if (! f.replaceWithText(jsonPretty))
-            DBG("[DIDITAGAIN preset-quality] latest write FAILED file=" << f.getFullPathName());
+        {
+            juce::Logger::writeToLog("[DIDITAGAIN preset-quality] latest write FAILED file="
+                                     + f.getFullPathName());
+        }
     }
 
     // 2) preset_quality_session.jsonl — append one line per load.
