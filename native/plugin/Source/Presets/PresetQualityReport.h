@@ -401,13 +401,17 @@ inline void report(DiditagainProcessor& proc,
     };
 
     bool presetValueNotApplied = false;
+    // When the preset asks for zero reverb AND the engine applied zero, there is
+    // no mismatch — never flag reverbMix in that case (Report 71).
+    const bool reverbBothZero = presetJsonReverbMix <= 0.0011f && appliedReverbMix <= 0.0011f;
     if (presetReverbSilenced && reverbReturnNotSilent)
     {
         warnings.add("REVERB_BYPASS_NOT_SILENT");
         presetValueMismatchFields.addIfNotAlreadyThere("reverbMix");
         presetValueNotApplied = true;
     }
-    else if (! presetReverbSilenced && appliedExceeds(appliedReverbMix, presetJsonReverbMix))
+    else if (! presetReverbSilenced && ! reverbBothZero
+             && appliedExceeds(appliedReverbMix, presetJsonReverbMix))
     {
         presetValueMismatchFields.addIfNotAlreadyThere("reverbMix");
         presetValueNotApplied = true;
