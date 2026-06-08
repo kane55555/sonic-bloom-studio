@@ -519,6 +519,10 @@ inline void report(DiditagainProcessor& proc,
         warnings.add("MASTER_GAIN_CLAMPED");
     if (presetJsonMasterGainDb <= -40.0f && ! intentionalMute)
         warnings.add("UNINTENTIONAL_MASTER_MUTE");
+    // GAIN_STAGE_ACCOUNTING_MISMATCH: dryOutput must equal dryRaw + masterTrim.
+    if (dryRawPeakDb > -100.0f && dryOutputDb > -100.0f
+        && std::abs(dryOutputDb - dryOutputExpectedDb) > 3.0f)
+        warnings.add("GAIN_STAGE_ACCOUNTING_MISMATCH");
     // BUG 4: probe a test note that always lands on a real zone (covering zone
     // for C4, else nearest zone root) so a root-only sample map never reports a
     // false NO_ZONE_FOR_TEST_NOTE.
