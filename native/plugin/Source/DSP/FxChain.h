@@ -217,11 +217,30 @@ public:
         captureRecentPeak(buffer, finalOutputRecent);
     }
 
-    // Capture the peak of the dry (pre-FX) voice bus, scaled by the live master
-    // gain so dryOutputPeakDb is metered at the SAME output stage as
-    // finalOutputPeakDb. With FX off this keeps the two meters within ~0-3 dB
-    // (EQ/comp/limiter residual) instead of the master-gain trim showing up as
-    // a phantom "final bus collapse" (BUG 1). Silence (0) still maps to -120.
+    // BUG 3 gain-stage attribution: capture the RAW voice-bus peak BEFORE the
+    // layer-bus glue/saturation/widener stage runs. Paired with the post-layer
+    // capture below this gives the reporter three explicit dry-chain probes —
+    // voice -> layerBus -> master — so a silent dry bus can be blamed on the
+    // exact stage that ate the signal instead of an ambiguous collapse.
+    void captureDryVoicePreLayerPeak(const juce::AudioBuffer<float>& buffer) noexcept
+    {
+        float p = 0.0f;
+        const int n = buffer.getNumSamples();
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        {
+            const auto* d = buffer.getReadPointer(ch);
+            for (int i = 0; i < n; ++i) { const float a = std::fabs(d[i]); if (a > p) p = a; }
+        }
+        voicePreLayerRecent.store(p, std::memory_order_relaxed);
+    }
+
+    // Capture the peak of the dry (pre-FX) voice bus AFTER the layer bus, scaled
+    // by the live master gain so dryOutputPeakDb is metered at the SAME output
+    // stage as finalOutputPeakDb. With FX off this keeps the two meters within
+    // ~0-3 dB (EQ/comp/limiter residual) instead of the master-gain trim showing
+    // up as a phantom "final bus collapse" (BUG 1). Silence (0) still maps to
+    // -120. The raw (post-layer, pre-master) peak is stored too so the reporter
+    // can solve dryOutputDb == postLayerDb + masterGainDb exactly.
     void captureDryOutputPeak(const juce::AudioBuffer<float>& buffer) noexcept
     {
         float p = 0.0f;
@@ -236,8 +255,11 @@ public:
         dryOutputRecent.store(p, std::memory_order_relaxed);
     }
 
-    // Raw (pre-master-gain) dry voice-bus peak — used purely for silence
-    // detection so a low master trim never masks a real DRY_BUS_SILENT.
+    // Pre-layer-bus (raw voice output) dry peak — distinguishes "no voice
+    // output" from "layer bus ate the signal".
+    float getDryVoicePreLayerPeakDb() const noexcept { return toDb(voicePreLayerRecent.load(std::memory_order_relaxed)); }
+    // Post-layer, pre-master-gain dry peak — used for silence detection so a low
+    // master trim never masks a real DRY_BUS_SILENT, and for stage attribution.
     float getDryVoiceRawPeakDb() const noexcept { return toDb(dryRawRecent.load(std::memory_order_relaxed)); }
     float getMasterGainDb()      const noexcept { return masterGain.getTargetGainDb(); }
 
