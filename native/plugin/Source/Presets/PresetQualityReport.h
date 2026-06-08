@@ -401,13 +401,17 @@ inline void report(DiditagainProcessor& proc,
     };
 
     bool presetValueNotApplied = false;
+    // When the preset asks for zero reverb AND the engine applied zero, there is
+    // no mismatch — never flag reverbMix in that case (Report 71).
+    const bool reverbBothZero = presetJsonReverbMix <= 0.0011f && appliedReverbMix <= 0.0011f;
     if (presetReverbSilenced && reverbReturnNotSilent)
     {
         warnings.add("REVERB_BYPASS_NOT_SILENT");
         presetValueMismatchFields.addIfNotAlreadyThere("reverbMix");
         presetValueNotApplied = true;
     }
-    else if (! presetReverbSilenced && appliedExceeds(appliedReverbMix, presetJsonReverbMix))
+    else if (! presetReverbSilenced && ! reverbBothZero
+             && appliedExceeds(appliedReverbMix, presetJsonReverbMix))
     {
         presetValueMismatchFields.addIfNotAlreadyThere("reverbMix");
         presetValueNotApplied = true;
@@ -440,18 +444,68 @@ inline void report(DiditagainProcessor& proc,
     if (presetValueNotApplied)
         warnings.add("PRESET_VALUE_NOT_APPLIED");
 
-    // Task 9/10: silence diagnosis. If notes are being played into a non-empty
-    // instrument but the dry bus is silent, the cause is gain/zone-mapping.
-    if (dryOutputDb <= -90.0f && finalDb <= -90.0f && up.main.enabled)
-        warnings.add("DRY_BUS_SILENT");
+    // Task 9/10 (Report 71): silence diagnosis with an EXACT root cause.
+    // A preset is considered silent when the post-master dry bus sits at or
+    // below -60 dBFS while the main layer is enabled. Rather than a bare
+    // DRY_BUS_SILENT, attribute the cause to the exact stage so the next
+    // report tells us why instead of just that it happened.
+    const float dryRawPeakDb  = fx.getDryVoiceRawPeakDb();   // pre-master-gain
+    const float masterGainDb  = fx.getMasterGainDb();
+    const int   silenceTestNote = 60;                        // canonical C4 probe
+    const int   zoneCount       = engine.getActiveZoneCount();
+    const int   zoneCoverage    = engine.classifyZoneCoverageForNote(silenceTestNote, 100);
+    juce::String drySilenceReason;
+    if (dryOutputDb <= -60.0f && up.main.enabled)
+    {
+        if (needsSource && zoneCount == 0)
+            drySilenceReason = "NO_ZONES_LOADED";
+        else if (needsSource && zoneCoverage == 2)
+            drySilenceReason = "NO_ZONE_FOR_TEST_NOTE";
+        else if (! oscillatorEngineActive && zoneCount == 0 && activePartials == 0)
+            drySilenceReason = "NO_SOUND_SOURCE";
+        else if (masterGainDb <= -40.0f)
+            drySilenceReason = "MASTER_GAIN_TOO_LOW";
+        else if (up.amp.gainDb <= -40.0f)
+            drySilenceReason = "AMP_GAIN_TOO_LOW";
+        else if (up.main.gainDb <= -40.0f)
+            drySilenceReason = "MAIN_LAYER_GAIN_TOO_LOW";
+        else if (busPeakDb <= -60.0f && fxInDb <= -60.0f && dryRawPeakDb <= -60.0f)
+            drySilenceReason = "NO_VOICE_OUTPUT";
+        else
+            drySilenceReason = "UNKNOWN_GAIN_COLLAPSE";
 
-    // FINAL_BUS_METER_MISMATCH: with every FX silenced the final output must
-    // track the (master-gain-scaled) dry bus within ~3 dB. A larger gap means
-    // the final gain stage or the metering is misrouted (BUG 1 regression).
+        warnings.add("DRY_BUS_SILENT");
+        warnings.add("DRY_BUS_SILENT_REASON_" + drySilenceReason);
+    }
+
+    // Gain-stage attribution (Report 71): when the voice/layer bus or FX input
+    // is healthy but the post-master dry bus is very low, name the exact stage
+    // that ate the signal instead of leaving it ambiguous. This fires even when
+    // the bus is not fully silent (e.g. -55 dB) so partial collapses surface.
+    const bool upstreamHealthy = busPeakDb > -40.0f || fxInDb > -40.0f || dryRawPeakDb > -40.0f;
+    if (upstreamHealthy && dryOutputDb <= -60.0f)
+    {
+        // dryOutputDb == dryRawPeakDb + masterGainDb. If the master trim alone
+        // accounts for the drop the master gain is the culprit; otherwise the
+        // signal was lost before the master stage (layer bus / amp / metering).
+        if (masterGainDb <= -40.0f)
+            warnings.add("GAIN_STAGE_COLLAPSE_MASTER_GAIN");
+        else if (dryRawPeakDb <= -60.0f)
+            warnings.add("GAIN_STAGE_COLLAPSE_PRE_MASTER");
+        else
+            warnings.add("GAIN_STAGE_COLLAPSE_METERING");
+    }
+
+    // FINAL_BUS_METER_MISMATCH: with every FX silenced the final output should
+    // track the (master-gain-scaled) dry bus. Only flag a genuine COLLAPSE —
+    // the final bus reading more than 12 dB BELOW a healthy dry bus (Report 71).
+    // A hotter final (limiter/EQ makeup) or a quiet/silent dry bus is not a
+    // routing fault, so those no longer trip the warning.
     const bool allFxOff = presetReverbSilenced && ! up.delay.enabled
                        && chorusMix <= 0.001f && satMix <= 0.001f;
-    if (allFxOff && dryOutputDb > -90.0f && finalOutputDb > -90.0f
-        && std::abs(finalOutputDb - dryOutputDb) > 3.0f)
+    const bool dryBusHealthy = dryOutputDb > -60.0f;
+    if (allFxOff && dryBusHealthy && finalOutputDb > -120.0f
+        && (dryOutputDb - finalOutputDb) > 12.0f)
         warnings.add("FINAL_BUS_METER_MISMATCH");
 
 
@@ -600,6 +654,12 @@ inline void report(DiditagainProcessor& proc,
         << " reverbReturnPeakDb=" << juce::String(reverbReturnDb, 2)
         << " delayReturnPeakDb=" << juce::String(delayReturnDb, 2)
         << " finalOutputPeakDb=" << juce::String(finalOutputDb, 2)
+        << " dryRawPeakDb=" << juce::String(dryRawPeakDb, 2)
+        << " masterGainDb=" << juce::String(masterGainDb, 2)
+        << " activeZoneCount=" << zoneCount
+        << " testNoteZoneCoverage=" << (zoneCoverage == 0 ? "none"
+                                        : zoneCoverage == 1 ? "exact" : "nearestFallback")
+        << " drySilenceReason=" << (drySilenceReason.isNotEmpty() ? drySilenceReason : juce::String("none"))
         << " presetJsonReverbMix=" << fmt(presetJsonReverbMix)
         << " appliedReverbMix=" << fmt(appliedReverbMix)
         << " presetJsonDelayMix=" << fmt(presetJsonDelayMix)
@@ -702,6 +762,12 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("reverbReturnPeakDb",     reverbReturnDb);
     j->setProperty("delayReturnPeakDb",      delayReturnDb);
     j->setProperty("finalOutputPeakDb",      finalOutputDb);
+    j->setProperty("dryRawPeakDb",           dryRawPeakDb);
+    j->setProperty("masterGainDb",           masterGainDb);
+    j->setProperty("activeZoneCount",        zoneCount);
+    j->setProperty("testNoteZoneCoverage",   zoneCoverage == 0 ? "none"
+                                             : zoneCoverage == 1 ? "exact" : "nearestFallback");
+    j->setProperty("drySilenceReason",       drySilenceReason.isNotEmpty() ? drySilenceReason : juce::String("none"));
     j->setProperty("presetJsonReverbMix",    presetJsonReverbMix);
     j->setProperty("appliedReverbMix",       appliedReverbMix);
     j->setProperty("presetJsonDelayMix",     presetJsonDelayMix);
