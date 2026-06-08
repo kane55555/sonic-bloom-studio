@@ -471,13 +471,25 @@ inline void report(DiditagainProcessor& proc,
     if (presetValueNotApplied)
         warnings.add("PRESET_VALUE_NOT_APPLIED");
 
-    // Task 9/10 (Report 71): silence diagnosis with an EXACT root cause.
-    // A preset is considered silent when the post-master dry bus sits at or
-    // below -60 dBFS while the main layer is enabled. Rather than a bare
-    // DRY_BUS_SILENT, attribute the cause to the exact stage so the next
-    // report tells us why instead of just that it happened.
-    const float dryRawPeakDb  = fx.getDryVoiceRawPeakDb();   // pre-master-gain
-    const float masterGainDb  = fx.getMasterGainDb();
+    // Task 9/10 (Report 71) + BUG 3 (Report 72): silence diagnosis with an
+    // EXACT root cause along the real dry signal chain:
+    //     voice render -> layerBus glue -> master gain (== amp.gainDb)
+    // Each stage now has its own meter probe so a silent/collapsed dry bus is
+    // attributed to the precise stage that ate the signal.
+    const float voicePreLayerDb = fx.getDryVoicePreLayerPeakDb(); // raw voice, pre-layerBus
+    const float postLayerDb     = fx.getDryVoiceRawPeakDb();      // post-layer, pre-master
+    const float dryRawPeakDb    = postLayerDb;                    // (alias kept for fields below)
+    const float masterGainDb    = fx.getMasterGainDb();
+    // amp.gainDb is routed straight to the master gain stage in UserPresetLoader
+    // (masterGain = amp.gainDb + choirNaturalGainTrimDb). So the "amp gain" and
+    // the "master gain" are the SAME stage — masterGainDb is the applied value
+    // and ampGainDb is what the preset JSON asked for. A divergence means a
+    // choir trim (or other override) adjusted it.
+    const float ampGainDb           = up.amp.gainDb;
+    const float mainLayerGainDb     = up.main.gainDb;
+    const float layer2GainStageDb   = up.layer2.enabled ? up.layer2.gainDb : -120.0f;
+    const float masterMinusAmpDb    = masterGainDb - ampGainDb;
+    const bool  masterGainMatchesAmp = std::abs(masterMinusAmpDb) <= 0.5f;
     // BUG 4: probe a test note that always lands on a real zone (covering zone
     // for C4, else nearest zone root) so a root-only sample map never reports a
     // false NO_ZONE_FOR_TEST_NOTE.
@@ -494,14 +506,18 @@ inline void report(DiditagainProcessor& proc,
             drySilenceReason = "NO_ZONE_FOR_TEST_NOTE";
         else if (! oscillatorEngineActive && zoneCount == 0 && activePartials == 0)
             drySilenceReason = "NO_SOUND_SOURCE";
+        else if (voicePreLayerDb <= -60.0f)
+            // Nothing came out of the voices at all — not a gain-stage problem.
+            drySilenceReason = (mainLayerGainDb <= -40.0f) ? juce::String("MAIN_LAYER_GAIN_TOO_LOW")
+                                                           : juce::String("NO_VOICE_OUTPUT");
+        else if (postLayerDb <= -60.0f)
+            // Voices were healthy but the layer-bus glue stage collapsed them.
+            drySilenceReason = "LAYER_BUS_COLLAPSE";
         else if (masterGainDb <= -40.0f)
-            drySilenceReason = "MASTER_GAIN_TOO_LOW";
-        else if (up.amp.gainDb <= -40.0f)
-            drySilenceReason = "AMP_GAIN_TOO_LOW";
-        else if (up.main.gainDb <= -40.0f)
-            drySilenceReason = "MAIN_LAYER_GAIN_TOO_LOW";
-        else if (busPeakDb <= -60.0f && fxInDb <= -60.0f && dryRawPeakDb <= -60.0f)
-            drySilenceReason = "NO_VOICE_OUTPUT";
+            // Post-layer signal is healthy; the master trim (driven by amp.gainDb)
+            // is what silenced the dry output.
+            drySilenceReason = (! masterGainMatchesAmp) ? juce::String("MASTER_GAIN_TOO_LOW")
+                                                        : juce::String("AMP_GAIN_TOO_LOW");
         else
             drySilenceReason = "UNKNOWN_GAIN_COLLAPSE";
 
@@ -509,19 +525,20 @@ inline void report(DiditagainProcessor& proc,
         warnings.add("DRY_BUS_SILENT_REASON_" + drySilenceReason);
     }
 
-    // Gain-stage attribution (Report 71): when the voice/layer bus or FX input
-    // is healthy but the post-master dry bus is very low, name the exact stage
-    // that ate the signal instead of leaving it ambiguous. This fires even when
-    // the bus is not fully silent (e.g. -55 dB) so partial collapses surface.
-    const bool upstreamHealthy = busPeakDb > -40.0f || fxInDb > -40.0f || dryRawPeakDb > -40.0f;
+    // Gain-stage attribution (Report 71/72): when an upstream stage is healthy
+    // but the post-master dry bus is very low, name the exact stage that ate the
+    // signal instead of leaving it ambiguous. This fires even when the bus is
+    // not fully silent (e.g. -55 dB) so partial collapses surface. The probes
+    // follow the real chain order: voice -> layerBus -> master.
+    const bool upstreamHealthy = voicePreLayerDb > -40.0f || postLayerDb > -40.0f
+                              || busPeakDb > -40.0f || fxInDb > -40.0f;
     if (upstreamHealthy && dryOutputDb <= -60.0f)
     {
-        // dryOutputDb == dryRawPeakDb + masterGainDb. If the master trim alone
-        // accounts for the drop the master gain is the culprit; otherwise the
-        // signal was lost before the master stage (layer bus / amp / metering).
-        if (masterGainDb <= -40.0f)
+        if (voicePreLayerDb > -40.0f && postLayerDb <= -60.0f)
+            warnings.add("GAIN_STAGE_COLLAPSE_LAYER_BUS");
+        else if (masterGainDb <= -40.0f)
             warnings.add("GAIN_STAGE_COLLAPSE_MASTER_GAIN");
-        else if (dryRawPeakDb <= -60.0f)
+        else if (postLayerDb <= -60.0f)
             warnings.add("GAIN_STAGE_COLLAPSE_PRE_MASTER");
         else
             warnings.add("GAIN_STAGE_COLLAPSE_METERING");
