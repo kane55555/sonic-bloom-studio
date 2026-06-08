@@ -880,6 +880,17 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("layer2GainStageDb",      layer2GainStageDb);
     j->setProperty("masterMinusAmpDb",       masterMinusAmpDb);
     j->setProperty("masterGainMatchesAmp",   masterGainMatchesAmp);
+    j->setProperty("presetJsonAmpGainDb",    presetJsonAmpGainDb);
+    j->setProperty("appliedAmpGainDb",       appliedAmpGainDb);
+    j->setProperty("presetJsonMasterGainDb", presetJsonMasterGainDb);
+    j->setProperty("appliedMasterGainDb",    appliedMasterGainDb);
+    j->setProperty("autoNormalizeGainDb",    autoNormalizeGainDb);
+    j->setProperty("limiterGainReductionDb", limiterGainReductionDb);
+    j->setProperty("masterGainSource",       masterGainSource);
+    j->setProperty("ampGainSource",          ampGainSource);
+    j->setProperty("intentionalMute",        intentionalMute);
+    j->setProperty("voicePreAmpPeakDb",      voicePreAmpDb);
+    j->setProperty("dryOutputExpectedDb",    dryOutputExpectedDb);
     j->setProperty("silenceTestNote",        silenceTestNote);
     j->setProperty("firstZoneRoot",          firstZoneRoot);
     j->setProperty("lastZoneRoot",           lastZoneRoot);
