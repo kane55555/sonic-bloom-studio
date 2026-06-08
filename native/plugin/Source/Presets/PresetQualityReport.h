@@ -504,6 +504,16 @@ inline void report(DiditagainProcessor& proc,
     const int   silenceTestNote = zoneProbe.testMidiNote >= 0 ? zoneProbe.testMidiNote : 60;
     const int   zoneCount       = engine.getActiveZoneCount();
     const int   zoneCoverage    = zoneCount == 0 ? 0 : (zoneProbe.usedNearest ? 2 : 1);
+    // BUG 4/5: surface the EXACT zone the probe landed on so a "no zone" report
+    // is always backed by the real first/last/selected roots and the file used.
+    const int   firstZoneRoot         = zoneProbe.firstZoneRoot;
+    const int   lastZoneRoot          = zoneProbe.lastZoneRoot;
+    const int   selectedZoneRoot      = zoneProbe.selectedZoneRoot;
+    const juce::String selectedZoneFile = zoneProbe.selectedZoneFile;
+    const bool  zoneFallbackUsed      = zoneProbe.usedNearest;
+    const int   zoneDistanceSemitones = (zoneProbe.hasZone && zoneProbe.selectedZoneRoot >= 0)
+                                        ? std::abs(zoneProbe.selectedZoneRoot - silenceTestNote)
+                                        : -1;
     juce::String drySilenceReason;
     if (dryOutputDb <= -60.0f && up.main.enabled)
     {
