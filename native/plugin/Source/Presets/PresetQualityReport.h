@@ -855,6 +855,12 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("masterMinusAmpDb",       masterMinusAmpDb);
     j->setProperty("masterGainMatchesAmp",   masterGainMatchesAmp);
     j->setProperty("silenceTestNote",        silenceTestNote);
+    j->setProperty("firstZoneRoot",          firstZoneRoot);
+    j->setProperty("lastZoneRoot",           lastZoneRoot);
+    j->setProperty("selectedZoneRoot",       selectedZoneRoot);
+    j->setProperty("selectedZoneFile",       selectedZoneFile.isNotEmpty() ? selectedZoneFile : juce::String("none"));
+    j->setProperty("zoneFallbackUsed",       zoneFallbackUsed);
+    j->setProperty("zoneDistanceSemitones",  zoneDistanceSemitones);
     j->setProperty("activeZoneCount",        zoneCount);
     j->setProperty("testNoteZoneCoverage",   zoneCoverage == 0 ? "none"
                                              : zoneCoverage == 1 ? "exact" : "nearestFallback");
