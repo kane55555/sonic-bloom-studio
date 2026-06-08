@@ -762,6 +762,12 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("reverbReturnPeakDb",     reverbReturnDb);
     j->setProperty("delayReturnPeakDb",      delayReturnDb);
     j->setProperty("finalOutputPeakDb",      finalOutputDb);
+    j->setProperty("dryRawPeakDb",           dryRawPeakDb);
+    j->setProperty("masterGainDb",           masterGainDb);
+    j->setProperty("activeZoneCount",        zoneCount);
+    j->setProperty("testNoteZoneCoverage",   zoneCoverage == 0 ? "none"
+                                             : zoneCoverage == 1 ? "exact" : "nearestFallback");
+    j->setProperty("drySilenceReason",       drySilenceReason.isNotEmpty() ? drySilenceReason : juce::String("none"));
     j->setProperty("presetJsonReverbMix",    presetJsonReverbMix);
     j->setProperty("appliedReverbMix",       appliedReverbMix);
     j->setProperty("presetJsonDelayMix",     presetJsonDelayMix);
