@@ -820,8 +820,16 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("reverbReturnPeakDb",     reverbReturnDb);
     j->setProperty("delayReturnPeakDb",      delayReturnDb);
     j->setProperty("finalOutputPeakDb",      finalOutputDb);
+    j->setProperty("dryVoicePreLayerPeakDb", voicePreLayerDb);
+    j->setProperty("postLayerPeakDb",        postLayerDb);
     j->setProperty("dryRawPeakDb",           dryRawPeakDb);
     j->setProperty("masterGainDb",           masterGainDb);
+    j->setProperty("ampGainDb",              ampGainDb);
+    j->setProperty("mainLayerGainDb",        mainLayerGainDb);
+    j->setProperty("layer2GainStageDb",      layer2GainStageDb);
+    j->setProperty("masterMinusAmpDb",       masterMinusAmpDb);
+    j->setProperty("masterGainMatchesAmp",   masterGainMatchesAmp);
+    j->setProperty("silenceTestNote",        silenceTestNote);
     j->setProperty("activeZoneCount",        zoneCount);
     j->setProperty("testNoteZoneCoverage",   zoneCoverage == 0 ? "none"
                                              : zoneCoverage == 1 ? "exact" : "nearestFallback");
