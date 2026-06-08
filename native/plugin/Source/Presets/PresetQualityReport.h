@@ -339,28 +339,53 @@ inline void report(DiditagainProcessor& proc,
 
     // --- Choir-mode safety state + warnings -------------------------------
     const float fxSendReleaseMsLive = proc.getSynthEngine().getFxSendReleaseMs();
-    const float choirFxSendRequested = up.fxSend.hasFxSendReleaseMs
-        ? up.fxSend.fxSendReleaseMs
-        : (up.safety.hasChoirFxSendReleaseMaxMs
-            ? up.safety.choirFxSendReleaseMaxMs
-            : juce::jmin(180.0f, up.amp.releaseMs
-                * (up.fxSend.hasFxSendReleaseMultiplier ? up.fxSend.fxSendReleaseMultiplier : 0.35f)));
+    // BUG 1: choir caps may ONLY lower a release that exceeds the safety max —
+    // they must never raise a short preset release (e.g. 1 ms) up to a floor.
+    // The reported choir value mirrors the real applied engine value, bounded
+    // only by an upper cap, so it equals appliedFxSendReleaseMs in every case.
+    constexpr float kChoirFxSendReleaseMaxMs = 180.0f;
     const float choirFxSendReleaseMs = choirMode
-        ? juce::jlimit(40.0f, 180.0f, choirFxSendRequested)
+        ? juce::jmin(kChoirFxSendReleaseMaxMs, fxSendReleaseMsLive)
         : fxSendReleaseMsLive;
-    const juce::String fxSendReleaseSource = choirMode ? juce::String("choirModeClamp")
-        : up.fxSend.hasFxSendReleaseMs ? juce::String("presetFxSend")
-        : up.fxSend.hasFxSendReleaseMultiplier ? juce::String("ampReleaseFallback")
+    // Source reflects the true origin: a preset-supplied value is presetFxSend,
+    // never choirModeClamp. choirModeClamp only applies when the choir cap
+    // actually had to reduce the live value.
+    const juce::String fxSendReleaseSource =
+          up.fxSend.hasFxSendReleaseMs                                      ? juce::String("presetFxSend")
+        : (choirMode && fxSendReleaseMsLive > kChoirFxSendReleaseMaxMs)     ? juce::String("choirModeClamp")
+        : up.fxSend.hasFxSendReleaseMultiplier                             ? juce::String("ampReleaseFallback")
         : juce::String("categoryDefault");
     const bool  choirAmpReleaseClamped = choirMode && (up.amp.releaseMs > 900.0f);
-    const bool  choirReverbCapApplied  = choirMode && reverbMix <= 0.2201f && reverbSize <= 0.6201f
-                                       && reverbDuckEnabled && reverbDuckAmount >= 0.28f
-                                       && reverbInputHpHz >= 250.0f && reverbInputHpHz <= 350.0f
-                                       && reverbInputLpHz >= 5000.0f && reverbInputLpHz <= 6000.0f;
-    const bool  choirDelayCapApplied   = choirMode && delayMix <= 0.0301f && delayFeedback <= 0.0801f
-                                       && delayDuckEnabled && std::abs(delayDuckAmount - 0.50f) < 0.001f;
+
+    // BUG 5: choir caps may only LOWER dangerous values. Report a cap as applied
+    // ONLY when a real before/after change occurred, and list the exact field.
+    juce::StringArray choirCapFieldsApplied;
+    if (choirMode)
+    {
+        auto addCap = [&choirCapFieldsApplied](const char* name, float before, float after,
+                                               bool loweredIsCap, int digits)
+        {
+            const float eps = digits == 0 ? 0.5f : 0.001f;
+            const bool changed = loweredIsCap ? (after < before - eps) : (after > before + eps);
+            if (changed)
+                choirCapFieldsApplied.add(juce::String(name) + " "
+                    + juce::String(before, digits) + "→" + juce::String(after, digits));
+        };
+        const float reqReverbMix  = up.reverb.enabled && ! up.reverb.bypass ? up.reverb.mix : 0.0f;
+        addCap("reverbMix",  reqReverbMix, reverbMix, true, 3);
+        addCap("reverbSize", up.reverb.size, reverbSize, true, 3);
+        if (up.reverb.inputHighpassHz >= 0.0f) addCap("reverbInputHighpassHz", up.reverb.inputHighpassHz, reverbInputHpHz, false, 0);
+        if (up.reverb.inputLowpassHz  >= 0.0f) addCap("reverbInputLowpassHz",  up.reverb.inputLowpassHz,  reverbInputLpHz,  true,  0);
+        const float reqDelayMix = up.delay.enabled ? up.delay.mix : 0.0f;
+        const float reqDelayFb  = up.delay.enabled ? up.delay.feedback : 0.0f;
+        addCap("delayMix",      reqDelayMix, delayMix, true, 3);
+        addCap("delayFeedback", reqDelayFb,  delayFeedback, true, 3);
+    }
+    const bool choirReverbCapApplied = choirCapFieldsApplied.joinIntoString(",").containsIgnoreCase("reverb");
+    const bool choirDelayCapApplied  = choirCapFieldsApplied.joinIntoString(",").containsIgnoreCase("delay");
     const int   choirActiveVoiceCount  = choirMode ? proc.getSynthEngine().getActiveVoiceCount() : 0;
     const bool  choirNoteDensityFxReduction = choirMode && noteDensityFxOn;
+
 
     // --- Preset JSON vs applied engine state (Tasks 6/7/8) ----------------
     // These expose what the preset asked for next to what the engine actually
