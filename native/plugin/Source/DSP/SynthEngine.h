@@ -158,7 +158,7 @@ public:
 
         // 2) No covering zone — test the nearest zone ROOT so the probe always
         //    lands on a real sample.
-        const SampleZone* nearest = &zones.front();
+        const dida::SampleZone* nearest = &zones.front();
         int bestDist = 1 << 30;
         for (const auto& z : zones)
         {
