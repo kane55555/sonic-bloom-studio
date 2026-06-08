@@ -729,6 +729,7 @@ inline void report(DiditagainProcessor& proc,
         << " choirFxSendReleaseMs=" << juce::String(choirFxSendReleaseMs, 1)
         << " choirReverbCapApplied=" << (choirReverbCapApplied ? "true" : "false")
         << " choirDelayCapApplied=" << (choirDelayCapApplied ? "true" : "false")
+        << " choirCapFieldsApplied=[" << choirCapFieldsApplied.joinIntoString(",") << "]"
         << " choirNoteDensityFxReduction=" << (choirNoteDensityFxReduction ? "true" : "false")
         << " choirActiveVoiceCount=" << choirActiveVoiceCount
         << " choirFxInputAfterNoteOffDb=" << juce::String(fxInDb, 2)
@@ -842,6 +843,11 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("choirFxSendReleaseMs",      choirFxSendReleaseMs);
     j->setProperty("choirReverbCapApplied",     choirReverbCapApplied);
     j->setProperty("choirDelayCapApplied",      choirDelayCapApplied);
+    {
+        juce::Array<juce::var> capVar;
+        for (auto& f : choirCapFieldsApplied) capVar.add(f);
+        j->setProperty("choirCapFieldsApplied", capVar);
+    }
     j->setProperty("choirNoteDensityFxReduction", choirNoteDensityFxReduction);
     j->setProperty("choirActiveVoiceCount",     choirActiveVoiceCount);
     j->setProperty("choirFxInputAfterNoteOffDb", fxInDb);
