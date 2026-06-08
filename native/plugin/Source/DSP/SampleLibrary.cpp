@@ -23,9 +23,10 @@ static int noteNameToMidi(const juce::String& noteToken)
     int semis = letterToSemis[upperFirst - 'A'];
     ++pos;
 
-    if (pos < s.length() && (s[pos] == '#' || s[pos] == 'b' || s[pos] == 'B'))
+    if (pos < s.length() && (s[pos] == '#' || s[pos] == 's' || s[pos] == 'S'
+                             || s[pos] == 'b' || s[pos] == 'B'))
     {
-        if (s[pos] == '#')      semis += 1;
+        if (s[pos] == '#' || s[pos] == 's' || s[pos] == 'S') semis += 1; // sharp ('s' alias)
         else if (s[pos] == 'b') semis -= 1;
         // capital B alone is the note "B" handled above; only flats use lower b.
         ++pos;
