@@ -285,11 +285,11 @@ public:
     void setChorusMode(int m) { chorus.setMode(m); }
 
 
-    void setDelayMix(float m) { const float v = delayHardBypass ? 0.0f : (choirDensityMode ? juce::jmin(m, 0.03f) : m); delay.setMix(v); delayActive = v > 0.001f; }
+    void setDelayMix(float m) { const float v = delayHardBypass ? 0.0f : (choirDensityMode ? juce::jmin(m, 0.03f) : m); delay.setMix(v); delayActive = v > 0.001f; if (! delayActive) { delay.reset(); delayReturnRecent.store(0.0f, std::memory_order_relaxed); } }
     void setDelayTime(float s) { delay.setTimeSeconds(s); }
     void setDelayFeedback(float f) { delay.setFeedback(delayHardBypass ? 0.0f : (choirDensityMode ? juce::jmin(f, 0.08f) : f)); }
 
-    void setReverbMix(float m) { const float v = reverbHardBypass ? 0.0f : (choirDensityMode ? juce::jmin(m, 0.22f) : m); reverb.setMix(v); reverbActive = v > 0.001f; }
+    void setReverbMix(float m) { const float v = reverbHardBypass ? 0.0f : (choirDensityMode ? juce::jmin(m, 0.22f) : m); reverb.setMix(v); reverbActive = v > 0.001f; if (! reverbActive) { reverb.reset(); reverbReturnRecent.store(0.0f, std::memory_order_relaxed); } }
     void setReverbSize(float s) { reverb.setSize(choirDensityMode ? juce::jmin(s, 0.62f) : s); }
 
     // Hard-bypass latches. Once a preset declares the reverb/delay silenced
