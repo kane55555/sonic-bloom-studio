@@ -618,10 +618,18 @@ private:
     // Tasks 6/7 dedicated meters.
     std::atomic<float> dryOutputRecent    { 0.0f };
     std::atomic<float> voicePreLayerRecent { 0.0f };  // BUG 3: raw voice, pre-layer-bus
+    std::atomic<float> voicePreAmpRecent  { 0.0f };   // Report 78: natural voice, pre-amp-gain
     std::atomic<float> dryRawRecent       { 0.0f };   // post-layer, pre-master
     std::atomic<float> reverbReturnRecent { 0.0f };
     std::atomic<float> delayReturnRecent  { 0.0f };
     std::atomic<float> finalOutputRecent  { 0.0f };
+    std::atomic<float> preLimiterRecent   { 0.0f };   // Report 78: pre-limiter peak for GR
+
+    // Report 78 gain-staging state.
+    float ampGainLinear      = 1.0f;
+    float ampGainDbApplied   = 0.0f;
+    float masterGainRequestedDb = 0.0f;
+    bool  masterGainClamped     = false;
 
     // Density-aware FX send reduction state.
     float densityFast = 0.0f;
