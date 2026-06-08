@@ -138,9 +138,13 @@ void SynthEngine::renderBlockWithFx(juce::AudioBuffer<float>& buffer,
     }
 
     updateHeldNotes(midi);
+    // BUG 3: probe the RAW voice bus BEFORE the layer-bus glue stage so the
+    // reporter can tell "no voice output" apart from a layer-bus collapse.
+    fx.captureDryVoicePreLayerPeak(dryRenderBuffer);
     layerBus.process(dryRenderBuffer);
-    // Task 6/7: capture the dry voice-bus peak BEFORE any FX return is mixed in
-    // so the reporter can tell instrument silence apart from FX silence.
+    // Task 6/7: capture the dry voice-bus peak (post-layer, pre-master) BEFORE
+    // any FX return is mixed in so the reporter can tell instrument silence
+    // apart from FX silence.
     fx.captureDryOutputPeak(dryRenderBuffer);
     fx.setActiveVoiceCountForDensity(getActiveVoiceCount());
     fx.processWetSend(fxSendBuffer);
