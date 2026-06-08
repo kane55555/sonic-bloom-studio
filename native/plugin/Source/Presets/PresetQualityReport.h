@@ -256,9 +256,16 @@ inline void report(DiditagainProcessor& proc,
 
     // Task 6/7: dedicated dry-bus / isolated wet-return / final-output meters.
     const float dryOutputDb    = fx.getDryOutputPeakDb();
-    const float reverbReturnDb = fx.getReverbReturnPeakDb();
-    const float delayReturnDb  = fx.getDelayReturnPeakDb();
     const float finalOutputDb  = fx.getFinalOutputPeakDb();
+    // BUG 2: the report runs at preset-load time with NO fresh audition render,
+    // so the live return meters can hold a stale tail from the previous preset.
+    // When the engine has latched reverb/delay silent (hard-bypass or the
+    // resolved mix is 0), the return is DEFINITIONALLY silent — report -120
+    // (linear 0) instead of trusting a possibly-stale meter.
+    const bool reverbLatchedSilent = fx.getReverbHardBypass();
+    const bool delayLatchedSilent  = fx.getDelayHardBypass();
+    const float reverbReturnDb = reverbLatchedSilent ? -120.0f : fx.getReverbReturnPeakDb();
+    const float delayReturnDb  = delayLatchedSilent  ? -120.0f : fx.getDelayReturnPeakDb();
 
 
     // resolvedFrom — explicit caller value wins; otherwise infer from state.
@@ -502,10 +509,12 @@ inline void report(DiditagainProcessor& proc,
     {
         if (needsSource && zoneCount == 0)
             drySilenceReason = "NO_ZONES_LOADED";
-        else if (needsSource && zoneCoverage == 2)
-            drySilenceReason = "NO_ZONE_FOR_TEST_NOTE";
         else if (! oscillatorEngineActive && zoneCount == 0 && activePartials == 0)
             drySilenceReason = "NO_SOUND_SOURCE";
+        // NOTE (BUG 4): a nearest-root fallback (zoneCoverage == 2) is a VALID
+        // selection — the probe always lands on a real sample when zones exist —
+        // so it is NEVER reported as NO_ZONE_FOR_TEST_NOTE. A silent dry bus with
+        // zones present is a gain/metering issue, attributed below.
         else if (voicePreLayerDb <= -60.0f)
             // Nothing came out of the voices at all — not a gain-stage problem.
             drySilenceReason = (mainLayerGainDb <= -40.0f) ? juce::String("MAIN_LAYER_GAIN_TOO_LOW")
