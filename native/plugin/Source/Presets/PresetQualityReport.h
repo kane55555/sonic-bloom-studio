@@ -947,6 +947,16 @@ inline void report(DiditagainProcessor& proc,
         << " measuredMasterStageDb=" << juce::String(measuredMasterStageDb, 2)
         << " ampStageMismatchDb=" << juce::String(ampStageMismatchDb, 2)
         << " meterReflectsCurrentPreset=" << (meterReflectsCurrentPreset ? "true" : "false")
+        << " currentPresetLoadId=" << currentPresetLoadId
+        << " lastRenderedPresetLoadId=" << lastRenderedPresetLoadId
+        << " lastRenderedPresetName=" << lastRenderedPresetName
+        << " lastRenderedPresetAmpGainDb=" << juce::String(lastRenderedPresetAmpGainDb, 2)
+        << " lastRenderTimestamp=" << lastRenderTimestamp
+        << " blocksRenderedSincePresetLoad=" << blocksRenderedSincePresetLoad
+        << " notesRenderedSincePresetLoad=" << notesRenderedSincePresetLoad
+        << " reportEligible=" << (reportEligible ? "true" : "false")
+        << " calibrationSafe=" << (calibrationSafe ? "true" : "false")
+        << " calibrationSkipReason=" << calibrationSkipReason
         << " silenceTestNote=" << silenceTestNote
         << " firstZoneRoot=" << firstZoneRoot
         << " lastZoneRoot=" << lastZoneRoot
@@ -1100,6 +1110,16 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("measuredMasterStageDb",  measuredMasterStageDb);
     j->setProperty("ampStageMismatchDb",     ampStageMismatchDb);
     j->setProperty("meterReflectsCurrentPreset", meterReflectsCurrentPreset);
+    j->setProperty("currentPresetLoadId",    currentPresetLoadId);
+    j->setProperty("lastRenderedPresetLoadId", lastRenderedPresetLoadId);
+    j->setProperty("lastRenderedPresetName", lastRenderedPresetName);
+    j->setProperty("lastRenderedPresetAmpGainDb", lastRenderedPresetAmpGainDb);
+    j->setProperty("lastRenderTimestamp",    lastRenderTimestamp);
+    j->setProperty("blocksRenderedSincePresetLoad", blocksRenderedSincePresetLoad);
+    j->setProperty("notesRenderedSincePresetLoad", notesRenderedSincePresetLoad);
+    j->setProperty("reportEligible",         reportEligible);
+    j->setProperty("calibrationSafe",        calibrationSafe);
+    j->setProperty("calibrationSkipReason",  calibrationSkipReason);
     j->setProperty("silenceTestNote",        silenceTestNote);
     j->setProperty("firstZoneRoot",          firstZoneRoot);
     j->setProperty("lastZoneRoot",           lastZoneRoot);
