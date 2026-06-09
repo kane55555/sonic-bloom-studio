@@ -568,7 +568,20 @@ inline void report(DiditagainProcessor& proc,
     const float ampStageMismatchDb = ampStageMeasurable ? (measuredAmpStageDb - meteredAmpGainDb) : 0.0f;
     // Do the meters reflect the freshly-loaded preset's amp gain yet? When false,
     // a JSON-vs-meter gap is a load-time propagation lag, NOT a broken audio path.
-    const bool  meterReflectsCurrentPreset = std::abs(meteredAmpGainDb - appliedAmpGainDb) <= 0.5f;
+    const int   currentPresetLoadId        = proc.getCurrentPresetLoadIdForReport();
+    const int   lastRenderedPresetLoadId   = proc.getLastRenderedPresetLoadId();
+    const juce::String lastRenderedPresetName = proc.getLastRenderedPresetName();
+    const float lastRenderedPresetAmpGainDb = proc.getLastRenderedPresetAmpGainDb();
+    const juce::int64 lastRenderTimestamp  = proc.getLastRenderTimestampMs();
+    const int   blocksRenderedSincePresetLoad = proc.getBlocksRenderedSincePresetLoad();
+    const int   notesRenderedSincePresetLoad  = proc.getNotesRenderedSincePresetLoad();
+    const bool  meterAmpMatchesCurrentPreset = std::abs(meteredAmpGainDb - appliedAmpGainDb) <= 0.5f;
+    const bool  currentPresetHasRendered = lastRenderedPresetLoadId == currentPresetLoadId
+        && currentPresetLoadId > 0
+        && blocksRenderedSincePresetLoad > 0
+        && notesRenderedSincePresetLoad > 0;
+    const bool  meterReflectsCurrentPreset = currentPresetHasRendered && meterAmpMatchesCurrentPreset;
+    const bool  reportEligible = currentPresetHasRendered && meterReflectsCurrentPreset;
     // End-to-end voice->dry accounting against the metered (real) amp gain. The
     // measured layer-bus glue gain is neutralised so the mismatch isolates the
     // amp + master stages (a correct render lands within a few dB of 0).
@@ -578,12 +591,18 @@ inline void report(DiditagainProcessor& proc,
     const float voiceToDryGainMismatchDb = voiceDryMeasurable ? (actualVoiceToDryGainDb - expectedVoiceToDryGainDb) : 0.0f;
     // MASTER_GAIN_CLAMPED / UNINTENTIONAL_MASTER_MUTE surface presets that tried
     // to use master gain as a big loudness correction (now refused).
+    if (! reportEligible)
+    {
+        warnings.addIfNotAlreadyThere("REPORT_PENDING_NO_CURRENT_RENDER");
+        warnings.addIfNotAlreadyThere("METERS_PRE_PRESET_RENDER");
+    }
+
     if (fx.wasMasterGainClamped())
         warnings.add("MASTER_GAIN_CLAMPED");
     if (presetJsonMasterGainDb <= -40.0f && ! intentionalMute)
         warnings.add("UNINTENTIONAL_MASTER_MUTE");
     // GAIN_STAGE_ACCOUNTING_MISMATCH: dryOutput must equal dryRaw + masterTrim.
-    if (dryRawPeakDb > -100.0f && dryOutputDb > -100.0f
+    if (reportEligible && dryRawPeakDb > -100.0f && dryOutputDb > -100.0f
         && std::abs(dryOutputDb - dryOutputExpectedDb) > 3.0f)
         warnings.add("GAIN_STAGE_ACCOUNTING_MISMATCH");
     // CRITICAL BUG 1/2 (Report 86): the amp gain must actually move the dry
@@ -599,7 +618,7 @@ inline void report(DiditagainProcessor& proc,
             warnings.add("AMP_GAIN_NOT_REFLECTED_IN_OUTPUT");
     }
     // The amp stage itself: post-amp minus pre-amp must equal the live amp gain.
-    if (ampStageMeasurable && std::abs(ampStageMismatchDb) > 6.0f)
+    if (reportEligible && ampStageMeasurable && std::abs(ampStageMismatchDb) > 6.0f)
         warnings.add("AMP_GAIN_NOT_REFLECTED_IN_OUTPUT");
     // When the meters predate the new preset's amp gain, make that explicit so a
     // JSON-vs-meter gap is never misread as a broken audio path or a tuning need.
@@ -631,7 +650,7 @@ inline void report(DiditagainProcessor& proc,
     const bool  voiceStarted        = zoneProbe.hasZone && mainLayerEnabled;
     const bool  sampleReaderStarted = zoneProbe.hasZone && selectedZoneFile.isNotEmpty();
     juce::String drySilenceReason;
-    if (dryOutputDb <= -60.0f && up.main.enabled)
+    if (reportEligible && dryOutputDb <= -60.0f && up.main.enabled)
     {
         // BUG 3 (Report 86): walk the REAL signal chain stage-by-stage and name
         // the exact stage that lost the signal. Never emit a generic
@@ -685,7 +704,7 @@ inline void report(DiditagainProcessor& proc,
     // follow the real chain order: voice -> layerBus -> master.
     const bool upstreamHealthy = voicePreLayerDb > -40.0f || postLayerDb > -40.0f
                               || busPeakDb > -40.0f || fxInDb > -40.0f;
-    if (upstreamHealthy && dryOutputDb <= -60.0f)
+    if (reportEligible && upstreamHealthy && dryOutputDb <= -60.0f)
     {
         if (voicePreLayerDb > -40.0f && postLayerDb <= -60.0f)
             warnings.add("GAIN_STAGE_COLLAPSE_LAYER_BUS");
@@ -705,7 +724,7 @@ inline void report(DiditagainProcessor& proc,
     const bool allFxOff = presetReverbSilenced && ! up.delay.enabled
                        && chorusMix <= 0.001f && satMix <= 0.001f;
     const bool dryBusHealthy = dryOutputDb > -60.0f;
-    if (allFxOff && dryBusHealthy && finalOutputDb > -120.0f
+    if (reportEligible && allFxOff && dryBusHealthy && finalOutputDb > -120.0f
         && (dryOutputDb - finalOutputDb) > 12.0f)
         warnings.add("FINAL_BUS_METER_MISMATCH");
 
@@ -761,7 +780,7 @@ inline void report(DiditagainProcessor& proc,
     // --- Loudness calibration (suggestion-only) ---------------------------
     const auto target = loudnessTargetForCategory(effectiveCategory);
     const float targetCenterDb = 0.5f * (target.minDb + target.maxDb);
-    const bool notesPlaying = finalDb > -100.0f;
+    const bool notesPlaying = reportEligible && finalDb > -100.0f;
     float suggestedGainDb = 0.0f;
     if (notesPlaying)
     {
@@ -799,12 +818,48 @@ inline void report(DiditagainProcessor& proc,
         }
     if (beep) warnings.add("POSSIBLE_BEEP_LAYER");
 
+    if (! reportEligible)
+    {
+        for (auto* staleWarning : { "DRY_BUS_SILENT", "SAMPLE_READER_STARTED_BUT_ZERO_BUFFER",
+                                    "AMP_STAGE_MUTED", "TOO_QUIET", "LOW_HEADROOM",
+                                    "AMP_GAIN_NOT_REFLECTED_IN_OUTPUT", "GAIN_STAGE_ACCOUNTING_MISMATCH" })
+            warnings.removeString(staleWarning);
+        for (int i = warnings.size(); --i >= 0;)
+            if (warnings[i].startsWith("DRY_BUS_SILENT_REASON_")
+                || warnings[i].startsWith("GAIN_STAGE_COLLAPSE_"))
+                warnings.remove(i);
+        warnings.addIfNotAlreadyThere("REPORT_PENDING_NO_CURRENT_RENDER");
+        warnings.addIfNotAlreadyThere("METERS_PRE_PRESET_RENDER");
+    }
+
+    juce::String calibrationSkipReason = "none";
+    if (! meterReflectsCurrentPreset) calibrationSkipReason = "staleMeters";
+    if (! reportEligible) calibrationSkipReason = "noCurrentRender";
+    if (warnings.contains("DRY_BUS_SILENT_REASON_SAMPLE_READER_STARTED_BUT_ZERO_BUFFER")) calibrationSkipReason = "sampleReaderZeroBuffer";
+    else if (warnings.contains("DRY_BUS_SILENT_REASON_AMP_STAGE_MUTED")) calibrationSkipReason = "ampStageMuted";
+    else if (warnings.contains("DRY_BUS_SILENT_REASON_DRY_BUS_MUTED") || warnings.contains("DRY_BUS_SILENT")) calibrationSkipReason = "dryBusMuted";
+    else if (dryPreAmpPeakDb <= -100.0f && reportEligible) calibrationSkipReason = "silentVoice";
+    else if (finalOutputDb <= -100.0f && reportEligible) calibrationSkipReason = "finalOutputSilent";
+    else if (warnings.contains("AMP_GAIN_NOT_REFLECTED_IN_OUTPUT") || warnings.contains("GAIN_STAGE_ACCOUNTING_MISMATCH")) calibrationSkipReason = "gainAccountingMismatch";
+    const bool calibrationSafe = reportEligible
+        && meterReflectsCurrentPreset
+        && finalOutputDb > -120.0f
+        && dryRawPeakDb > -120.0f
+        && ! warnings.contains("DRY_BUS_SILENT")
+        && ! warnings.contains("METERS_PRE_PRESET_RENDER")
+        && ! warnings.contains("REPORT_PENDING_NO_CURRENT_RENDER")
+        && ! warnings.contains("AMP_GAIN_NOT_REFLECTED_IN_OUTPUT")
+        && ! warnings.contains("GAIN_STAGE_ACCOUNTING_MISMATCH");
+    if (calibrationSafe)
+        calibrationSkipReason = "none";
+
     const juce::String rawPath = sourceInstrumentPathRaw.isNotEmpty()
                                ? sourceInstrumentPathRaw : up.source.path;
 
     // --- Dedupe: suppress identical reloads within 300ms ------------------
     auto& sess = sessionState();
-    const juce::String dedupeKey = up.presetName + "|" + rawPath + "|" + effectiveCategory;
+    const juce::String dedupeKey = up.presetName + "|" + rawPath + "|" + effectiveCategory
+        + "|eligible=" + (reportEligible ? "true" : "false");
     const juce::int64 nowMs = juce::Time::currentTimeMillis();
     if (sess.lastPresetKey == dedupeKey && (nowMs - sess.lastLoadMs) < 300)
         return;
@@ -892,6 +947,19 @@ inline void report(DiditagainProcessor& proc,
         << " measuredMasterStageDb=" << juce::String(measuredMasterStageDb, 2)
         << " ampStageMismatchDb=" << juce::String(ampStageMismatchDb, 2)
         << " meterReflectsCurrentPreset=" << (meterReflectsCurrentPreset ? "true" : "false")
+        << " currentPresetLoadId=" << currentPresetLoadId
+        << " lastRenderedPresetLoadId=" << lastRenderedPresetLoadId
+        << " lastRenderedPresetName=" << lastRenderedPresetName
+        << " lastRenderedPresetAmpGainDb=" << juce::String(lastRenderedPresetAmpGainDb, 2)
+        << " lastRenderTimestamp=" << lastRenderTimestamp
+        << " lastRenderTimestampMs=" << lastRenderTimestamp
+        << " blocksRenderedSincePresetLoad=" << blocksRenderedSincePresetLoad
+        << " notesRenderedSincePresetLoad=" << notesRenderedSincePresetLoad
+        << " reportEligible=" << (reportEligible ? "true" : "false")
+        << " calibrationSafe=" << (calibrationSafe ? "true" : "false")
+        << " calibrationSkipReason=" << calibrationSkipReason
+        << " manualTestWorkflow=" << (reportEligible ? juce::String("capturedAfterCurrentPresetNoteRender")
+                                                      : juce::String("playNoteAfterLoadingPreset_reportPending"))
         << " silenceTestNote=" << silenceTestNote
         << " firstZoneRoot=" << firstZoneRoot
         << " lastZoneRoot=" << lastZoneRoot
@@ -1045,6 +1113,19 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("measuredMasterStageDb",  measuredMasterStageDb);
     j->setProperty("ampStageMismatchDb",     ampStageMismatchDb);
     j->setProperty("meterReflectsCurrentPreset", meterReflectsCurrentPreset);
+    j->setProperty("currentPresetLoadId",    currentPresetLoadId);
+    j->setProperty("lastRenderedPresetLoadId", lastRenderedPresetLoadId);
+    j->setProperty("lastRenderedPresetName", lastRenderedPresetName);
+    j->setProperty("lastRenderedPresetAmpGainDb", lastRenderedPresetAmpGainDb);
+    j->setProperty("lastRenderTimestamp",    lastRenderTimestamp);
+    j->setProperty("lastRenderTimestampMs",  lastRenderTimestamp);
+    j->setProperty("blocksRenderedSincePresetLoad", blocksRenderedSincePresetLoad);
+    j->setProperty("notesRenderedSincePresetLoad", notesRenderedSincePresetLoad);
+    j->setProperty("reportEligible",         reportEligible);
+    j->setProperty("calibrationSafe",        calibrationSafe);
+    j->setProperty("calibrationSkipReason",  calibrationSkipReason);
+    j->setProperty("manualTestWorkflow", reportEligible ? juce::String("captured after current-preset note render")
+                                                        : juce::String("Play a note after loading this preset. Current report is pending."));
     j->setProperty("silenceTestNote",        silenceTestNote);
     j->setProperty("firstZoneRoot",          firstZoneRoot);
     j->setProperty("lastZoneRoot",           lastZoneRoot);
@@ -1249,6 +1330,18 @@ inline void report(DiditagainProcessor& proc,
               << "measuredMasterStageDb: "     << juce::String(measuredMasterStageDb, 2) << "\n"
               << "ampStageMismatchDb: "        << juce::String(ampStageMismatchDb, 2) << "\n"
               << "meterReflectsCurrentPreset: " << (meterReflectsCurrentPreset ? "true" : "false") << "\n"
+              << "currentPresetLoadId: "        << currentPresetLoadId << "\n"
+              << "lastRenderedPresetLoadId: "   << lastRenderedPresetLoadId << "\n"
+              << "lastRenderedPresetName: "     << lastRenderedPresetName << "\n"
+              << "lastRenderedPresetAmpGainDb: " << juce::String(lastRenderedPresetAmpGainDb, 2) << "\n"
+              << "lastRenderTimestamp: "        << lastRenderTimestamp << "\n"
+              << "blocksRenderedSincePresetLoad: " << blocksRenderedSincePresetLoad << "\n"
+              << "notesRenderedSincePresetLoad: "  << notesRenderedSincePresetLoad << "\n"
+              << "reportEligible: "             << (reportEligible ? "true" : "false") << "\n"
+              << "calibrationSafe: "            << (calibrationSafe ? "true" : "false") << "\n"
+              << "calibrationSkipReason: "      << calibrationSkipReason << "\n"
+              << "manualTestWorkflow: "         << (reportEligible ? juce::String("captured after current-preset note render")
+                                                                   : juce::String("Play a note after loading this preset. Current report is pending.")) << "\n"
               << "drySilenceReason: "          << (drySilenceReason.isNotEmpty() ? drySilenceReason : juce::String("none")) << "\n"
               << "mainLayerEnabled: "          << (mainLayerEnabled ? "true" : "false") << "\n"
               << "voiceStarted: "              << (voiceStarted ? "true" : "false") << "\n"

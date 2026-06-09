@@ -45,6 +45,13 @@ public:
     bool   isPresetChangeQueued() const noexcept { return deferredPresetChange.queued; }
     int    getObservedPresetSerial() const noexcept { return observedPresetLoadSerial; }
     int    getRequestedPresetSerial() const noexcept { return presetLoadSerial.load(std::memory_order_acquire); }
+    int    getCurrentPresetLoadIdForReport() const noexcept { return currentPresetLoadIdForReport; }
+    int    getLastRenderedPresetLoadId() const noexcept { return lastRenderedPresetLoadId; }
+    const juce::String& getLastRenderedPresetName() const noexcept { return lastRenderedPresetName; }
+    float  getLastRenderedPresetAmpGainDb() const noexcept { return lastRenderedPresetAmpGainDb; }
+    juce::int64 getLastRenderTimestampMs() const noexcept { return lastRenderTimestampMs; }
+    int    getBlocksRenderedSincePresetLoad() const noexcept { return blocksRenderedSincePresetLoad; }
+    int    getNotesRenderedSincePresetLoad() const noexcept { return notesRenderedSincePresetLoad; }
 
 private:
     juce::AudioProcessorValueTreeState apvts;
@@ -73,6 +80,17 @@ private:
     int debugBlockCounter = 0;
     int clipBlocksSinceLog = 0;
     int stoppedBlocks = 0; // transport-stop counter for FX-tail flush
+
+    // Preset-quality render freshness. These are updated only from the audio
+    // thread after the current preset has actually rendered, so the report never
+    // calibrates from meters left behind by the previous preset.
+    int currentPresetLoadIdForReport = 0;
+    int lastRenderedPresetLoadId = 0;
+    juce::String lastRenderedPresetName;
+    float lastRenderedPresetAmpGainDb = 0.0f;
+    juce::int64 lastRenderTimestampMs = 0;
+    int blocksRenderedSincePresetLoad = 0;
+    int notesRenderedSincePresetLoad = 0;
 
     // ---- Fresh-instance startup default + DAW project recall ----
     // hasRestoredState becomes true only when setStateInformation restored a
