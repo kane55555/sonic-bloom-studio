@@ -808,6 +808,11 @@ inline void report(DiditagainProcessor& proc,
         << " intentionalMute=" << (intentionalMute ? "true" : "false")
         << " voicePreAmpPeakDb=" << juce::String(voicePreAmpDb, 2)
         << " dryOutputExpectedDb=" << juce::String(dryOutputExpectedDb, 2)
+        << " requestedAmpGainDb=" << juce::String(requestedAmpGainDb, 2)
+        << " ampGainClampReason=" << ampGainClampReason
+        << " expectedVoiceToDryGainDb=" << juce::String(expectedVoiceToDryGainDb, 2)
+        << " actualVoiceToDryGainDb=" << juce::String(actualVoiceToDryGainDb, 2)
+        << " voiceToDryGainMismatchDb=" << juce::String(voiceToDryGainMismatchDb, 2)
         << " silenceTestNote=" << silenceTestNote
         << " firstZoneRoot=" << firstZoneRoot
         << " lastZoneRoot=" << lastZoneRoot
