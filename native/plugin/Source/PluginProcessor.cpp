@@ -405,8 +405,8 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             observedPresetLoadSerial = latestPresetSerial;
             currentPresetLoadIdForReport = latestPresetSerial;
             lastRenderedPresetLoadId = 0;
-            lastRenderedPresetName = presetManager.getPresetName(presetManager.getCurrentPresetIndex());
-            lastRenderedPresetAmpGainDb = getF("ampGain");
+            lastRenderedPresetName = {};
+            lastRenderedPresetAmpGainDb = 0.0f;
             lastRenderTimestampMs = 0;
             blocksRenderedSincePresetLoad = 0;
             notesRenderedSincePresetLoad = 0;
