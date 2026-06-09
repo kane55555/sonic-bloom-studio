@@ -401,7 +401,16 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     if (newPresetLoaded || queuedTargetChanged || appliedVoiceStateMismatch)
     {
         if (newPresetLoaded)
+        {
             observedPresetLoadSerial = latestPresetSerial;
+            currentPresetLoadIdForReport = latestPresetSerial;
+            lastRenderedPresetLoadId = 0;
+            lastRenderedPresetName = presetManager.getPresetName(presetManager.getCurrentPresetIndex());
+            lastRenderedPresetAmpGainDb = getF("ampGain");
+            lastRenderTimestampMs = 0;
+            blocksRenderedSincePresetLoad = 0;
+            notesRenderedSincePresetLoad = 0;
+        }
 
         const auto previousAge = deferredPresetChange.queued ? deferredPresetChange.ageInBlocks : 0;
         deferredPresetChange.queued = true;
@@ -765,7 +774,34 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     }
 
     // ---- Render voices + FX (master gain + limiter applied inside FX chain) ----
+    const bool blockHasNoteOn = [&midiMessages]
+    {
+        for (const auto meta : midiMessages)
+            if (meta.getMessage().isNoteOn())
+                return true;
+        return false;
+    }();
     synthEngine.renderBlockWithFx(buffer, midiMessages, 0, buffer.getNumSamples());
+
+    if (currentPresetLoadIdForReport > 0)
+    {
+        ++blocksRenderedSincePresetLoad;
+        if (blockHasNoteOn)
+            ++notesRenderedSincePresetLoad;
+
+        const bool currentAmpWasMetered = std::abs(synthEngine.getFx().getMeteredAmpGainDb() - getF("ampGain")) <= 0.5f;
+        const bool currentNoteRendered = notesRenderedSincePresetLoad > 0
+            && synthEngine.getFx().getDryPreAmpPeakDb() > -100.0f;
+        if (currentAmpWasMetered && currentNoteRendered)
+        {
+            lastRenderedPresetLoadId = currentPresetLoadIdForReport;
+            lastRenderedPresetName = presetManager.getPresetName(presetManager.getCurrentPresetIndex());
+            lastRenderedPresetAmpGainDb = synthEngine.getFx().getMeteredAmpGainDb();
+            lastRenderTimestampMs = juce::Time::currentTimeMillis();
+        }
+    }
+
+    presetManager.emitPendingUserDiapresetQualityReportIfReady();
 
 
     // ---- Output clipping meter: warn if the master bus exceeds -1 dBFS
