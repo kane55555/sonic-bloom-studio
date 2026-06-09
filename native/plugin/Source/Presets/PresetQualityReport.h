@@ -966,6 +966,9 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("testNoteZoneCoverage",   zoneCoverage == 0 ? "none"
                                              : zoneCoverage == 1 ? "exact" : "nearestFallback");
     j->setProperty("drySilenceReason",       drySilenceReason.isNotEmpty() ? drySilenceReason : juce::String("none"));
+    j->setProperty("mainLayerEnabled",       mainLayerEnabled);
+    j->setProperty("voiceStarted",           voiceStarted);
+    j->setProperty("sampleReaderStarted",    sampleReaderStarted);
     j->setProperty("presetJsonReverbMix",    presetJsonReverbMix);
     j->setProperty("appliedReverbMix",       appliedReverbMix);
     j->setProperty("presetJsonDelayMix",     presetJsonDelayMix);
