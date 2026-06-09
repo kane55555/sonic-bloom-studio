@@ -256,6 +256,14 @@ public:
         dryRawRecent.store(p, std::memory_order_relaxed);
         p *= masterGain.getTargetGainLinear();
         dryOutputRecent.store(p, std::memory_order_relaxed);
+        // Report 86: snapshot the amp gain that was ACTUALLY live for the render
+        // that produced these meters. The quality report runs at preset-LOAD
+        // time, BEFORE the new preset's "ampGain" APVTS param has propagated
+        // through processBlock -> setAmpGainDb(), so the meters reflect this
+        // (possibly previous) amp gain. Pairing the meter with the gain that
+        // shaped it lets the reporter do self-consistent gain accounting instead
+        // of comparing the new preset's requested gain against a stale render.
+        meteredAmpGainDb.store(ampGainDbApplied, std::memory_order_relaxed);
     }
 
     // Pre-layer-bus (raw voice output) dry peak — distinguishes "no voice
