@@ -12,6 +12,7 @@
 //==============================================================================
 #include <JuceHeader.h>
 #include "UserPresetFormat.h"
+#include "UserPresetLoader.h"
 #include "../PluginProcessor.h"
 #include "../DSP/SynthEngine.h"
 
@@ -492,7 +493,6 @@ inline void report(DiditagainProcessor& proc,
     // loudness and master is only a small final trim. amp and master no longer
     // share a stage and cannot fight each other.
     const float presetJsonAmpGainDb    = up.amp.gainDb;                     // requested by preset JSON
-    const float appliedAmpGainDb       = fx.getAmpGainDb();                 // applied amp-gain stage
     const float presetJsonMasterGainDb = fx.getMasterGainRequestedDb();    // requested master (pre-clamp)
     const float appliedMasterGainDb    = masterGainDb;                      // applied master (post-clamp)
     const float autoNormalizeGainDb    = 0.0f;                             // no auto-normalization: report observes only
@@ -501,29 +501,39 @@ inline void report(DiditagainProcessor& proc,
     const juce::String masterGainSource = fx.wasMasterGainClamped() ? juce::String("safetyClamp")
                                         : (std::abs(appliedMasterGainDb) < 0.01f ? juce::String("default")
                                                                                  : juce::String("preset"));
-    // CRITICAL CHECK 1 (Report 79): amp-gain truthfulness. appliedAmpGainDb is the
-    // LIVE amp stage read back from the engine; requestedAmpGainDb is the raw JSON
-    // request. When they differ the source must NOT claim "preset" — it must name
-    // the exact reason (safety clamp to [-60,+24] or a load-time gain trim such as
-    // the choir-mode trim) with before/after values exposed via requestedAmpGainDb
-    // / appliedAmpGainDb / ampGainClampReason.
-    const float requestedAmpGainDb = presetJsonAmpGainDb;
-    const bool  ampGainDiffers     = std::abs(appliedAmpGainDb - requestedAmpGainDb) > 0.1f;
+    // CRITICAL FIX (Report 81): amp-gain truthfulness is now computed DIRECTLY
+    // from the preset source instead of reading the live engine stage back.
+    //
+    // The old live read (fx.getAmpGainDb()) was one-preset-LATE: the report runs
+    // before the freshly-loaded preset's "ampGain" parameter has propagated
+    // through APVTS -> processBlock -> FxChain::setAmpGainDb(), so it returned the
+    // PREVIOUS preset's amp gain. That stale value was then mislabelled as a
+    // mysterious "loadTimeGainTrim". We instead reproduce exactly what
+    // applyToProcessor() does, observation-only (no DSP is touched):
+    //     finalAmpGainDb = clamp(presetJsonAmpGainDb + loadTimeGainTrimDb, -60, +24)
+    // loadTimeGainTrimDb is 0 for everything except choir-mode presets, and is
+    // reported on its own line so the math is always explicit.
+    const float requestedAmpGainDb  = presetJsonAmpGainDb;
+    const float loadTimeGainTrimDb  = dida::userpreset::loadTimeGainTrimDb(up); // 0 unless choir-mode
+    const float preClampAmpGainDb   = presetJsonAmpGainDb + loadTimeGainTrimDb;
+    const float finalAmpGainDb      = juce::jlimit(-60.0f, 24.0f, preClampAmpGainDb);
+    const float appliedAmpGainDb    = finalAmpGainDb;          // the REAL final live amp gain
+    // A clamp happens ONLY when the requested value (plus any explicit trim)
+    // exceeds the engine's safety range. A non-zero trim is NOT a clamp.
     juce::String ampGainClampReason = "none";
-    if (ampGainDiffers)
-    {
-        if (requestedAmpGainDb > 24.0f && appliedAmpGainDb >= 23.9f)
-            ampGainClampReason = "safetyClampMax(+24dB)";
-        else if (requestedAmpGainDb < -60.0f && appliedAmpGainDb <= -59.9f)
-            ampGainClampReason = "safetyClampMin(-60dB)";
-        else
-            ampGainClampReason = "loadTimeGainTrim"; // additive trim applied at load (e.g. choir)
-    }
+    if (preClampAmpGainDb > 24.0f)       ampGainClampReason = "outOfRange(+24dB)";
+    else if (preClampAmpGainDb < -60.0f) ampGainClampReason = "outOfRange(-60dB)";
+    const bool ampGainClamped = (ampGainClampReason != "none");
+    // Source is the PRESET unless a real safety clamp moved it. The load-time
+    // trim is reported on its own line (loadTimeGainTrimSource) and is never
+    // hidden inside ampGainSource.
     const juce::String ampGainSource =
-          ampGainDiffers ? (ampGainClampReason.startsWith("safetyClamp") ? juce::String("safetyClamp")
-                                                                         : juce::String("presetTrim"))
+          ampGainClamped ? juce::String("safetyClamp")
         : (std::abs(requestedAmpGainDb) < 0.01f ? juce::String("default") : juce::String("preset"));
-    const float ampGainDb           = appliedAmpGainDb;        // alias now reflects the REAL applied amp gain
+    const juce::String loadTimeGainTrimSource =
+          std::abs(loadTimeGainTrimDb) < 0.001f ? juce::String("disabled")
+                                                : juce::String("choirNaturalTrim");
+    const float ampGainDb           = appliedAmpGainDb;        // alias reflects the REAL final amp gain
     const float mainLayerGainDb     = up.main.gainDb;
     const float layer2GainStageDb   = up.layer2.enabled ? up.layer2.gainDb : -120.0f;
     const float masterMinusAmpDb    = masterGainDb - ampGainDb;
@@ -809,6 +819,9 @@ inline void report(DiditagainProcessor& proc,
         << " voicePreAmpPeakDb=" << juce::String(voicePreAmpDb, 2)
         << " dryOutputExpectedDb=" << juce::String(dryOutputExpectedDb, 2)
         << " requestedAmpGainDb=" << juce::String(requestedAmpGainDb, 2)
+        << " loadTimeGainTrimDb=" << juce::String(loadTimeGainTrimDb, 2)
+        << " loadTimeGainTrimSource=" << loadTimeGainTrimSource
+        << " finalAmpGainDb=" << juce::String(finalAmpGainDb, 2)
         << " ampGainClampReason=" << ampGainClampReason
         << " expectedVoiceToDryGainDb=" << juce::String(expectedVoiceToDryGainDb, 2)
         << " actualVoiceToDryGainDb=" << juce::String(actualVoiceToDryGainDb, 2)
@@ -951,6 +964,9 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("voicePreAmpPeakDb",      voicePreAmpDb);
     j->setProperty("dryOutputExpectedDb",    dryOutputExpectedDb);
     j->setProperty("requestedAmpGainDb",     requestedAmpGainDb);
+    j->setProperty("loadTimeGainTrimDb",     loadTimeGainTrimDb);
+    j->setProperty("loadTimeGainTrimSource", loadTimeGainTrimSource);
+    j->setProperty("finalAmpGainDb",         finalAmpGainDb);
     j->setProperty("ampGainClampReason",     ampGainClampReason);
     j->setProperty("expectedVoiceToDryGainDb", expectedVoiceToDryGainDb);
     j->setProperty("actualVoiceToDryGainDb", actualVoiceToDryGainDb);
@@ -1144,6 +1160,9 @@ inline void report(DiditagainProcessor& proc,
               << "voicePreAmpPeakDb: "         << juce::String(voicePreAmpDb, 2) << "\n"
               << "dryOutputExpectedDb: "       << juce::String(dryOutputExpectedDb, 2) << "\n"
               << "requestedAmpGainDb: "        << juce::String(requestedAmpGainDb, 2) << "\n"
+              << "loadTimeGainTrimDb: "        << juce::String(loadTimeGainTrimDb, 2) << "\n"
+              << "loadTimeGainTrimSource: "    << loadTimeGainTrimSource << "\n"
+              << "finalAmpGainDb: "            << juce::String(finalAmpGainDb, 2) << "\n"
               << "ampGainClampReason: "        << ampGainClampReason << "\n"
               << "expectedVoiceToDryGainDb: "  << juce::String(expectedVoiceToDryGainDb, 2) << "\n"
               << "actualVoiceToDryGainDb: "    << juce::String(actualVoiceToDryGainDb, 2) << "\n"

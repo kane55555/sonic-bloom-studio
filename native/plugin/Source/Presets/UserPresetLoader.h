@@ -24,6 +24,13 @@ bool parseFile(const juce::File& file, UserPreset& out, juce::String& errorOut);
 // `preset.source.path` into the SynthEngine.
 void applyToProcessor(const UserPreset& preset, juce::AudioProcessor& proc);
 
+// Additive load-time gain trim (dB) applied on top of preset.amp.gainDb inside
+// applyToProcessor(). Currently only choir-mode presets receive a non-zero trim;
+// every other preset returns 0 so its raw amp.gainDb is applied verbatim.
+// Exposed so the preset-quality report can reproduce the engine's gain math
+// deterministically instead of reading the (one-preset-late) live engine stage.
+float loadTimeGainTrimDb(const UserPreset& preset);
+
 // Serialise a preset to JSON text suitable for ".diapreset" on disk.
 juce::String toJson(const UserPreset& preset);
 

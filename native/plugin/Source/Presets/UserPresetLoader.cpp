@@ -836,6 +836,14 @@ void clampEnvelopeForCategory(juce::AudioProcessor& proc, const UserPreset& p, F
 
 } // anonymous
 
+// Public: reproduce the engine's load-time gain trim so the quality report can
+// compute the true applied amp gain without a stale live read. Only choir-mode
+// presets get a trim; everything else returns 0.
+float loadTimeGainTrimDb(const UserPreset& p)
+{
+    return isChoirModePreset(p) ? choirNaturalGainTrimDb(p) : 0.0f;
+}
+
 void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
 {
     const Family fam = familyOf(p.category);
@@ -844,20 +852,40 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     // -- Source / category validation (non-fatal warning only)
     validateSourceForCategory(p);
 
-    // -- Gain staging (Report 78): amp.gainDb is the PRIMARY preset loudness and
-    //    is routed to the dedicated ampGain stage. The master trim is reset to a
-    //    neutral 0 dB on EVERY load (never inherited, never used as a loudness
-    //    correction). The choir natural-mode trim rides on the amp stage too.
-    const float choirGainTrimDb = choirMode ? choirNaturalGainTrimDb(p) : 0.0f;
-    setParamById(proc, "ampGain",    p.amp.gainDb + choirGainTrimDb);
+    // -- Gain staging (Report 78/81): amp.gainDb is the PRIMARY preset loudness
+    //    and is routed verbatim to the dedicated ampGain stage, plus an explicit
+    //    additive load-time trim (choir-mode only) and the engine's [-60,+24] dB
+    //    safety clamp. NOTHING from the previous preset is carried in: the trim
+    //    is recomputed from THIS preset every load and the master trim is reset
+    //    to a neutral 0 dB on EVERY load.
+    const float loadTimeTrimDb     = loadTimeGainTrimDb(p);   // 0 unless choir-mode
+    const float requestedAmpGainDb = p.amp.gainDb;
+    const float finalAmpGainDb     = juce::jlimit(-60.0f, 24.0f, requestedAmpGainDb + loadTimeTrimDb);
+    setParamById(proc, "ampGain",    finalAmpGainDb);
     setParamById(proc, "masterGain", 0.0f);
     if (auto* dp = dynamic_cast<DiditagainProcessor*>(&proc))
         dp->getSynthEngine().getFx().noteRequestedMasterGainDb(0.0f);
-    if (choirMode && std::abs(choirGainTrimDb) > 0.001f)
+
+    // BUG 2 (Report 81): per-load gain trace. Logs the EXACT amp gain applied
+    // this load alongside the previous load's final amp gain so any one-preset-
+    // late inheritance is immediately visible.
+    {
+        static float previousFinalAmpGainDb = 0.0f;
+        const bool changedThisLoad = std::abs(finalAmpGainDb - previousFinalAmpGainDb) > 0.001f;
+        juce::Logger::writeToLog(juce::String("[DIDITAGAIN gain] PRESET_GAIN_APPLIED preset=")
+            + p.presetName
+            + " requestedAmpGainDb=" + juce::String(requestedAmpGainDb, 2)
+            + " loadTimeGainTrimDb=" + juce::String(loadTimeTrimDb, 2)
+            + " finalAmpGainDb=" + juce::String(finalAmpGainDb, 2)
+            + " previousFinalAmpGainDb=" + juce::String(previousFinalAmpGainDb, 2)
+            + " changedThisLoad=" + (changedThisLoad ? "true" : "false"));
+        previousFinalAmpGainDb = finalAmpGainDb;
+    }
+    if (std::abs(loadTimeTrimDb) > 0.001f)
         juce::Logger::writeToLog(juce::String("[DIDITAGAIN choir-safety] preset=")
             + p.presetName + " effect=ampGain"
             + " oldGainDb=" + juce::String(p.amp.gainDb, 2)
-            + " newGainDb=" + juce::String(p.amp.gainDb + choirGainTrimDb, 2)
+            + " newGainDb=" + juce::String(finalAmpGainDb, 2)
             + " reason=choirNaturalGainTrim");
 
     // -- Amp env: clamped to per-category musical ranges
@@ -1295,7 +1323,7 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     {
         int enabledPartials = 0;
         for (auto& pb : p.partials) if (pb.enabled) ++enabledPartials;
-        const float appliedAmpGainDb = p.amp.gainDb + choirGainTrimDb;
+        const float appliedAmpGainDb = juce::jlimit(-60.0f, 24.0f, p.amp.gainDb + loadTimeGainTrimDb(p));
         didaUserPresetLog("PRESET_APPLIED name=" + p.presetName
             + " category=" + p.category
             + " mainLayerEnabled=" + (p.main.enabled ? "true" : "false")
