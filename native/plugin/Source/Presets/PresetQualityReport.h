@@ -591,12 +591,18 @@ inline void report(DiditagainProcessor& proc,
     const float voiceToDryGainMismatchDb = voiceDryMeasurable ? (actualVoiceToDryGainDb - expectedVoiceToDryGainDb) : 0.0f;
     // MASTER_GAIN_CLAMPED / UNINTENTIONAL_MASTER_MUTE surface presets that tried
     // to use master gain as a big loudness correction (now refused).
+    if (! reportEligible)
+    {
+        warnings.addIfNotAlreadyThere("REPORT_PENDING_NO_CURRENT_RENDER");
+        warnings.addIfNotAlreadyThere("METERS_PRE_PRESET_RENDER");
+    }
+
     if (fx.wasMasterGainClamped())
         warnings.add("MASTER_GAIN_CLAMPED");
     if (presetJsonMasterGainDb <= -40.0f && ! intentionalMute)
         warnings.add("UNINTENTIONAL_MASTER_MUTE");
     // GAIN_STAGE_ACCOUNTING_MISMATCH: dryOutput must equal dryRaw + masterTrim.
-    if (dryRawPeakDb > -100.0f && dryOutputDb > -100.0f
+    if (reportEligible && dryRawPeakDb > -100.0f && dryOutputDb > -100.0f
         && std::abs(dryOutputDb - dryOutputExpectedDb) > 3.0f)
         warnings.add("GAIN_STAGE_ACCOUNTING_MISMATCH");
     // CRITICAL BUG 1/2 (Report 86): the amp gain must actually move the dry
@@ -612,7 +618,7 @@ inline void report(DiditagainProcessor& proc,
             warnings.add("AMP_GAIN_NOT_REFLECTED_IN_OUTPUT");
     }
     // The amp stage itself: post-amp minus pre-amp must equal the live amp gain.
-    if (ampStageMeasurable && std::abs(ampStageMismatchDb) > 6.0f)
+    if (reportEligible && ampStageMeasurable && std::abs(ampStageMismatchDb) > 6.0f)
         warnings.add("AMP_GAIN_NOT_REFLECTED_IN_OUTPUT");
     // When the meters predate the new preset's amp gain, make that explicit so a
     // JSON-vs-meter gap is never misread as a broken audio path or a tuning need.
@@ -644,7 +650,7 @@ inline void report(DiditagainProcessor& proc,
     const bool  voiceStarted        = zoneProbe.hasZone && mainLayerEnabled;
     const bool  sampleReaderStarted = zoneProbe.hasZone && selectedZoneFile.isNotEmpty();
     juce::String drySilenceReason;
-    if (dryOutputDb <= -60.0f && up.main.enabled)
+    if (reportEligible && dryOutputDb <= -60.0f && up.main.enabled)
     {
         // BUG 3 (Report 86): walk the REAL signal chain stage-by-stage and name
         // the exact stage that lost the signal. Never emit a generic
@@ -698,7 +704,7 @@ inline void report(DiditagainProcessor& proc,
     // follow the real chain order: voice -> layerBus -> master.
     const bool upstreamHealthy = voicePreLayerDb > -40.0f || postLayerDb > -40.0f
                               || busPeakDb > -40.0f || fxInDb > -40.0f;
-    if (upstreamHealthy && dryOutputDb <= -60.0f)
+    if (reportEligible && upstreamHealthy && dryOutputDb <= -60.0f)
     {
         if (voicePreLayerDb > -40.0f && postLayerDb <= -60.0f)
             warnings.add("GAIN_STAGE_COLLAPSE_LAYER_BUS");
@@ -718,7 +724,7 @@ inline void report(DiditagainProcessor& proc,
     const bool allFxOff = presetReverbSilenced && ! up.delay.enabled
                        && chorusMix <= 0.001f && satMix <= 0.001f;
     const bool dryBusHealthy = dryOutputDb > -60.0f;
-    if (allFxOff && dryBusHealthy && finalOutputDb > -120.0f
+    if (reportEligible && allFxOff && dryBusHealthy && finalOutputDb > -120.0f
         && (dryOutputDb - finalOutputDb) > 12.0f)
         warnings.add("FINAL_BUS_METER_MISMATCH");
 
