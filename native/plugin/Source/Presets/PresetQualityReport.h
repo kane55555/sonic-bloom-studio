@@ -501,9 +501,29 @@ inline void report(DiditagainProcessor& proc,
     const juce::String masterGainSource = fx.wasMasterGainClamped() ? juce::String("safetyClamp")
                                         : (std::abs(appliedMasterGainDb) < 0.01f ? juce::String("default")
                                                                                  : juce::String("preset"));
-    const juce::String ampGainSource    = std::abs(presetJsonAmpGainDb) < 0.01f ? juce::String("default")
-                                                                                : juce::String("preset");
-    const float ampGainDb           = presetJsonAmpGainDb;        // (alias kept for existing fields)
+    // CRITICAL CHECK 1 (Report 79): amp-gain truthfulness. appliedAmpGainDb is the
+    // LIVE amp stage read back from the engine; requestedAmpGainDb is the raw JSON
+    // request. When they differ the source must NOT claim "preset" — it must name
+    // the exact reason (safety clamp to [-60,+24] or a load-time gain trim such as
+    // the choir-mode trim) with before/after values exposed via requestedAmpGainDb
+    // / appliedAmpGainDb / ampGainClampReason.
+    const float requestedAmpGainDb = presetJsonAmpGainDb;
+    const bool  ampGainDiffers     = std::abs(appliedAmpGainDb - requestedAmpGainDb) > 0.1f;
+    juce::String ampGainClampReason = "none";
+    if (ampGainDiffers)
+    {
+        if (requestedAmpGainDb > 24.0f && appliedAmpGainDb >= 23.9f)
+            ampGainClampReason = "safetyClampMax(+24dB)";
+        else if (requestedAmpGainDb < -60.0f && appliedAmpGainDb <= -59.9f)
+            ampGainClampReason = "safetyClampMin(-60dB)";
+        else
+            ampGainClampReason = "loadTimeGainTrim"; // additive trim applied at load (e.g. choir)
+    }
+    const juce::String ampGainSource =
+          ampGainDiffers ? (ampGainClampReason.startsWith("safetyClamp") ? juce::String("safetyClamp")
+                                                                         : juce::String("presetTrim"))
+        : (std::abs(requestedAmpGainDb) < 0.01f ? juce::String("default") : juce::String("preset"));
+    const float ampGainDb           = appliedAmpGainDb;        // alias now reflects the REAL applied amp gain
     const float mainLayerGainDb     = up.main.gainDb;
     const float layer2GainStageDb   = up.layer2.enabled ? up.layer2.gainDb : -120.0f;
     const float masterMinusAmpDb    = masterGainDb - ampGainDb;
@@ -513,6 +533,18 @@ inline void report(DiditagainProcessor& proc,
     // expected value is exactly dryRaw + masterTrim. A divergence > 3 dB means a
     // metering/gain-stage bug rather than intentional gain.
     const float dryOutputExpectedDb = dryRawPeakDb + masterGainDb;
+    // CRITICAL CHECK 3 (Report 79): voice -> dry gain accounting. The dry bus is
+    // built as: voicePreAmp --(+appliedAmpGain)--> layerBus(unity glue) --(+masterTrim)--> dryOutput.
+    // EXPECTED end-to-end voice->dry gain is therefore appliedAmpGainDb + masterGainDb.
+    // ACTUAL is dryOutput - voicePreAmp. A mismatch beyond a few dB that is NOT
+    // attributable to the limiter (metered separately as limiterGainReductionDb)
+    // points at a stage moving gain silently. Reported as numbers only — the hard
+    // GAIN_STAGE_ACCOUNTING_MISMATCH warning stays on the exact master path so the
+    // glue stage's legitimate peak shaping never trips a false positive.
+    const float expectedVoiceToDryGainDb = appliedAmpGainDb + masterGainDb;
+    const bool  voiceDryMeasurable       = voicePreAmpDb > -100.0f && dryOutputDb > -100.0f;
+    const float actualVoiceToDryGainDb   = voiceDryMeasurable ? (dryOutputDb - voicePreAmpDb) : 0.0f;
+    const float voiceToDryGainMismatchDb = voiceDryMeasurable ? (actualVoiceToDryGainDb - expectedVoiceToDryGainDb) : 0.0f;
     // MASTER_GAIN_CLAMPED / UNINTENTIONAL_MASTER_MUTE surface presets that tried
     // to use master gain as a big loudness correction (now refused).
     if (fx.wasMasterGainClamped())
@@ -540,6 +572,14 @@ inline void report(DiditagainProcessor& proc,
     const int   zoneDistanceSemitones = (zoneProbe.hasZone && zoneProbe.selectedZoneRoot >= 0)
                                         ? std::abs(zoneProbe.selectedZoneRoot - silenceTestNote)
                                         : -1;
+    // CRITICAL CHECK 6 (Report 79): voice/zone start proxies for DRY_BUS_SILENT
+    // diagnosis. Derived from the zone probe + preset layer state (no extra RT
+    // hooks): a voice can start when a real zone backs the test note AND the main
+    // layer is enabled; the sample reader is considered started when that zone
+    // resolved to a concrete file.
+    const bool  mainLayerEnabled    = up.main.enabled;
+    const bool  voiceStarted        = zoneProbe.hasZone && mainLayerEnabled;
+    const bool  sampleReaderStarted = zoneProbe.hasZone && selectedZoneFile.isNotEmpty();
     juce::String drySilenceReason;
     if (dryOutputDb <= -60.0f && up.main.enabled)
     {
@@ -768,6 +808,11 @@ inline void report(DiditagainProcessor& proc,
         << " intentionalMute=" << (intentionalMute ? "true" : "false")
         << " voicePreAmpPeakDb=" << juce::String(voicePreAmpDb, 2)
         << " dryOutputExpectedDb=" << juce::String(dryOutputExpectedDb, 2)
+        << " requestedAmpGainDb=" << juce::String(requestedAmpGainDb, 2)
+        << " ampGainClampReason=" << ampGainClampReason
+        << " expectedVoiceToDryGainDb=" << juce::String(expectedVoiceToDryGainDb, 2)
+        << " actualVoiceToDryGainDb=" << juce::String(actualVoiceToDryGainDb, 2)
+        << " voiceToDryGainMismatchDb=" << juce::String(voiceToDryGainMismatchDb, 2)
         << " silenceTestNote=" << silenceTestNote
         << " firstZoneRoot=" << firstZoneRoot
         << " lastZoneRoot=" << lastZoneRoot
@@ -779,6 +824,9 @@ inline void report(DiditagainProcessor& proc,
         << " testNoteZoneCoverage=" << (zoneCoverage == 0 ? "none"
                                         : zoneCoverage == 1 ? "exact" : "nearestFallback")
         << " drySilenceReason=" << (drySilenceReason.isNotEmpty() ? drySilenceReason : juce::String("none"))
+        << " mainLayerEnabled=" << (mainLayerEnabled ? "true" : "false")
+        << " voiceStarted=" << (voiceStarted ? "true" : "false")
+        << " sampleReaderStarted=" << (sampleReaderStarted ? "true" : "false")
         << " presetJsonReverbMix=" << fmt(presetJsonReverbMix)
         << " appliedReverbMix=" << fmt(appliedReverbMix)
         << " presetJsonDelayMix=" << fmt(presetJsonDelayMix)
@@ -902,6 +950,11 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("intentionalMute",        intentionalMute);
     j->setProperty("voicePreAmpPeakDb",      voicePreAmpDb);
     j->setProperty("dryOutputExpectedDb",    dryOutputExpectedDb);
+    j->setProperty("requestedAmpGainDb",     requestedAmpGainDb);
+    j->setProperty("ampGainClampReason",     ampGainClampReason);
+    j->setProperty("expectedVoiceToDryGainDb", expectedVoiceToDryGainDb);
+    j->setProperty("actualVoiceToDryGainDb", actualVoiceToDryGainDb);
+    j->setProperty("voiceToDryGainMismatchDb", voiceToDryGainMismatchDb);
     j->setProperty("silenceTestNote",        silenceTestNote);
     j->setProperty("firstZoneRoot",          firstZoneRoot);
     j->setProperty("lastZoneRoot",           lastZoneRoot);
@@ -913,6 +966,9 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("testNoteZoneCoverage",   zoneCoverage == 0 ? "none"
                                              : zoneCoverage == 1 ? "exact" : "nearestFallback");
     j->setProperty("drySilenceReason",       drySilenceReason.isNotEmpty() ? drySilenceReason : juce::String("none"));
+    j->setProperty("mainLayerEnabled",       mainLayerEnabled);
+    j->setProperty("voiceStarted",           voiceStarted);
+    j->setProperty("sampleReaderStarted",    sampleReaderStarted);
     j->setProperty("presetJsonReverbMix",    presetJsonReverbMix);
     j->setProperty("appliedReverbMix",       appliedReverbMix);
     j->setProperty("presetJsonDelayMix",     presetJsonDelayMix);
@@ -1087,7 +1143,15 @@ inline void report(DiditagainProcessor& proc,
               << "intentionalMute: "           << (intentionalMute ? "true" : "false") << "\n"
               << "voicePreAmpPeakDb: "         << juce::String(voicePreAmpDb, 2) << "\n"
               << "dryOutputExpectedDb: "       << juce::String(dryOutputExpectedDb, 2) << "\n"
+              << "requestedAmpGainDb: "        << juce::String(requestedAmpGainDb, 2) << "\n"
+              << "ampGainClampReason: "        << ampGainClampReason << "\n"
+              << "expectedVoiceToDryGainDb: "  << juce::String(expectedVoiceToDryGainDb, 2) << "\n"
+              << "actualVoiceToDryGainDb: "    << juce::String(actualVoiceToDryGainDb, 2) << "\n"
+              << "voiceToDryGainMismatchDb: "  << juce::String(voiceToDryGainMismatchDb, 2) << "\n"
               << "drySilenceReason: "          << (drySilenceReason.isNotEmpty() ? drySilenceReason : juce::String("none")) << "\n"
+              << "mainLayerEnabled: "          << (mainLayerEnabled ? "true" : "false") << "\n"
+              << "voiceStarted: "              << (voiceStarted ? "true" : "false") << "\n"
+              << "sampleReaderStarted: "       << (sampleReaderStarted ? "true" : "false") << "\n"
               << "firstZoneRoot: "             << firstZoneRoot << "\n"
               << "lastZoneRoot: "              << lastZoneRoot << "\n"
               << "selectedZoneRoot: "          << selectedZoneRoot << "\n"
