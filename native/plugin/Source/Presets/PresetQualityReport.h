@@ -950,6 +950,11 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("intentionalMute",        intentionalMute);
     j->setProperty("voicePreAmpPeakDb",      voicePreAmpDb);
     j->setProperty("dryOutputExpectedDb",    dryOutputExpectedDb);
+    j->setProperty("requestedAmpGainDb",     requestedAmpGainDb);
+    j->setProperty("ampGainClampReason",     ampGainClampReason);
+    j->setProperty("expectedVoiceToDryGainDb", expectedVoiceToDryGainDb);
+    j->setProperty("actualVoiceToDryGainDb", actualVoiceToDryGainDb);
+    j->setProperty("voiceToDryGainMismatchDb", voiceToDryGainMismatchDb);
     j->setProperty("silenceTestNote",        silenceTestNote);
     j->setProperty("firstZoneRoot",          firstZoneRoot);
     j->setProperty("lastZoneRoot",           lastZoneRoot);
