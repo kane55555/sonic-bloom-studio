@@ -952,11 +952,14 @@ inline void report(DiditagainProcessor& proc,
         << " lastRenderedPresetName=" << lastRenderedPresetName
         << " lastRenderedPresetAmpGainDb=" << juce::String(lastRenderedPresetAmpGainDb, 2)
         << " lastRenderTimestamp=" << lastRenderTimestamp
+        << " lastRenderTimestampMs=" << lastRenderTimestamp
         << " blocksRenderedSincePresetLoad=" << blocksRenderedSincePresetLoad
         << " notesRenderedSincePresetLoad=" << notesRenderedSincePresetLoad
         << " reportEligible=" << (reportEligible ? "true" : "false")
         << " calibrationSafe=" << (calibrationSafe ? "true" : "false")
         << " calibrationSkipReason=" << calibrationSkipReason
+        << " manualTestWorkflow=" << (reportEligible ? juce::String("capturedAfterCurrentPresetNoteRender")
+                                                      : juce::String("playNoteAfterLoadingPreset_reportPending"))
         << " silenceTestNote=" << silenceTestNote
         << " firstZoneRoot=" << firstZoneRoot
         << " lastZoneRoot=" << lastZoneRoot
@@ -1115,11 +1118,14 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("lastRenderedPresetName", lastRenderedPresetName);
     j->setProperty("lastRenderedPresetAmpGainDb", lastRenderedPresetAmpGainDb);
     j->setProperty("lastRenderTimestamp",    lastRenderTimestamp);
+    j->setProperty("lastRenderTimestampMs",  lastRenderTimestamp);
     j->setProperty("blocksRenderedSincePresetLoad", blocksRenderedSincePresetLoad);
     j->setProperty("notesRenderedSincePresetLoad", notesRenderedSincePresetLoad);
     j->setProperty("reportEligible",         reportEligible);
     j->setProperty("calibrationSafe",        calibrationSafe);
     j->setProperty("calibrationSkipReason",  calibrationSkipReason);
+    j->setProperty("manualTestWorkflow", reportEligible ? juce::String("captured after current-preset note render")
+                                                        : juce::String("Play a note after loading this preset. Current report is pending."));
     j->setProperty("silenceTestNote",        silenceTestNote);
     j->setProperty("firstZoneRoot",          firstZoneRoot);
     j->setProperty("lastZoneRoot",           lastZoneRoot);
