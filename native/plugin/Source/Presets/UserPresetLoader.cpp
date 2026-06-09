@@ -836,6 +836,14 @@ void clampEnvelopeForCategory(juce::AudioProcessor& proc, const UserPreset& p, F
 
 } // anonymous
 
+// Public: reproduce the engine's load-time gain trim so the quality report can
+// compute the true applied amp gain without a stale live read. Only choir-mode
+// presets get a trim; everything else returns 0.
+float loadTimeGainTrimDb(const UserPreset& p)
+{
+    return isChoirModePreset(p) ? choirNaturalGainTrimDb(p) : 0.0f;
+}
+
 void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
 {
     const Family fam = familyOf(p.category);
