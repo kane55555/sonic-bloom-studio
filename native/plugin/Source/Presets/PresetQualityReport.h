@@ -543,17 +543,38 @@ inline void report(DiditagainProcessor& proc,
     // expected value is exactly dryRaw + masterTrim. A divergence > 3 dB means a
     // metering/gain-stage bug rather than intentional gain.
     const float dryOutputExpectedDb = dryRawPeakDb + masterGainDb;
-    // CRITICAL CHECK 3 (Report 79): voice -> dry gain accounting. The dry bus is
-    // built as: voicePreAmp --(+appliedAmpGain)--> layerBus(unity glue) --(+masterTrim)--> dryOutput.
-    // EXPECTED end-to-end voice->dry gain is therefore appliedAmpGainDb + masterGainDb.
-    // ACTUAL is dryOutput - voicePreAmp. A mismatch beyond a few dB that is NOT
-    // attributable to the limiter (metered separately as limiterGainReductionDb)
-    // points at a stage moving gain silently. Reported as numbers only — the hard
-    // GAIN_STAGE_ACCOUNTING_MISMATCH warning stays on the exact master path so the
-    // glue stage's legitimate peak shaping never trips a false positive.
-    const float expectedVoiceToDryGainDb = appliedAmpGainDb + masterGainDb;
-    const bool  voiceDryMeasurable       = voicePreAmpDb > -100.0f && dryOutputDb > -100.0f;
-    const float actualVoiceToDryGainDb   = voiceDryMeasurable ? (dryOutputDb - voicePreAmpDb) : 0.0f;
+    // CRITICAL FIX (Report 86): the amp-gain audio path IS applied
+    // (SynthEngine::renderBlockWithFx -> fx.applyAmpGain) BEFORE every dry meter.
+    // The old accounting was broken because it compared the NEW preset's
+    // requested amp gain (appliedAmpGainDb, from JSON) against meters produced by
+    // the PREVIOUS render — the report runs at load time, before the new ampGain
+    // param has propagated to the engine. We now do the math against the amp gain
+    // that ACTUALLY shaped the metered audio (meteredAmpGainDb) and measure each
+    // stage directly from its own probe so the chain is internally consistent.
+    //
+    // Real signal order: voice raw (dryPreAmp) -> ampGain -> dryPostAmp
+    //   -> layerBus -> postLayer (dryRaw) -> masterTrim -> dryOutput
+    const float dryPreAmpPeakDb   = voicePreAmpDb;                 // pre-amp voice bus
+    const float dryPostAmpPeakDb  = fx.getDryPostAmpPeakDb();      // post-amp, pre-layer
+    const float meteredAmpGainDb  = fx.getMeteredAmpGainDb();      // amp gain live at meter time
+    // Per-stage gains measured straight off the consistent meter set.
+    const bool  ampStageMeasurable   = dryPreAmpPeakDb > -100.0f && dryPostAmpPeakDb > -100.0f;
+    const bool  layerStageMeasurable = dryPostAmpPeakDb > -100.0f && postLayerDb > -100.0f;
+    const float measuredAmpStageDb   = ampStageMeasurable   ? (dryPostAmpPeakDb - dryPreAmpPeakDb) : 0.0f;
+    const float measuredLayerStageDb = layerStageMeasurable ? (postLayerDb - dryPostAmpPeakDb)     : 0.0f;
+    const float measuredMasterStageDb = (postLayerDb > -100.0f && dryOutputDb > -100.0f)
+                                        ? (dryOutputDb - postLayerDb) : 0.0f;
+    // Does the amp stage actually move the signal by the gain that was live?
+    const float ampStageMismatchDb = ampStageMeasurable ? (measuredAmpStageDb - meteredAmpGainDb) : 0.0f;
+    // Do the meters reflect the freshly-loaded preset's amp gain yet? When false,
+    // a JSON-vs-meter gap is a load-time propagation lag, NOT a broken audio path.
+    const bool  meterReflectsCurrentPreset = std::abs(meteredAmpGainDb - appliedAmpGainDb) <= 0.5f;
+    // End-to-end voice->dry accounting against the metered (real) amp gain. The
+    // measured layer-bus glue gain is neutralised so the mismatch isolates the
+    // amp + master stages (a correct render lands within a few dB of 0).
+    const float expectedVoiceToDryGainDb = meteredAmpGainDb + measuredLayerStageDb + masterGainDb;
+    const bool  voiceDryMeasurable       = dryPreAmpPeakDb > -100.0f && dryOutputDb > -100.0f;
+    const float actualVoiceToDryGainDb   = voiceDryMeasurable ? (dryOutputDb - dryPreAmpPeakDb) : 0.0f;
     const float voiceToDryGainMismatchDb = voiceDryMeasurable ? (actualVoiceToDryGainDb - expectedVoiceToDryGainDb) : 0.0f;
     // MASTER_GAIN_CLAMPED / UNINTENTIONAL_MASTER_MUTE surface presets that tried
     // to use master gain as a big loudness correction (now refused).
