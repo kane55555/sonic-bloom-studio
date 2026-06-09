@@ -884,6 +884,14 @@ inline void report(DiditagainProcessor& proc,
         << " expectedVoiceToDryGainDb=" << juce::String(expectedVoiceToDryGainDb, 2)
         << " actualVoiceToDryGainDb=" << juce::String(actualVoiceToDryGainDb, 2)
         << " voiceToDryGainMismatchDb=" << juce::String(voiceToDryGainMismatchDb, 2)
+        << " dryPreAmpPeakDb=" << juce::String(dryPreAmpPeakDb, 2)
+        << " dryPostAmpPeakDb=" << juce::String(dryPostAmpPeakDb, 2)
+        << " meteredAmpGainDb=" << juce::String(meteredAmpGainDb, 2)
+        << " measuredAmpStageDb=" << juce::String(measuredAmpStageDb, 2)
+        << " measuredLayerStageDb=" << juce::String(measuredLayerStageDb, 2)
+        << " measuredMasterStageDb=" << juce::String(measuredMasterStageDb, 2)
+        << " ampStageMismatchDb=" << juce::String(ampStageMismatchDb, 2)
+        << " meterReflectsCurrentPreset=" << (meterReflectsCurrentPreset ? "true" : "false")
         << " silenceTestNote=" << silenceTestNote
         << " firstZoneRoot=" << firstZoneRoot
         << " lastZoneRoot=" << lastZoneRoot
