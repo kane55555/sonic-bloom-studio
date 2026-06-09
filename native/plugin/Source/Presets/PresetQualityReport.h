@@ -780,7 +780,7 @@ inline void report(DiditagainProcessor& proc,
     // --- Loudness calibration (suggestion-only) ---------------------------
     const auto target = loudnessTargetForCategory(effectiveCategory);
     const float targetCenterDb = 0.5f * (target.minDb + target.maxDb);
-    const bool notesPlaying = finalDb > -100.0f;
+    const bool notesPlaying = reportEligible && finalDb > -100.0f;
     float suggestedGainDb = 0.0f;
     if (notesPlaying)
     {
@@ -818,12 +818,48 @@ inline void report(DiditagainProcessor& proc,
         }
     if (beep) warnings.add("POSSIBLE_BEEP_LAYER");
 
+    if (! reportEligible)
+    {
+        for (auto* staleWarning : { "DRY_BUS_SILENT", "SAMPLE_READER_STARTED_BUT_ZERO_BUFFER",
+                                    "AMP_STAGE_MUTED", "TOO_QUIET", "LOW_HEADROOM",
+                                    "AMP_GAIN_NOT_REFLECTED_IN_OUTPUT", "GAIN_STAGE_ACCOUNTING_MISMATCH" })
+            warnings.removeString(staleWarning);
+        for (int i = warnings.size(); --i >= 0;)
+            if (warnings[i].startsWith("DRY_BUS_SILENT_REASON_")
+                || warnings[i].startsWith("GAIN_STAGE_COLLAPSE_"))
+                warnings.remove(i);
+        warnings.addIfNotAlreadyThere("REPORT_PENDING_NO_CURRENT_RENDER");
+        warnings.addIfNotAlreadyThere("METERS_PRE_PRESET_RENDER");
+    }
+
+    juce::String calibrationSkipReason = "none";
+    if (! meterReflectsCurrentPreset) calibrationSkipReason = "staleMeters";
+    if (! reportEligible) calibrationSkipReason = "noCurrentRender";
+    if (warnings.contains("DRY_BUS_SILENT_REASON_SAMPLE_READER_STARTED_BUT_ZERO_BUFFER")) calibrationSkipReason = "sampleReaderZeroBuffer";
+    else if (warnings.contains("DRY_BUS_SILENT_REASON_AMP_STAGE_MUTED")) calibrationSkipReason = "ampStageMuted";
+    else if (warnings.contains("DRY_BUS_SILENT_REASON_DRY_BUS_MUTED") || warnings.contains("DRY_BUS_SILENT")) calibrationSkipReason = "dryBusMuted";
+    else if (dryPreAmpPeakDb <= -100.0f && reportEligible) calibrationSkipReason = "silentVoice";
+    else if (finalOutputDb <= -100.0f && reportEligible) calibrationSkipReason = "finalOutputSilent";
+    else if (warnings.contains("AMP_GAIN_NOT_REFLECTED_IN_OUTPUT") || warnings.contains("GAIN_STAGE_ACCOUNTING_MISMATCH")) calibrationSkipReason = "gainAccountingMismatch";
+    const bool calibrationSafe = reportEligible
+        && meterReflectsCurrentPreset
+        && finalOutputDb > -120.0f
+        && dryRawPeakDb > -120.0f
+        && ! warnings.contains("DRY_BUS_SILENT")
+        && ! warnings.contains("METERS_PRE_PRESET_RENDER")
+        && ! warnings.contains("REPORT_PENDING_NO_CURRENT_RENDER")
+        && ! warnings.contains("AMP_GAIN_NOT_REFLECTED_IN_OUTPUT")
+        && ! warnings.contains("GAIN_STAGE_ACCOUNTING_MISMATCH");
+    if (calibrationSafe)
+        calibrationSkipReason = "none";
+
     const juce::String rawPath = sourceInstrumentPathRaw.isNotEmpty()
                                ? sourceInstrumentPathRaw : up.source.path;
 
     // --- Dedupe: suppress identical reloads within 300ms ------------------
     auto& sess = sessionState();
-    const juce::String dedupeKey = up.presetName + "|" + rawPath + "|" + effectiveCategory;
+    const juce::String dedupeKey = up.presetName + "|" + rawPath + "|" + effectiveCategory
+        + "|eligible=" + (reportEligible ? "true" : "false");
     const juce::int64 nowMs = juce::Time::currentTimeMillis();
     if (sess.lastPresetKey == dedupeKey && (nowMs - sess.lastLoadMs) < 300)
         return;
