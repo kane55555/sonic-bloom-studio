@@ -136,6 +136,7 @@ public:
     bool isCurrentPresetUserDiapreset() const noexcept { return requestedPresetIsUserDiapreset; }
     bool shouldApplyUserDiapresetAfterSampleLoad() const noexcept { return pendingUserDiapresetApply; }
     void applyPendingUserDiapresetAfterSampleLoad();
+    void emitPendingUserDiapresetQualityReportIfReady();
 
     void toggleFavorite(int index);
     std::vector<int> searchByTag(const juce::String& tag) const;
@@ -173,6 +174,9 @@ private:
     bool requestedPresetIsUserDiapreset = false;
     bool pendingUserDiapresetApply = false;
     dida::userpreset::UserPreset pendingUserDiapreset;
+    bool qualityReportWaitingForRender = false;
+    int  qualityReportPendingLoadId = 0;
+    int  qualityReportFinalEmittedLoadId = 0;
     // Developer/debug-only: when true, raw sample folders under the Samples
     // root and the Presets/User category folders also appear as presets in
     // the browser. Default OFF — only .diapreset files are user-facing.
@@ -182,6 +186,7 @@ private:
     void loadUserPresets();
     void loadDroppedSamples();
     void loadDiapresetFiles();
+    void emitCurrentUserDiapresetQualityReport();
     void autoIndexUserInstrumentFolders();
     void seedGuitarPresetBankIfMissing();
     void seedVintageSynthBankIfMissing();
