@@ -586,6 +586,25 @@ inline void report(DiditagainProcessor& proc,
     if (dryRawPeakDb > -100.0f && dryOutputDb > -100.0f
         && std::abs(dryOutputDb - dryOutputExpectedDb) > 3.0f)
         warnings.add("GAIN_STAGE_ACCOUNTING_MISMATCH");
+    // CRITICAL BUG 1/2 (Report 86): the amp gain must actually move the dry
+    // signal. A large voice->dry accounting gap that is NOT explained by a
+    // load-time meter lag (meterReflectsCurrentPreset) points at the amp stage
+    // failing to reach the audio path. Surface it as its OWN warning instead of
+    // letting it hide behind LOW_HEADROOM / TOO_QUIET.
+    if (voiceDryMeasurable && meterReflectsCurrentPreset)
+    {
+        if (std::abs(voiceToDryGainMismatchDb) > 6.0f)
+            warnings.add("GAIN_STAGE_ACCOUNTING_MISMATCH");
+        if (std::abs(voiceToDryGainMismatchDb) > 12.0f)
+            warnings.add("AMP_GAIN_NOT_REFLECTED_IN_OUTPUT");
+    }
+    // The amp stage itself: post-amp minus pre-amp must equal the live amp gain.
+    if (ampStageMeasurable && std::abs(ampStageMismatchDb) > 6.0f)
+        warnings.add("AMP_GAIN_NOT_REFLECTED_IN_OUTPUT");
+    // When the meters predate the new preset's amp gain, make that explicit so a
+    // JSON-vs-meter gap is never misread as a broken audio path or a tuning need.
+    if (voiceDryMeasurable && ! meterReflectsCurrentPreset)
+        warnings.add("METERS_PRE_PRESET_RENDER");
     // BUG 4: probe a test note that always lands on a real zone (covering zone
     // for C4, else nearest zone root) so a root-only sample map never reports a
     // false NO_ZONE_FOR_TEST_NOTE.
