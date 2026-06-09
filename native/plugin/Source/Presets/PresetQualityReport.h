@@ -633,28 +633,46 @@ inline void report(DiditagainProcessor& proc,
     juce::String drySilenceReason;
     if (dryOutputDb <= -60.0f && up.main.enabled)
     {
+        // BUG 3 (Report 86): walk the REAL signal chain stage-by-stage and name
+        // the exact stage that lost the signal. Never emit a generic
+        // NO_VOICE_OUTPUT when a zone + sample reader + file are present.
+        //   dryPreAmp -> ampGain -> dryPostAmp -> layerBus -> postLayer
+        //             -> masterTrim -> dryOutput
         if (needsSource && zoneCount == 0)
             drySilenceReason = "NO_ZONES_LOADED";
         else if (! oscillatorEngineActive && zoneCount == 0 && activePartials == 0)
             drySilenceReason = "NO_SOUND_SOURCE";
         // NOTE (BUG 4): a nearest-root fallback (zoneCoverage == 2) is a VALID
         // selection — the probe always lands on a real sample when zones exist —
-        // so it is NEVER reported as NO_ZONE_FOR_TEST_NOTE. A silent dry bus with
-        // zones present is a gain/metering issue, attributed below.
-        else if (voicePreLayerDb <= -60.0f)
-            // Nothing came out of the voices at all — not a gain-stage problem.
-            drySilenceReason = (mainLayerGainDb <= -40.0f) ? juce::String("MAIN_LAYER_GAIN_TOO_LOW")
-                                                           : juce::String("NO_VOICE_OUTPUT");
+        // so it is NEVER reported as NO_ZONE_FOR_TEST_NOTE.
+        else if (dryPreAmpPeakDb <= -60.0f)
+        {
+            // Voice bus produced nothing BEFORE the amp stage.
+            if (mainLayerGainDb <= -40.0f)
+                drySilenceReason = "MAIN_LAYER_GAIN_TOO_LOW";
+            else if (sampleReaderStarted)
+                // A zone+file resolved and the reader started, yet the buffer is
+                // empty — precise stage instead of generic NO_VOICE_OUTPUT.
+                drySilenceReason = "SAMPLE_READER_STARTED_BUT_ZERO_BUFFER";
+            else
+                drySilenceReason = "VOICE_RENDERED_SILENT";
+        }
+        else if (dryPostAmpPeakDb <= -60.0f)
+            // Signal existed pre-amp but the amp stage zeroed it.
+            drySilenceReason = (meteredAmpGainDb <= -40.0f) ? juce::String("AMP_STAGE_MUTED")
+                                                            : juce::String("OUTPUT_METER_WRONG_BUFFER");
         else if (postLayerDb <= -60.0f)
-            // Voices were healthy but the layer-bus glue stage collapsed them.
-            drySilenceReason = "LAYER_BUS_COLLAPSE";
+            // Post-amp was healthy but the layer-bus glue stage collapsed it.
+            drySilenceReason = "LAYER_STAGE_MUTED";
         else if (masterGainDb <= -40.0f)
-            // Post-layer signal is healthy; the master trim (driven by amp.gainDb)
-            // is what silenced the dry output.
-            drySilenceReason = (! masterGainMatchesAmp) ? juce::String("MASTER_GAIN_TOO_LOW")
-                                                        : juce::String("AMP_GAIN_TOO_LOW");
+            // Post-layer is healthy; the master trim silenced the dry output.
+            drySilenceReason = "DRY_BUS_MUTED";
+        else if (limiterGainReductionDb > 40.0f)
+            drySilenceReason = "LIMITER_OR_SAFETY_MUTED";
         else
-            drySilenceReason = "UNKNOWN_GAIN_COLLAPSE";
+            // Upstream chain all healthy yet the dry-output meter reads silent:
+            // the meter is reading the wrong tap, not the audio path.
+            drySilenceReason = "OUTPUT_METER_PRE_AMP";
 
         warnings.add("DRY_BUS_SILENT");
         warnings.add("DRY_BUS_SILENT_REASON_" + drySilenceReason);
