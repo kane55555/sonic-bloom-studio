@@ -1037,6 +1037,14 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("expectedVoiceToDryGainDb", expectedVoiceToDryGainDb);
     j->setProperty("actualVoiceToDryGainDb", actualVoiceToDryGainDb);
     j->setProperty("voiceToDryGainMismatchDb", voiceToDryGainMismatchDb);
+    j->setProperty("dryPreAmpPeakDb",        dryPreAmpPeakDb);
+    j->setProperty("dryPostAmpPeakDb",       dryPostAmpPeakDb);
+    j->setProperty("meteredAmpGainDb",       meteredAmpGainDb);
+    j->setProperty("measuredAmpStageDb",     measuredAmpStageDb);
+    j->setProperty("measuredLayerStageDb",   measuredLayerStageDb);
+    j->setProperty("measuredMasterStageDb",  measuredMasterStageDb);
+    j->setProperty("ampStageMismatchDb",     ampStageMismatchDb);
+    j->setProperty("meterReflectsCurrentPreset", meterReflectsCurrentPreset);
     j->setProperty("silenceTestNote",        silenceTestNote);
     j->setProperty("firstZoneRoot",          firstZoneRoot);
     j->setProperty("lastZoneRoot",           lastZoneRoot);
