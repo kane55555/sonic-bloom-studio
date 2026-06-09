@@ -819,6 +819,9 @@ inline void report(DiditagainProcessor& proc,
         << " voicePreAmpPeakDb=" << juce::String(voicePreAmpDb, 2)
         << " dryOutputExpectedDb=" << juce::String(dryOutputExpectedDb, 2)
         << " requestedAmpGainDb=" << juce::String(requestedAmpGainDb, 2)
+        << " loadTimeGainTrimDb=" << juce::String(loadTimeGainTrimDb, 2)
+        << " loadTimeGainTrimSource=" << loadTimeGainTrimSource
+        << " finalAmpGainDb=" << juce::String(finalAmpGainDb, 2)
         << " ampGainClampReason=" << ampGainClampReason
         << " expectedVoiceToDryGainDb=" << juce::String(expectedVoiceToDryGainDb, 2)
         << " actualVoiceToDryGainDb=" << juce::String(actualVoiceToDryGainDb, 2)
