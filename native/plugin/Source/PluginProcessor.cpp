@@ -790,8 +790,7 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
             ++notesRenderedSincePresetLoad;
 
         const bool currentAmpWasMetered = std::abs(synthEngine.getFx().getMeteredAmpGainDb() - getF("ampGain")) <= 0.5f;
-        const bool currentNoteRendered = notesRenderedSincePresetLoad > 0
-            && synthEngine.getFx().getDryPreAmpPeakDb() > -100.0f;
+        const bool currentNoteRendered = notesRenderedSincePresetLoad > 0;
         if (currentAmpWasMetered && currentNoteRendered)
         {
             lastRenderedPresetLoadId = currentPresetLoadIdForReport;
