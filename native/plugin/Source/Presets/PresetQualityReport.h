@@ -501,9 +501,29 @@ inline void report(DiditagainProcessor& proc,
     const juce::String masterGainSource = fx.wasMasterGainClamped() ? juce::String("safetyClamp")
                                         : (std::abs(appliedMasterGainDb) < 0.01f ? juce::String("default")
                                                                                  : juce::String("preset"));
-    const juce::String ampGainSource    = std::abs(presetJsonAmpGainDb) < 0.01f ? juce::String("default")
-                                                                                : juce::String("preset");
-    const float ampGainDb           = presetJsonAmpGainDb;        // (alias kept for existing fields)
+    // CRITICAL CHECK 1 (Report 79): amp-gain truthfulness. appliedAmpGainDb is the
+    // LIVE amp stage read back from the engine; requestedAmpGainDb is the raw JSON
+    // request. When they differ the source must NOT claim "preset" — it must name
+    // the exact reason (safety clamp to [-60,+24] or a load-time gain trim such as
+    // the choir-mode trim) with before/after values exposed via requestedAmpGainDb
+    // / appliedAmpGainDb / ampGainClampReason.
+    const float requestedAmpGainDb = presetJsonAmpGainDb;
+    const bool  ampGainDiffers     = std::abs(appliedAmpGainDb - requestedAmpGainDb) > 0.1f;
+    juce::String ampGainClampReason = "none";
+    if (ampGainDiffers)
+    {
+        if (requestedAmpGainDb > 24.0f && appliedAmpGainDb >= 23.9f)
+            ampGainClampReason = "safetyClampMax(+24dB)";
+        else if (requestedAmpGainDb < -60.0f && appliedAmpGainDb <= -59.9f)
+            ampGainClampReason = "safetyClampMin(-60dB)";
+        else
+            ampGainClampReason = "loadTimeGainTrim"; // additive trim applied at load (e.g. choir)
+    }
+    const juce::String ampGainSource =
+          ampGainDiffers ? (ampGainClampReason.startsWith("safetyClamp") ? juce::String("safetyClamp")
+                                                                         : juce::String("presetTrim"))
+        : (std::abs(requestedAmpGainDb) < 0.01f ? juce::String("default") : juce::String("preset"));
+    const float ampGainDb           = appliedAmpGainDb;        // alias now reflects the REAL applied amp gain
     const float mainLayerGainDb     = up.main.gainDb;
     const float layer2GainStageDb   = up.layer2.enabled ? up.layer2.gainDb : -120.0f;
     const float masterMinusAmpDb    = masterGainDb - ampGainDb;
