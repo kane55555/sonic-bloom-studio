@@ -964,6 +964,9 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("voicePreAmpPeakDb",      voicePreAmpDb);
     j->setProperty("dryOutputExpectedDb",    dryOutputExpectedDb);
     j->setProperty("requestedAmpGainDb",     requestedAmpGainDb);
+    j->setProperty("loadTimeGainTrimDb",     loadTimeGainTrimDb);
+    j->setProperty("loadTimeGainTrimSource", loadTimeGainTrimSource);
+    j->setProperty("finalAmpGainDb",         finalAmpGainDb);
     j->setProperty("ampGainClampReason",     ampGainClampReason);
     j->setProperty("expectedVoiceToDryGainDb", expectedVoiceToDryGainDb);
     j->setProperty("actualVoiceToDryGainDb", actualVoiceToDryGainDb);
