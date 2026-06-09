@@ -543,17 +543,38 @@ inline void report(DiditagainProcessor& proc,
     // expected value is exactly dryRaw + masterTrim. A divergence > 3 dB means a
     // metering/gain-stage bug rather than intentional gain.
     const float dryOutputExpectedDb = dryRawPeakDb + masterGainDb;
-    // CRITICAL CHECK 3 (Report 79): voice -> dry gain accounting. The dry bus is
-    // built as: voicePreAmp --(+appliedAmpGain)--> layerBus(unity glue) --(+masterTrim)--> dryOutput.
-    // EXPECTED end-to-end voice->dry gain is therefore appliedAmpGainDb + masterGainDb.
-    // ACTUAL is dryOutput - voicePreAmp. A mismatch beyond a few dB that is NOT
-    // attributable to the limiter (metered separately as limiterGainReductionDb)
-    // points at a stage moving gain silently. Reported as numbers only — the hard
-    // GAIN_STAGE_ACCOUNTING_MISMATCH warning stays on the exact master path so the
-    // glue stage's legitimate peak shaping never trips a false positive.
-    const float expectedVoiceToDryGainDb = appliedAmpGainDb + masterGainDb;
-    const bool  voiceDryMeasurable       = voicePreAmpDb > -100.0f && dryOutputDb > -100.0f;
-    const float actualVoiceToDryGainDb   = voiceDryMeasurable ? (dryOutputDb - voicePreAmpDb) : 0.0f;
+    // CRITICAL FIX (Report 86): the amp-gain audio path IS applied
+    // (SynthEngine::renderBlockWithFx -> fx.applyAmpGain) BEFORE every dry meter.
+    // The old accounting was broken because it compared the NEW preset's
+    // requested amp gain (appliedAmpGainDb, from JSON) against meters produced by
+    // the PREVIOUS render — the report runs at load time, before the new ampGain
+    // param has propagated to the engine. We now do the math against the amp gain
+    // that ACTUALLY shaped the metered audio (meteredAmpGainDb) and measure each
+    // stage directly from its own probe so the chain is internally consistent.
+    //
+    // Real signal order: voice raw (dryPreAmp) -> ampGain -> dryPostAmp
+    //   -> layerBus -> postLayer (dryRaw) -> masterTrim -> dryOutput
+    const float dryPreAmpPeakDb   = voicePreAmpDb;                 // pre-amp voice bus
+    const float dryPostAmpPeakDb  = fx.getDryPostAmpPeakDb();      // post-amp, pre-layer
+    const float meteredAmpGainDb  = fx.getMeteredAmpGainDb();      // amp gain live at meter time
+    // Per-stage gains measured straight off the consistent meter set.
+    const bool  ampStageMeasurable   = dryPreAmpPeakDb > -100.0f && dryPostAmpPeakDb > -100.0f;
+    const bool  layerStageMeasurable = dryPostAmpPeakDb > -100.0f && postLayerDb > -100.0f;
+    const float measuredAmpStageDb   = ampStageMeasurable   ? (dryPostAmpPeakDb - dryPreAmpPeakDb) : 0.0f;
+    const float measuredLayerStageDb = layerStageMeasurable ? (postLayerDb - dryPostAmpPeakDb)     : 0.0f;
+    const float measuredMasterStageDb = (postLayerDb > -100.0f && dryOutputDb > -100.0f)
+                                        ? (dryOutputDb - postLayerDb) : 0.0f;
+    // Does the amp stage actually move the signal by the gain that was live?
+    const float ampStageMismatchDb = ampStageMeasurable ? (measuredAmpStageDb - meteredAmpGainDb) : 0.0f;
+    // Do the meters reflect the freshly-loaded preset's amp gain yet? When false,
+    // a JSON-vs-meter gap is a load-time propagation lag, NOT a broken audio path.
+    const bool  meterReflectsCurrentPreset = std::abs(meteredAmpGainDb - appliedAmpGainDb) <= 0.5f;
+    // End-to-end voice->dry accounting against the metered (real) amp gain. The
+    // measured layer-bus glue gain is neutralised so the mismatch isolates the
+    // amp + master stages (a correct render lands within a few dB of 0).
+    const float expectedVoiceToDryGainDb = meteredAmpGainDb + measuredLayerStageDb + masterGainDb;
+    const bool  voiceDryMeasurable       = dryPreAmpPeakDb > -100.0f && dryOutputDb > -100.0f;
+    const float actualVoiceToDryGainDb   = voiceDryMeasurable ? (dryOutputDb - dryPreAmpPeakDb) : 0.0f;
     const float voiceToDryGainMismatchDb = voiceDryMeasurable ? (actualVoiceToDryGainDb - expectedVoiceToDryGainDb) : 0.0f;
     // MASTER_GAIN_CLAMPED / UNINTENTIONAL_MASTER_MUTE surface presets that tried
     // to use master gain as a big loudness correction (now refused).
@@ -565,6 +586,25 @@ inline void report(DiditagainProcessor& proc,
     if (dryRawPeakDb > -100.0f && dryOutputDb > -100.0f
         && std::abs(dryOutputDb - dryOutputExpectedDb) > 3.0f)
         warnings.add("GAIN_STAGE_ACCOUNTING_MISMATCH");
+    // CRITICAL BUG 1/2 (Report 86): the amp gain must actually move the dry
+    // signal. A large voice->dry accounting gap that is NOT explained by a
+    // load-time meter lag (meterReflectsCurrentPreset) points at the amp stage
+    // failing to reach the audio path. Surface it as its OWN warning instead of
+    // letting it hide behind LOW_HEADROOM / TOO_QUIET.
+    if (voiceDryMeasurable && meterReflectsCurrentPreset)
+    {
+        if (std::abs(voiceToDryGainMismatchDb) > 6.0f)
+            warnings.add("GAIN_STAGE_ACCOUNTING_MISMATCH");
+        if (std::abs(voiceToDryGainMismatchDb) > 12.0f)
+            warnings.add("AMP_GAIN_NOT_REFLECTED_IN_OUTPUT");
+    }
+    // The amp stage itself: post-amp minus pre-amp must equal the live amp gain.
+    if (ampStageMeasurable && std::abs(ampStageMismatchDb) > 6.0f)
+        warnings.add("AMP_GAIN_NOT_REFLECTED_IN_OUTPUT");
+    // When the meters predate the new preset's amp gain, make that explicit so a
+    // JSON-vs-meter gap is never misread as a broken audio path or a tuning need.
+    if (voiceDryMeasurable && ! meterReflectsCurrentPreset)
+        warnings.add("METERS_PRE_PRESET_RENDER");
     // BUG 4: probe a test note that always lands on a real zone (covering zone
     // for C4, else nearest zone root) so a root-only sample map never reports a
     // false NO_ZONE_FOR_TEST_NOTE.
@@ -593,28 +633,46 @@ inline void report(DiditagainProcessor& proc,
     juce::String drySilenceReason;
     if (dryOutputDb <= -60.0f && up.main.enabled)
     {
+        // BUG 3 (Report 86): walk the REAL signal chain stage-by-stage and name
+        // the exact stage that lost the signal. Never emit a generic
+        // NO_VOICE_OUTPUT when a zone + sample reader + file are present.
+        //   dryPreAmp -> ampGain -> dryPostAmp -> layerBus -> postLayer
+        //             -> masterTrim -> dryOutput
         if (needsSource && zoneCount == 0)
             drySilenceReason = "NO_ZONES_LOADED";
         else if (! oscillatorEngineActive && zoneCount == 0 && activePartials == 0)
             drySilenceReason = "NO_SOUND_SOURCE";
         // NOTE (BUG 4): a nearest-root fallback (zoneCoverage == 2) is a VALID
         // selection — the probe always lands on a real sample when zones exist —
-        // so it is NEVER reported as NO_ZONE_FOR_TEST_NOTE. A silent dry bus with
-        // zones present is a gain/metering issue, attributed below.
-        else if (voicePreLayerDb <= -60.0f)
-            // Nothing came out of the voices at all — not a gain-stage problem.
-            drySilenceReason = (mainLayerGainDb <= -40.0f) ? juce::String("MAIN_LAYER_GAIN_TOO_LOW")
-                                                           : juce::String("NO_VOICE_OUTPUT");
+        // so it is NEVER reported as NO_ZONE_FOR_TEST_NOTE.
+        else if (dryPreAmpPeakDb <= -60.0f)
+        {
+            // Voice bus produced nothing BEFORE the amp stage.
+            if (mainLayerGainDb <= -40.0f)
+                drySilenceReason = "MAIN_LAYER_GAIN_TOO_LOW";
+            else if (sampleReaderStarted)
+                // A zone+file resolved and the reader started, yet the buffer is
+                // empty — precise stage instead of generic NO_VOICE_OUTPUT.
+                drySilenceReason = "SAMPLE_READER_STARTED_BUT_ZERO_BUFFER";
+            else
+                drySilenceReason = "VOICE_RENDERED_SILENT";
+        }
+        else if (dryPostAmpPeakDb <= -60.0f)
+            // Signal existed pre-amp but the amp stage zeroed it.
+            drySilenceReason = (meteredAmpGainDb <= -40.0f) ? juce::String("AMP_STAGE_MUTED")
+                                                            : juce::String("OUTPUT_METER_WRONG_BUFFER");
         else if (postLayerDb <= -60.0f)
-            // Voices were healthy but the layer-bus glue stage collapsed them.
-            drySilenceReason = "LAYER_BUS_COLLAPSE";
+            // Post-amp was healthy but the layer-bus glue stage collapsed it.
+            drySilenceReason = "LAYER_STAGE_MUTED";
         else if (masterGainDb <= -40.0f)
-            // Post-layer signal is healthy; the master trim (driven by amp.gainDb)
-            // is what silenced the dry output.
-            drySilenceReason = (! masterGainMatchesAmp) ? juce::String("MASTER_GAIN_TOO_LOW")
-                                                        : juce::String("AMP_GAIN_TOO_LOW");
+            // Post-layer is healthy; the master trim silenced the dry output.
+            drySilenceReason = "DRY_BUS_MUTED";
+        else if (limiterGainReductionDb > 40.0f)
+            drySilenceReason = "LIMITER_OR_SAFETY_MUTED";
         else
-            drySilenceReason = "UNKNOWN_GAIN_COLLAPSE";
+            // Upstream chain all healthy yet the dry-output meter reads silent:
+            // the meter is reading the wrong tap, not the audio path.
+            drySilenceReason = "OUTPUT_METER_PRE_AMP";
 
         warnings.add("DRY_BUS_SILENT");
         warnings.add("DRY_BUS_SILENT_REASON_" + drySilenceReason);
@@ -826,6 +884,14 @@ inline void report(DiditagainProcessor& proc,
         << " expectedVoiceToDryGainDb=" << juce::String(expectedVoiceToDryGainDb, 2)
         << " actualVoiceToDryGainDb=" << juce::String(actualVoiceToDryGainDb, 2)
         << " voiceToDryGainMismatchDb=" << juce::String(voiceToDryGainMismatchDb, 2)
+        << " dryPreAmpPeakDb=" << juce::String(dryPreAmpPeakDb, 2)
+        << " dryPostAmpPeakDb=" << juce::String(dryPostAmpPeakDb, 2)
+        << " meteredAmpGainDb=" << juce::String(meteredAmpGainDb, 2)
+        << " measuredAmpStageDb=" << juce::String(measuredAmpStageDb, 2)
+        << " measuredLayerStageDb=" << juce::String(measuredLayerStageDb, 2)
+        << " measuredMasterStageDb=" << juce::String(measuredMasterStageDb, 2)
+        << " ampStageMismatchDb=" << juce::String(ampStageMismatchDb, 2)
+        << " meterReflectsCurrentPreset=" << (meterReflectsCurrentPreset ? "true" : "false")
         << " silenceTestNote=" << silenceTestNote
         << " firstZoneRoot=" << firstZoneRoot
         << " lastZoneRoot=" << lastZoneRoot
@@ -971,6 +1037,14 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("expectedVoiceToDryGainDb", expectedVoiceToDryGainDb);
     j->setProperty("actualVoiceToDryGainDb", actualVoiceToDryGainDb);
     j->setProperty("voiceToDryGainMismatchDb", voiceToDryGainMismatchDb);
+    j->setProperty("dryPreAmpPeakDb",        dryPreAmpPeakDb);
+    j->setProperty("dryPostAmpPeakDb",       dryPostAmpPeakDb);
+    j->setProperty("meteredAmpGainDb",       meteredAmpGainDb);
+    j->setProperty("measuredAmpStageDb",     measuredAmpStageDb);
+    j->setProperty("measuredLayerStageDb",   measuredLayerStageDb);
+    j->setProperty("measuredMasterStageDb",  measuredMasterStageDb);
+    j->setProperty("ampStageMismatchDb",     ampStageMismatchDb);
+    j->setProperty("meterReflectsCurrentPreset", meterReflectsCurrentPreset);
     j->setProperty("silenceTestNote",        silenceTestNote);
     j->setProperty("firstZoneRoot",          firstZoneRoot);
     j->setProperty("lastZoneRoot",           lastZoneRoot);
@@ -1167,6 +1241,14 @@ inline void report(DiditagainProcessor& proc,
               << "expectedVoiceToDryGainDb: "  << juce::String(expectedVoiceToDryGainDb, 2) << "\n"
               << "actualVoiceToDryGainDb: "    << juce::String(actualVoiceToDryGainDb, 2) << "\n"
               << "voiceToDryGainMismatchDb: "  << juce::String(voiceToDryGainMismatchDb, 2) << "\n"
+              << "dryPreAmpPeakDb: "           << juce::String(dryPreAmpPeakDb, 2) << "\n"
+              << "dryPostAmpPeakDb: "          << juce::String(dryPostAmpPeakDb, 2) << "\n"
+              << "meteredAmpGainDb: "          << juce::String(meteredAmpGainDb, 2) << "\n"
+              << "measuredAmpStageDb: "        << juce::String(measuredAmpStageDb, 2) << "\n"
+              << "measuredLayerStageDb: "      << juce::String(measuredLayerStageDb, 2) << "\n"
+              << "measuredMasterStageDb: "     << juce::String(measuredMasterStageDb, 2) << "\n"
+              << "ampStageMismatchDb: "        << juce::String(ampStageMismatchDb, 2) << "\n"
+              << "meterReflectsCurrentPreset: " << (meterReflectsCurrentPreset ? "true" : "false") << "\n"
               << "drySilenceReason: "          << (drySilenceReason.isNotEmpty() ? drySilenceReason : juce::String("none")) << "\n"
               << "mainLayerEnabled: "          << (mainLayerEnabled ? "true" : "false") << "\n"
               << "voiceStarted: "              << (voiceStarted ? "true" : "false") << "\n"

@@ -256,8 +256,27 @@ public:
         dryRawRecent.store(p, std::memory_order_relaxed);
         p *= masterGain.getTargetGainLinear();
         dryOutputRecent.store(p, std::memory_order_relaxed);
+        // Report 86: snapshot the amp gain that was ACTUALLY live for the render
+        // that produced these meters. The quality report runs at preset-LOAD
+        // time, BEFORE the new preset's "ampGain" APVTS param has propagated
+        // through processBlock -> setAmpGainDb(), so the meters reflect this
+        // (possibly previous) amp gain. Pairing the meter with the gain that
+        // shaped it lets the reporter do self-consistent gain accounting instead
+        // of comparing the new preset's requested gain against a stale render.
+        meteredAmpGainDb.store(ampGainDbApplied, std::memory_order_relaxed);
     }
 
+    // Report 86: explicit dry-chain probe names matching the real signal order
+    //   dryPreAmp (voicePreAmp) -> ampGain -> dryPostAmp (voicePreLayer)
+    //   -> layerBus -> postLayer (dryRaw) -> masterTrim -> dryOutput
+    // The voicePreLayer probe is captured AFTER applyAmpGain, so it is the
+    // POST-AMP, pre-layer peak (dryPostAmpPeakDb).
+    float getDryPreAmpPeakDb()  const noexcept { return toDb(voicePreAmpRecent.load(std::memory_order_relaxed)); }
+    float getDryPostAmpPeakDb() const noexcept { return toDb(voicePreLayerRecent.load(std::memory_order_relaxed)); }
+    // The amp gain (dB) that was actually live when the dry meters above were
+    // captured. Use this for gain accounting so the math is self-consistent even
+    // when the report runs before the new preset's amp gain has propagated.
+    float getMeteredAmpGainDb() const noexcept { return meteredAmpGainDb.load(std::memory_order_relaxed); }
     // Pre-layer-bus (raw voice output) dry peak — distinguishes "no voice
     // output" from "layer bus ate the signal".
     float getDryVoicePreLayerPeakDb() const noexcept { return toDb(voicePreLayerRecent.load(std::memory_order_relaxed)); }
@@ -624,6 +643,7 @@ private:
     std::atomic<float> delayReturnRecent  { 0.0f };
     std::atomic<float> finalOutputRecent  { 0.0f };
     std::atomic<float> preLimiterRecent   { 0.0f };   // Report 78: pre-limiter peak for GR
+    std::atomic<float> meteredAmpGainDb   { 0.0f };   // Report 86: amp gain live at dry-meter capture
 
     // Report 78 gain-staging state.
     float ampGainLinear      = 1.0f;
