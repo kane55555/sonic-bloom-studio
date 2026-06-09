@@ -533,6 +533,18 @@ inline void report(DiditagainProcessor& proc,
     // expected value is exactly dryRaw + masterTrim. A divergence > 3 dB means a
     // metering/gain-stage bug rather than intentional gain.
     const float dryOutputExpectedDb = dryRawPeakDb + masterGainDb;
+    // CRITICAL CHECK 3 (Report 79): voice -> dry gain accounting. The dry bus is
+    // built as: voicePreAmp --(+appliedAmpGain)--> layerBus(unity glue) --(+masterTrim)--> dryOutput.
+    // EXPECTED end-to-end voice->dry gain is therefore appliedAmpGainDb + masterGainDb.
+    // ACTUAL is dryOutput - voicePreAmp. A mismatch beyond a few dB that is NOT
+    // attributable to the limiter (metered separately as limiterGainReductionDb)
+    // points at a stage moving gain silently. Reported as numbers only — the hard
+    // GAIN_STAGE_ACCOUNTING_MISMATCH warning stays on the exact master path so the
+    // glue stage's legitimate peak shaping never trips a false positive.
+    const float expectedVoiceToDryGainDb = appliedAmpGainDb + masterGainDb;
+    const bool  voiceDryMeasurable       = voicePreAmpDb > -100.0f && dryOutputDb > -100.0f;
+    const float actualVoiceToDryGainDb   = voiceDryMeasurable ? (dryOutputDb - voicePreAmpDb) : 0.0f;
+    const float voiceToDryGainMismatchDb = voiceDryMeasurable ? (actualVoiceToDryGainDb - expectedVoiceToDryGainDb) : 0.0f;
     // MASTER_GAIN_CLAMPED / UNINTENTIONAL_MASTER_MUTE surface presets that tried
     // to use master gain as a big loudness correction (now refused).
     if (fx.wasMasterGainClamped())
