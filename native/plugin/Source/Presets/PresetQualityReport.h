@@ -572,6 +572,14 @@ inline void report(DiditagainProcessor& proc,
     const int   zoneDistanceSemitones = (zoneProbe.hasZone && zoneProbe.selectedZoneRoot >= 0)
                                         ? std::abs(zoneProbe.selectedZoneRoot - silenceTestNote)
                                         : -1;
+    // CRITICAL CHECK 6 (Report 79): voice/zone start proxies for DRY_BUS_SILENT
+    // diagnosis. Derived from the zone probe + preset layer state (no extra RT
+    // hooks): a voice can start when a real zone backs the test note AND the main
+    // layer is enabled; the sample reader is considered started when that zone
+    // resolved to a concrete file.
+    const bool  mainLayerEnabled    = up.main.enabled;
+    const bool  voiceStarted        = zoneProbe.hasZone && mainLayerEnabled;
+    const bool  sampleReaderStarted = zoneProbe.hasZone && selectedZoneFile.isNotEmpty();
     juce::String drySilenceReason;
     if (dryOutputDb <= -60.0f && up.main.enabled)
     {
