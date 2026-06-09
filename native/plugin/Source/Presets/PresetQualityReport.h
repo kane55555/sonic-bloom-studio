@@ -568,7 +568,20 @@ inline void report(DiditagainProcessor& proc,
     const float ampStageMismatchDb = ampStageMeasurable ? (measuredAmpStageDb - meteredAmpGainDb) : 0.0f;
     // Do the meters reflect the freshly-loaded preset's amp gain yet? When false,
     // a JSON-vs-meter gap is a load-time propagation lag, NOT a broken audio path.
-    const bool  meterReflectsCurrentPreset = std::abs(meteredAmpGainDb - appliedAmpGainDb) <= 0.5f;
+    const int   currentPresetLoadId        = proc.getCurrentPresetLoadIdForReport();
+    const int   lastRenderedPresetLoadId   = proc.getLastRenderedPresetLoadId();
+    const juce::String lastRenderedPresetName = proc.getLastRenderedPresetName();
+    const float lastRenderedPresetAmpGainDb = proc.getLastRenderedPresetAmpGainDb();
+    const juce::int64 lastRenderTimestamp  = proc.getLastRenderTimestampMs();
+    const int   blocksRenderedSincePresetLoad = proc.getBlocksRenderedSincePresetLoad();
+    const int   notesRenderedSincePresetLoad  = proc.getNotesRenderedSincePresetLoad();
+    const bool  meterAmpMatchesCurrentPreset = std::abs(meteredAmpGainDb - appliedAmpGainDb) <= 0.5f;
+    const bool  currentPresetHasRendered = lastRenderedPresetLoadId == currentPresetLoadId
+        && currentPresetLoadId > 0
+        && blocksRenderedSincePresetLoad > 0
+        && notesRenderedSincePresetLoad > 0;
+    const bool  meterReflectsCurrentPreset = currentPresetHasRendered && meterAmpMatchesCurrentPreset;
+    const bool  reportEligible = currentPresetHasRendered && meterReflectsCurrentPreset;
     // End-to-end voice->dry accounting against the metered (real) amp gain. The
     // measured layer-bus glue gain is neutralised so the mismatch isolates the
     // amp + master stages (a correct render lands within a few dB of 0).
