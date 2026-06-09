@@ -755,7 +755,17 @@ void PresetManager::applyPendingUserDiapresetAfterSampleLoad()
     dida::userpreset::applyToProcessor(pendingUserDiapreset, processor);
     logFinalActivePresetParams(processor, pendingUserDiapreset.presetName);
 
-    // Debug: emit one structured preset-quality block per .diapreset load.
+    if (auto* dp = dynamic_cast<DiditagainProcessor*>(&processor))
+    {
+        qualityReportWaitingForRender = true;
+        qualityReportPendingLoadId = dp->getCurrentPresetLoadIdForReport();
+        qualityReportFinalEmittedLoadId = 0;
+        emitCurrentUserDiapresetQualityReport(); // pending: tells the user to play a note first
+    }
+}
+
+void PresetManager::emitCurrentUserDiapresetQualityReport()
+{
     if (auto* dp = dynamic_cast<DiditagainProcessor*>(&processor))
         dida::presetreport::report(*dp, pendingUserDiapreset, requestedCategory,
                                    requestedSampleFolderPath,
@@ -771,6 +781,26 @@ void PresetManager::applyPendingUserDiapresetAfterSampleLoad()
                                    requestedAllowCrossCategorySource,
                                    requestedSourceFolderWavCount,
                                    requestedExtraSourceWarnings);
+}
+
+void PresetManager::emitPendingUserDiapresetQualityReportIfReady()
+{
+    if (! qualityReportWaitingForRender)
+        return;
+    auto* dp = dynamic_cast<DiditagainProcessor*>(&processor);
+    if (dp == nullptr)
+        return;
+    const int currentLoadId = dp->getCurrentPresetLoadIdForReport();
+    if (qualityReportPendingLoadId <= 0 || currentLoadId != qualityReportPendingLoadId)
+        return;
+    if (qualityReportFinalEmittedLoadId == currentLoadId)
+        return;
+    if (dp->getLastRenderedPresetLoadId() != currentLoadId)
+        return;
+
+    qualityReportFinalEmittedLoadId = currentLoadId;
+    qualityReportWaitingForRender = false;
+    emitCurrentUserDiapresetQualityReport();
 }
 
 static void applyOscBlock(juce::AudioProcessor& proc, const juce::var& obj,
