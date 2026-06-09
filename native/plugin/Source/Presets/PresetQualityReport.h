@@ -12,6 +12,7 @@
 //==============================================================================
 #include <JuceHeader.h>
 #include "UserPresetFormat.h"
+#include "UserPresetLoader.h"
 #include "../PluginProcessor.h"
 #include "../DSP/SynthEngine.h"
 
