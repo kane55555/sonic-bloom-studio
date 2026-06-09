@@ -643,6 +643,7 @@ private:
     std::atomic<float> delayReturnRecent  { 0.0f };
     std::atomic<float> finalOutputRecent  { 0.0f };
     std::atomic<float> preLimiterRecent   { 0.0f };   // Report 78: pre-limiter peak for GR
+    std::atomic<float> meteredAmpGainDb   { 0.0f };   // Report 86: amp gain live at dry-meter capture
 
     // Report 78 gain-staging state.
     float ampGainLinear      = 1.0f;
