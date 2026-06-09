@@ -824,6 +824,9 @@ inline void report(DiditagainProcessor& proc,
         << " testNoteZoneCoverage=" << (zoneCoverage == 0 ? "none"
                                         : zoneCoverage == 1 ? "exact" : "nearestFallback")
         << " drySilenceReason=" << (drySilenceReason.isNotEmpty() ? drySilenceReason : juce::String("none"))
+        << " mainLayerEnabled=" << (mainLayerEnabled ? "true" : "false")
+        << " voiceStarted=" << (voiceStarted ? "true" : "false")
+        << " sampleReaderStarted=" << (sampleReaderStarted ? "true" : "false")
         << " presetJsonReverbMix=" << fmt(presetJsonReverbMix)
         << " appliedReverbMix=" << fmt(appliedReverbMix)
         << " presetJsonDelayMix=" << fmt(presetJsonDelayMix)
