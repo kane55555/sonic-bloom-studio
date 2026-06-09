@@ -1323,7 +1323,7 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     {
         int enabledPartials = 0;
         for (auto& pb : p.partials) if (pb.enabled) ++enabledPartials;
-        const float appliedAmpGainDb = p.amp.gainDb + choirGainTrimDb;
+        const float appliedAmpGainDb = juce::jlimit(-60.0f, 24.0f, p.amp.gainDb + loadTimeGainTrimDb(p));
         didaUserPresetLog("PRESET_APPLIED name=" + p.presetName
             + " category=" + p.category
             + " mainLayerEnabled=" + (p.main.enabled ? "true" : "false")
