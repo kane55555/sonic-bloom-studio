@@ -173,7 +173,9 @@ bool parseFile(const juce::File& file, UserPreset& out, juce::String& errorOut)
         out.fallbackSynthIfMissing = true;
     }
 
+    // "amp" is canonical; AI Texture demo-pack files use "ampEnvelope".
     auto amp = json.getProperty("amp", juce::var());
+    if (! amp.isObject()) amp = json.getProperty("ampEnvelope", juce::var());
     out.amp.gainDb    = getF(amp, "gainDb",    out.amp.gainDb);
     out.amp.pan       = getF(amp, "pan",       out.amp.pan);
     out.amp.attackMs  = getF(amp, "attackMs",  out.amp.attackMs);
@@ -187,7 +189,8 @@ bool parseFile(const juce::File& file, UserPreset& out, juce::String& errorOut)
     out.filter.cutoffHz  = getF(flt, "cutoffHz",  out.filter.cutoffHz);
     out.filter.resonance = getF(flt, "resonance", out.filter.resonance);
     out.filter.drive     = getF(flt, "drive",     out.filter.drive);
-    out.filter.keytrack  = getF(flt, "keytrack",  out.filter.keytrack);
+    // accept both "keytrack" and the demo-pack "keyTrack" spelling.
+    out.filter.keytrack  = getF(flt, "keytrack",  getF(flt, "keyTrack", out.filter.keytrack));
 
     auto layers = json.getProperty("layers", juce::var());
     out.main   = parseLayer(layers.getProperty("main",   juce::var()), out.main);
