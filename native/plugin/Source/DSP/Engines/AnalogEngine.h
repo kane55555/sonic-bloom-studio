@@ -10,6 +10,7 @@
 #include "IEngineSource.h"
 #include "../Envelope.h"
 #include <array>
+#include <atomic>
 #include <random>
 
 namespace dida { namespace engines {
