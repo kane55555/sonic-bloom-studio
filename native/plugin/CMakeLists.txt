@@ -137,6 +137,13 @@ juce_generate_juce_header(DIDITAGAIN_STUDIO)
 juce_add_binary_data(DIDITAGAIN_STUDIO_BinaryData
     SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/Assets/diditagain_logo.png"
+        # AI Texture Demo Pack (installed to the managed Documents tree on first run)
+        "${CMAKE_CURRENT_SOURCE_DIR}/Resources/AITextureDemoPack/Presets/AI Brass Air Test.diapreset"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Resources/AITextureDemoPack/Presets/AI Choir Ghost Test.diapreset"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Resources/AITextureDemoPack/Presets/AI Guitar Dust Test.diapreset"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Resources/AITextureDemoPack/Textures/dida_brass_air_C4.wav"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Resources/AITextureDemoPack/Textures/dida_choir_ghost_C4.wav"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Resources/AITextureDemoPack/Textures/dida_guitar_dust_C4.wav"
 )
 
 target_link_libraries(DIDITAGAIN_STUDIO PRIVATE DIDITAGAIN_STUDIO_BinaryData)
