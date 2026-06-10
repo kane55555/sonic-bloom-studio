@@ -13,6 +13,7 @@
 #include "../DSP/SampleLibrary.h"
 #include "../PluginProcessor.h"
 #include "../DSP/SynthEngine.h"
+#include "BinaryData.h"
 #include <limits>
 #include <cmath>
 
