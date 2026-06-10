@@ -2124,12 +2124,12 @@ void PresetManager::seedAiTextureDemoPackIfMissing()
     auto dir  = root.getChildFile("AI Texture");
     dir.createDirectory();
 
-    // v6 migration marker. Earlier builds installed AI Texture demo presets with
-    // stale broad sourceInstrument paths (for example {DIDA_DOCS}/Samples/Choir)
-    // that resolved through legacy category guesses. Re-run once to overwrite the
-    // three managed demo .diapreset files with exact Presets/User multisample paths.
-    auto seededMarkerV6 = dir.getChildFile(".seeded_ai_texture_demo_v6");
-    if (seededMarkerV6.existsAsFile())
+    // v7 migration marker. v6 fixed the multisample source paths; v7 recalibrates
+    // the AI Texture demo preset loudness now that the body is a real multisample
+    // (per-preset ampEnvelope.gainDb boosts + subtler texture levelDb). Re-run once
+    // to overwrite the three managed demo .diapreset files with the new gains.
+    auto seededMarkerV7 = dir.getChildFile(".seeded_ai_texture_demo_v7");
+    if (seededMarkerV7.existsAsFile())
         return;
 
     auto docsRoot = dida::SampleLibrary::getSamplesRoot().getParentDirectory();
@@ -2153,9 +2153,9 @@ void PresetManager::seedAiTextureDemoPackIfMissing()
         "AI Choir Ghost Test.diapreset",
         "AI Guitar Dust Test.diapreset"
     };
-    // v6: refresh the three managed AI Texture demo presets in place so installed
-    // copies get the exact sourceInstrument.path values. This does not touch any
-    // other presets or non-managed user content.
+    // v7: refresh the three managed AI Texture demo presets in place so installed
+    // copies get the recalibrated gains (and exact sourceInstrument.path values).
+    // This does not touch any other presets or non-managed user content.
     for (auto* name : presetFiles)
     {
         auto destFile = dir.getChildFile(name);
@@ -2169,9 +2169,9 @@ void PresetManager::seedAiTextureDemoPackIfMissing()
         }
     }
 
-    seededMarkerV6.replaceWithText("1");
+    seededMarkerV7.replaceWithText("1");
 
-    didaPresetManagerLog("seeded AI Texture demo pack (v6) count=" + juce::String(written)
+    didaPresetManagerLog("seeded AI Texture demo pack (v7) count=" + juce::String(written)
         + " presets=" + dir.getFullPathName()
         + " textures=" + texRoot.getFullPathName());
 }

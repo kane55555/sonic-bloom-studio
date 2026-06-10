@@ -731,14 +731,25 @@ inline void report(DiditagainProcessor& proc,
         && blocksRenderedSincePresetLoad > 0
         && notesRenderedSincePresetLoad > 0;
     const bool  meterReflectsCurrentPreset = currentPresetHasRendered && meterAmpMatchesCurrentPreset;
-    // AI Texture stability gate (Task 5): an AI Texture preset must not publish a
-    // pass/fail-eligible report until its analog support/body voice has actually
-    // rendered at least one block after note-on. Otherwise a probe that captured
-    // only the cached texture (support voice not yet sounding) produces a false
-    // TOO_QUIET. Non-AI presets are unaffected.
+    // AI Texture eligibility gate (enhancement-layer model): AI Texture is now an
+    // enhancement layer ON TOP of a real multisample body, not a standalone
+    // analog-support demo. The report becomes eligible as soon as the CURRENT
+    // preset's MULTISAMPLE voice has rendered after note-on. Analog support is
+    // optional and is NO LONGER required for eligibility. The legacy analog
+    // support-body render still counts (fallback when the multisample is missing).
     const bool  aiSupportBodyRendered = engine.hasSupportBodyRenderedBlock();
+    // Multisample body render proxy: a resolved zone backing the test note plus a
+    // concrete sample file, with the main layer enabled, after the current preset
+    // has rendered a note. wavZones>0 guarantees the source folder resolved.
+    const auto  aiGateZoneProbe = engine.probeReportZone(60, 100);
+    const bool  aiMultisampleBodyRendered = aiTexturePreset
+        && currentPresetHasRendered
+        && wavZones > 0
+        && aiGateZoneProbe.hasZone
+        && aiGateZoneProbe.selectedZoneFile.isNotEmpty()
+        && up.main.enabled;
     const bool  reportEligible = currentPresetHasRendered && meterReflectsCurrentPreset
-        && (! aiTexturePreset || aiSupportBodyRendered);
+        && (! aiTexturePreset || aiMultisampleBodyRendered || aiSupportBodyRendered);
     // End-to-end voice->dry accounting against the metered (real) amp gain. The
     // measured layer-bus glue gain is neutralised so the mismatch isolates the
     // amp + master stages (a correct render lands within a few dB of 0).
@@ -752,7 +763,11 @@ inline void report(DiditagainProcessor& proc,
     {
         warnings.addIfNotAlreadyThere("REPORT_PENDING_NO_CURRENT_RENDER");
         warnings.addIfNotAlreadyThere("METERS_PRE_PRESET_RENDER");
-        if (aiTexturePreset && currentPresetHasRendered && ! aiSupportBodyRendered)
+        // Only warn that the support body never rendered when there is ALSO no
+        // multisample body loaded. With analog support disabled and a real
+        // multisample body present, this is an expected, healthy configuration.
+        if (aiTexturePreset && currentPresetHasRendered
+            && ! aiSupportBodyRendered && ! aiMultisampleBodyRendered)
             warnings.addIfNotAlreadyThere("AI_TEXTURE_SUPPORT_BODY_NOT_RENDERED");
     }
 
