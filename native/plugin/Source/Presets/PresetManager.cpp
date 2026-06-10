@@ -2124,13 +2124,14 @@ void PresetManager::seedAiTextureDemoPackIfMissing()
     auto dir  = root.getChildFile("AI Texture");
     dir.createDirectory();
 
-    // v7 migration marker. v6 fixed the multisample source paths; v7 recalibrates
-    // the AI Texture demo preset loudness now that the body is a real multisample
-    // (per-preset ampEnvelope.gainDb boosts + subtler texture levelDb). Re-run once
-    // to overwrite the three managed demo .diapreset files with the new gains.
-    auto seededMarkerV7 = dir.getChildFile(".seeded_ai_texture_demo_v7");
-    if (seededMarkerV7.existsAsFile())
+    // v8 migration marker. v6 fixed the multisample source paths; v7 recalibrated
+    // loudness; v8 re-balances the final output (Brass +3 dB, Guitar +12 dB) so the
+    // multisample body is no longer hot, and keeps the cached texture subtle. Re-run
+    // once to overwrite the three managed demo .diapreset files with the new gains.
+    auto seededMarkerV8 = dir.getChildFile(".seeded_ai_texture_demo_v8");
+    if (seededMarkerV8.existsAsFile())
         return;
+
 
     auto docsRoot = dida::SampleLibrary::getSamplesRoot().getParentDirectory();
     auto texRoot  = docsRoot.getChildFile("NeuralTextures").getChildFile("Demo");
