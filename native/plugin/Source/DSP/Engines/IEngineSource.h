@@ -38,7 +38,8 @@ enum class EngineType
     Supersaw,   // 3..9 detuned saws
     Fm,         // 4-operator FM
     Wavetable,  // single wavetable osc with morph
-    Granular    // grain player placeholder
+    Granular,   // grain player placeholder
+    NeuralTextureCached // AI Texture v0.1 — plays a cached offline WAV texture
 };
 
 inline EngineType engineTypeFromString(const juce::String& s) noexcept
@@ -49,6 +50,8 @@ inline EngineType engineTypeFromString(const juce::String& s) noexcept
     if (l == "fm")        return EngineType::Fm;
     if (l == "wavetable") return EngineType::Wavetable;
     if (l == "granular")  return EngineType::Granular;
+    // AI Texture v0.1 — cached neural texture playback (no realtime inference).
+    if (l == "neuraltexturecached" || l == "neuraltexture") return EngineType::NeuralTextureCached;
     return EngineType::Pcm;
 }
 
@@ -61,6 +64,7 @@ inline const char* engineTypeToString(EngineType t) noexcept
         case EngineType::Fm:        return "fm";
         case EngineType::Wavetable: return "wavetable";
         case EngineType::Granular:  return "granular";
+        case EngineType::NeuralTextureCached: return "neuralTextureCached";
         case EngineType::Pcm:
         default:                    return "pcm";
     }

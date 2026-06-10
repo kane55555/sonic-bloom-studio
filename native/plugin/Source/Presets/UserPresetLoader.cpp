@@ -42,7 +42,9 @@
 #include "../DSP/Engines/WavetableEngine.h"
 #include "../DSP/Engines/GranularEngine.h"
 #include "../DSP/Engines/PcmEngine.h"
+#include "../DSP/Engines/NeuralTextureEngine.h"
 #include <algorithm>
+#include <map>
 
 
 namespace dida { namespace userpreset {
@@ -345,6 +347,31 @@ bool parseFile(const juce::File& file, UserPreset& out, juce::String& errorOut)
             }
 
             out.partials.add(pb);
+        }
+    }
+
+    // ------- AI Texture v0.1 (cached) metadata -------
+    // Optional. A MISSING "ai" object leaves out.ai defaulted to disabled so
+    // every pre-AI .diapreset behaves exactly as before.
+    auto ai = json.getProperty("ai", juce::var());
+    if (ai.isObject())
+    {
+        out.ai.present        = true;
+        out.ai.enabled        = getB(ai, "enabled",        out.ai.enabled);
+        out.ai.profileVersion = getI(ai, "profileVersion", out.ai.profileVersion);
+        out.ai.provider       = getS(ai, "provider",       out.ai.provider);
+        out.ai.analysisFile   = getS(ai, "analysisFile",   out.ai.analysisFile);
+        out.ai.textureMode    = getS(ai, "textureMode",    out.ai.textureMode);
+
+        auto tp = ai.getProperty("timbreProfile", juce::var());
+        if (tp.isObject())
+        {
+            out.ai.timbreProfile.brightness       = getF(tp, "brightness",       out.ai.timbreProfile.brightness);
+            out.ai.timbreProfile.harmonicDensity  = getF(tp, "harmonicDensity",  out.ai.timbreProfile.harmonicDensity);
+            out.ai.timbreProfile.noiseAir         = getF(tp, "noiseAir",         out.ai.timbreProfile.noiseAir);
+            out.ai.timbreProfile.attackNoise      = getF(tp, "attackNoise",      out.ai.timbreProfile.attackNoise);
+            out.ai.timbreProfile.pitchInstability = getF(tp, "pitchInstability", out.ai.timbreProfile.pitchInstability);
+            out.ai.timbreProfile.bodyWarmth       = getF(tp, "bodyWarmth",       out.ai.timbreProfile.bodyWarmth);
         }
     }
 
@@ -1363,6 +1390,52 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
     // ---- Instantiate partial engines on every voice ----------------------
     if (auto* dp = dynamic_cast<DiditagainProcessor*>(&proc))
     {
+        // AI Texture v0.1: decode each cached neural texture WAV ONCE here on
+        // the message thread, then SHARE the immutable buffer with every voice's
+        // engine instance. No file IO ever happens on the audio thread.
+        struct TextureCacheEntry
+        {
+            std::shared_ptr<const juce::AudioBuffer<float>> buffer;
+            double sampleRate = 44100.0;
+            bool   missing    = true;
+        };
+        std::map<juce::String, TextureCacheEntry> textureCache;
+
+        auto resolveTexture = [&](const juce::String& rawPath) -> TextureCacheEntry&
+        {
+            auto it = textureCache.find(rawPath);
+            if (it != textureCache.end()) return it->second;
+
+            TextureCacheEntry entry;
+            if (rawPath.isNotEmpty())
+            {
+                const juce::File f = resolveSourcePath(rawPath);
+                dida::engines::NeuralTextureEngine loader;
+                if (loader.loadTextureFile(f))
+                {
+                    // Pull the decoded buffer out via a tiny second engine load.
+                    // (loadTextureFile stores it internally; re-expose by loading
+                    //  into a shared buffer here.)
+                    juce::AudioFormatManager fm; fm.registerBasicFormats();
+                    if (auto* reader = fm.createReaderFor(f))
+                    {
+                        std::unique_ptr<juce::AudioFormatReader> r(reader);
+                        const int len = (int) juce::jmin<juce::int64>(
+                            r->lengthInSamples, 60 * (juce::int64) r->sampleRate);
+                        auto buf = std::make_shared<juce::AudioBuffer<float>>(2, juce::jmax(1, len));
+                        buf->clear();
+                        r->read(buf.get(), 0, len, 0, true, r->numChannels > 1);
+                        if (r->numChannels == 1) buf->copyFrom(1, 0, *buf, 0, 0, len);
+                        entry.buffer     = buf;
+                        entry.sampleRate = r->sampleRate;
+                        entry.missing    = false;
+                    }
+                }
+            }
+            auto res = textureCache.emplace(rawPath, std::move(entry));
+            return res.first->second;
+        };
+
         auto makeEngine = [](const juce::String& t)
             -> std::unique_ptr<dida::engines::IEngineSource>
         {
@@ -1373,10 +1446,25 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
                 case dida::engines::EngineType::Fm:        return std::make_unique<dida::engines::FmEngine>();
                 case dida::engines::EngineType::Wavetable: return std::make_unique<dida::engines::WavetableEngine>();
                 case dida::engines::EngineType::Granular:  return std::make_unique<dida::engines::GranularEngine>();
+                // AI Texture v0.1 — cached neural texture playback.
+                case dida::engines::EngineType::NeuralTextureCached:
+                    return std::make_unique<dida::engines::NeuralTextureEngine>();
                 case dida::engines::EngineType::Pcm:
                 default:                                   return std::make_unique<dida::engines::PcmEngine>();
             }
         };
+
+        // Unknown engineType remains non-fatal — falls back to PCM with a log.
+        for (auto& pb : p.partials)
+        {
+            if (pb.engineType.isNotEmpty()
+                && dida::engines::engineTypeFromString(pb.engineType) == dida::engines::EngineType::Pcm
+                && ! pb.engineType.equalsIgnoreCase("pcm"))
+            {
+                didaUserPresetLog("WARNING unknown partial engineType=\"" + pb.engineType
+                                  + "\" — falling back to pcm (non-fatal)");
+            }
+        }
 
         dp->getSynthEngine().forEachSynthVoice([&](SynthVoice& v)
         {
@@ -1395,8 +1483,46 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
                 const auto& pb = p.partials.getReference(i);
                 auto eng = makeEngine(pb.engineType);
                 if (eng == nullptr) continue;
-                v.setPartial(i, std::move(eng), pb.enabled, pb.level, pb.pan,
-                             pb.pitchSemis, pb.fineCents);
+
+                const bool isNeural =
+                    dida::engines::engineTypeFromString(pb.engineType)
+                        == dida::engines::EngineType::NeuralTextureCached;
+
+                if (isNeural)
+                {
+                    // ---- AI Texture v0.1 cached configuration + gain safety ----
+                    auto* nte = static_cast<dida::engines::NeuralTextureEngine*>(eng.get());
+                    const juce::var ep = pb.engineParams;
+                    const juce::String texPath = ep.getProperty("texturePath", "").toString();
+                    auto& cached = resolveTexture(texPath);
+                    if (! cached.missing && cached.buffer != nullptr)
+                        nte->setSharedTexture(cached.buffer, cached.sampleRate);
+
+                    nte->setLoop((bool)  ep.getProperty("loop", true));
+                    nte->setRootMidi((int) ep.getProperty("rootMidi", 60));
+                    nte->setPitchTracking((bool) ep.getProperty("pitchTracking", false));
+                    nte->setFollowMainEnvelope(pb.followMainEnvelope);
+                    nte->setReleaseMs(pb.amp.releaseMs);
+                    nte->setEqRole(pb.eqRole.isNotEmpty() ? pb.eqRole : juce::String("neuralTexture"));
+                    nte->setDebugName(p.presetName + "/p" + juce::String(i));
+
+                    // Gain safety: default quiet, hard cap at -9 dB. Use an
+                    // explicit levelDb if present, else amp.gainDb, else default.
+                    float levelDb = dida::engines::NeuralTextureEngine::kDefaultLevelDb;
+                    if (ep.hasProperty("levelDb")) levelDb = (float) (double) ep.getProperty("levelDb", levelDb);
+                    else if (pb.amp.gainDb != 0.0f) levelDb = pb.amp.gainDb;
+                    nte->setLevelDb(levelDb);
+
+                    // Neural texture gain is fully owned by the engine; the slot
+                    // applies only pan + the live "Texture Amount" multiplier.
+                    v.setPartial(i, std::move(eng), pb.enabled, 1.0f, pb.pan,
+                                 pb.pitchSemis, pb.fineCents, /*isNeuralTexture=*/true);
+                }
+                else
+                {
+                    v.setPartial(i, std::move(eng), pb.enabled, pb.level, pb.pan,
+                                 pb.pitchSemis, pb.fineCents);
+                }
             }
         });
     }
@@ -1607,6 +1733,29 @@ juce::String toJson(const UserPreset& p)
             ps.add(juce::var(po));
         }
         obj->setProperty("partials", ps);
+    }
+
+    // ------- AI Texture v0.1 metadata. Only serialized when present so existing
+    //         .diapreset files round-trip byte-identically. -------
+    if (p.ai.present || p.ai.enabled)
+    {
+        auto* aio = new juce::DynamicObject();
+        aio->setProperty("enabled",        p.ai.enabled);
+        aio->setProperty("profileVersion", p.ai.profileVersion);
+        if (p.ai.provider.isNotEmpty())     aio->setProperty("provider",     p.ai.provider);
+        if (p.ai.analysisFile.isNotEmpty()) aio->setProperty("analysisFile", p.ai.analysisFile);
+        aio->setProperty("textureMode",    p.ai.textureMode);
+
+        auto* tp = new juce::DynamicObject();
+        tp->setProperty("brightness",       p.ai.timbreProfile.brightness);
+        tp->setProperty("harmonicDensity",  p.ai.timbreProfile.harmonicDensity);
+        tp->setProperty("noiseAir",         p.ai.timbreProfile.noiseAir);
+        tp->setProperty("attackNoise",      p.ai.timbreProfile.attackNoise);
+        tp->setProperty("pitchInstability", p.ai.timbreProfile.pitchInstability);
+        tp->setProperty("bodyWarmth",       p.ai.timbreProfile.bodyWarmth);
+        aio->setProperty("timbreProfile", juce::var(tp));
+
+        obj->setProperty("ai", juce::var(aio));
     }
 
     return juce::JSON::toString(juce::var(obj));

@@ -114,6 +114,9 @@ private:
         else if (role == "warmth")  { hpHz =  160.0f; lpHz =  2400.0f; trimDb = -2.0f; }
         else if (role == "air")     { hpHz = 2600.0f; lpHz = 18000.0f; trimDb = -6.0f; }
         else if (role == "texture") { hpHz =  900.0f; lpHz =  5500.0f; trimDb = -4.0f; }
+        // AI Texture v0.1: keep neural layers out of the main sample's body so
+        // cached textures add air/colour without muddying the multisample.
+        else if (role == "neuraltexture") { hpHz = 500.0f; lpHz = 12000.0f; trimDb = -8.0f; }
         else if (role == "sub")     { hpHz =   20.0f; lpHz =   150.0f; trimDb = -2.0f; }
         else if (role == "lead")    { hpHz =   80.0f; lpHz = 19000.0f; trimDb =  0.0f; }
         else if (role == "full")    { hpHz =   20.0f; lpHz = 20000.0f; trimDb =  0.0f; }

@@ -68,16 +68,18 @@ void SynthVoice::clearPartials() noexcept
 void SynthVoice::setPartial(int idx,
                             std::unique_ptr<dida::engines::IEngineSource> engine,
                             bool enabled, float level, float pan,
-                            int pitchSemis, float fineCents) noexcept
+                            int pitchSemis, float fineCents,
+                            bool isNeuralTexture) noexcept
 {
     if (idx < 0 || idx >= kMaxPartials) return;
     auto& slot = partials_[(size_t) idx];
-    slot.engine     = std::move(engine);
-    slot.enabled    = enabled && slot.engine != nullptr;
-    slot.level      = juce::jlimit(0.0f, 4.0f, level);
-    slot.pan        = juce::jlimit(-1.0f, 1.0f, pan);
-    slot.pitchSemis = pitchSemis;
-    slot.fineCents  = fineCents;
+    slot.engine          = std::move(engine);
+    slot.enabled         = enabled && slot.engine != nullptr;
+    slot.level           = juce::jlimit(0.0f, 4.0f, level);
+    slot.pan             = juce::jlimit(-1.0f, 1.0f, pan);
+    slot.pitchSemis      = pitchSemis;
+    slot.fineCents       = fineCents;
+    slot.isNeuralTexture = isNeuralTexture;
     if (slot.engine) slot.engine->prepare(sampleRate, preparedBlockSize);
 }
 
@@ -551,9 +553,12 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
                 std::fill_n(tL.data(), n, 0.0f);
                 std::fill_n(tR.data(), n, 0.0f);
                 slot.engine->renderAdd(tL.data(), tR.data(), n, pitchHz, mod);
+                // AI Texture v0.1: scale neural texture partials by the live
+                // "Texture Amount" (0..1). amount=0 fully mutes the texture.
+                const float liveGain = slot.isNeuralTexture ? neuralTextureLiveGain : 1.0f;
                 const float panAng = (slot.pan + 1.0f) * 0.25f * juce::MathConstants<float>::pi;
-                const float gL = std::cos(panAng) * 1.41421356f * slot.level;
-                const float gR = std::sin(panAng) * 1.41421356f * slot.level;
+                const float gL = std::cos(panAng) * 1.41421356f * slot.level * liveGain;
+                const float gR = std::sin(panAng) * 1.41421356f * slot.level * liveGain;
                 for (int i = 0; i < n; ++i)
                 {
                     pL[done + i] += tL[i] * gL;

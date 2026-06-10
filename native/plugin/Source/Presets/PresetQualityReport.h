@@ -287,6 +287,45 @@ inline void report(DiditagainProcessor& proc,
         warnings.add("TOO_WET");
     if (up.layer2.enabled && up.layer2.gainDb > 0.0f) warnings.add("LAYER_TOO_LOUD");
 
+    // --- AI Texture v0.1 (cached) checks. Observation-only: these NEVER block
+    //     preset load and never alter DSP. ---------------------------------
+    {
+        bool hasNeuralPartial = false;
+        for (const auto& pb : up.partials)
+        {
+            if (! pb.enabled) continue;
+            if (! pb.engineType.equalsIgnoreCase("neuralTextureCached")
+                && ! pb.engineType.equalsIgnoreCase("neuralTexture")) continue;
+            hasNeuralPartial = true;
+
+            const juce::var ep = pb.engineParams;
+            const juce::String texPath = ep.getProperty("texturePath", "").toString();
+            const juce::File texFile = texPath.isNotEmpty()
+                ? dida::userpreset::resolveSourcePath(texPath) : juce::File();
+            if (texPath.isEmpty() || ! texFile.existsAsFile())
+                warnings.add("AI_TEXTURE_MISSING");                 // MODEL_OR_TEXTURE_MISSING
+
+            // Gain safety: a neural texture must stay quiet under the main sample.
+            float lvlDb = ep.hasProperty("levelDb") ? (float) (double) ep.getProperty("levelDb", -18.0)
+                                                     : (pb.amp.gainDb != 0.0f ? pb.amp.gainDb : -18.0f);
+            if (lvlDb > -9.0f) warnings.add("AI_TEXTURE_TOO_LOUD");
+        }
+
+        if (up.ai.enabled || hasNeuralPartial) warnings.add("AI_TEXTURE_ENABLED");
+        // textureMode must be the only mode the plugin can consume in v0.1.
+        if (up.ai.present && ! up.ai.textureMode.equalsIgnoreCase("cached"))
+            warnings.add("AI_TEXTURE_NOT_CACHED");
+        // Offline analysis file referenced but absent.
+        if (up.ai.enabled && up.ai.analysisFile.isNotEmpty()
+            && ! dida::userpreset::resolveSourcePath(up.ai.analysisFile).existsAsFile())
+            warnings.add("AI_ANALYSIS_MISSING");
+        // Only ddsp/rave/"" are recognised providers in v0.1.
+        if (up.ai.present && up.ai.provider.isNotEmpty()
+            && ! up.ai.provider.equalsIgnoreCase("ddsp")
+            && ! up.ai.provider.equalsIgnoreCase("rave"))
+            warnings.add("AI_PROVIDER_UNSUPPORTED");
+    }
+
     const auto resolved = juce::File(resolvedFolderPath);
     const bool wantsFolder = up.source.type.isEmpty()
                           || up.source.type.equalsIgnoreCase("multisampleFolder");
