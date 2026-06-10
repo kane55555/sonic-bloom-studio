@@ -1675,6 +1675,11 @@ inline void report(DiditagainProcessor& proc,
               << "neuralTextureContributionPercent: " << juce::String(neuralTextureContributionPercent, 1) << "\n"
               << "neuralTextureContributionEstimated: " << (neuralTextureContributionEstimated ? "true" : "false") << "\n"
               << "neuralTextureSoloActive: "   << (neuralTextureSoloActive ? "true" : "false") << "\n"
+              << "supportBodyPeakDb: "         << juce::String(supportBodyPeakDb, 2) << "\n"
+              << "supportBodyGainDb: "         << juce::String(supportBodyGainDb, 2) << "\n"
+              << "supportBodyActive: "         << (supportBodyActive ? "true" : "false") << "\n"
+              << "supportBodyVoiceStarted: "   << (supportBodyVoiceStarted ? "true" : "false") << "\n"
+              << "supportBodyEnvelopeState: "  << supportBodyEnvelopeState << "\n"
               << "warnings: "                  << (warnings.isEmpty() ? juce::String("none") : warnings.joinIntoString(",")) << "\n"
               << "timestamp: "                 << timestamp            << "\n"
               << "==================================================\n";
