@@ -1613,6 +1613,12 @@ inline void report(DiditagainProcessor& proc,
               << "categoryTargetMinDb: "       << juce::String(target.minDb, 2) << "\n"
               << "categoryTargetMaxDb: "       << juce::String(target.maxDb, 2) << "\n"
               << "suggestedGainAdjustmentDb: " << (notesPlaying ? juce::String(suggestedGainDb, 2) : juce::String("n/a")) << "\n"
+              << "aiTexturePreset: "           << (aiTexturePreset ? "true" : "false") << "\n"
+              << "textureType: "               << aiTextureTypeStr << "\n"
+              << "neuralTexturePeakDb: "       << juce::String(neuralTexturePeakDb, 2) << "\n"
+              << "neuralTextureGainDb: "       << juce::String(neuralTextureGainDb, 2) << "\n"
+              << "neuralTextureContributionPercent: " << juce::String(neuralTextureContributionPercent, 1) << "\n"
+              << "neuralTextureSoloActive: "   << (neuralTextureSoloActive ? "true" : "false") << "\n"
               << "warnings: "                  << (warnings.isEmpty() ? juce::String("none") : warnings.joinIntoString(",")) << "\n"
               << "timestamp: "                 << timestamp            << "\n"
               << "==================================================\n";
