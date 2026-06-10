@@ -367,6 +367,8 @@ private:
     int preparedBlockSize = 512;
     // AI Texture v0.1 live amount (0..1) — scales neural texture partials only.
     float neuralTextureLiveGain = 1.0f;
+    // AI Texture v0.2 debug solo — mutes everything except neural texture partials.
+    bool  soloNeuralTexture = false;
 
     // Per-layer peak metering — logged ~once per second per voice.
     float peakSamp = 0.0f, peakOscB = 0.0f, peakSub = 0.0f, peakNoise = 0.0f, peakOut = 0.0f;
