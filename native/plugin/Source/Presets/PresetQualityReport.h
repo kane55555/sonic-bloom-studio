@@ -901,7 +901,13 @@ inline void report(DiditagainProcessor& proc,
         if (! choirSyntheticLayerDisabled && effectiveLayer2GainDb > -120.0f)
             warnings.add("CHOIR_SYNTH_LAYER_ACTIVE");
         if (finalDb > -10.0f) warnings.add("CHOIR_TOO_HOT");
-        if (choirZoneTooFar)  warnings.add("CHOIR_ZONE_TOO_FAR");
+        // Zone-distance warnings are irrelevant for a texture-only AI choir
+        // preset (the body is the cached texture, not a multisample map), so
+        // suppress CHOIR_ZONE_TOO_FAR there. Genuine missing-file errors
+        // (AI_TEXTURE_MISSING_FILE / SOURCE_MISSING) are left untouched.
+        const bool aiChoirTextureOnly = aiTexturePreset
+            && aiTextureType.equalsIgnoreCase("choir_ghost");
+        if (choirZoneTooFar && ! aiChoirTextureOnly) warnings.add("CHOIR_ZONE_TOO_FAR");
         const float choirChorusCap = (nLow.contains("wide") || nLow.contains("heaven")) ? 0.015f : 0.0f;
         if (chorusMix > choirChorusCap + 0.001f) warnings.add("CHOIR_CHORUS_TOO_HIGH");
         if (std::abs(choirHumanizePitchCents) > 0.25f
