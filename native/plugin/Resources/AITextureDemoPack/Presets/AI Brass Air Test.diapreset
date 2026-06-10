@@ -72,8 +72,8 @@
   "partials": [
     {
       "enabled": true,
-      "engineType": "sawBrassSupport",
-      "levelDb": -11.0,
+      "engineType": "analog",
+      "levelDb": -12.0,
       "pan": 0.0,
       "engineParams": {
         "role": "support",

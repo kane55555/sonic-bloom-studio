@@ -1074,11 +1074,21 @@ inline void report(DiditagainProcessor& proc,
     const float neuralTexturePeakDb  = neuralTexturePeakLin > 1.0e-6f
         ? juce::Decibels::gainToDecibels(neuralTexturePeakLin) : -120.0f;
 
-    // Rough contribution of the texture to the final output (peak ratio).
+    // Contribution of the texture to the final output (peak ratio). When a
+    // current-preset note render exists (reportEligible) AND the live texture
+    // meter captured a real block peak, use ONLY those live values so the
+    // percentage is STABLE across repeated reports and reflects THIS render.
+    // Without a current render fall back to the deterministic static estimate
+    // and flag it as estimated so pending / no-note data never mixes into the
+    // final loudness judgment (TOO_QUIET is already gated by reportEligible).
     const float finalOutputLin = finalOutputDb > -120.0f
         ? juce::Decibels::decibelsToGain(finalOutputDb) : 0.0f;
-    const float neuralTextureContributionPercent = (finalOutputLin > 1.0e-6f && neuralTexturePeakLin > 0.0f)
-        ? juce::jlimit(0.0f, 100.0f, 100.0f * neuralTexturePeakLin / finalOutputLin) : 0.0f;
+    const bool  contributionFromLiveRender = reportEligible && liveTexturePeakLin > 1.0e-6f;
+    const float contributionTexturePeakLin = contributionFromLiveRender
+        ? liveTexturePeakLin : estTexturePeakLin;
+    const bool  neuralTextureContributionEstimated = ! contributionFromLiveRender;
+    const float neuralTextureContributionPercent = (finalOutputLin > 1.0e-6f && contributionTexturePeakLin > 0.0f)
+        ? juce::jlimit(0.0f, 100.0f, 100.0f * contributionTexturePeakLin / finalOutputLin) : 0.0f;
     const juce::String aiTextureTypeStr = aiTextureType.isNotEmpty() ? aiTextureType : juce::String("none");
 
     juce::String out;
@@ -1243,6 +1253,7 @@ inline void report(DiditagainProcessor& proc,
         << " neuralTexturePeakDb=" << juce::String(neuralTexturePeakDb, 2)
         << " neuralTextureGainDb=" << juce::String(neuralTextureGainDb, 2)
         << " neuralTextureContributionPercent=" << juce::String(neuralTextureContributionPercent, 1)
+        << " neuralTextureContributionEstimated=" << (neuralTextureContributionEstimated ? "true" : "false")
         << " neuralTextureSoloActive=" << (neuralTextureSoloActive ? "true" : "false")
         << " pluginVersion=" << pluginVersion
         << " timestamp=" << timestamp
@@ -1434,6 +1445,7 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("neuralTexturePeakDb",            neuralTexturePeakDb);
     j->setProperty("neuralTextureGainDb",            neuralTextureGainDb);
     j->setProperty("neuralTextureContributionPercent", neuralTextureContributionPercent);
+    j->setProperty("neuralTextureContributionEstimated", neuralTextureContributionEstimated);
     j->setProperty("neuralTextureSoloActive",        neuralTextureSoloActive);
     juce::Array<juce::var> warnVar;
     for (auto& w : warnings) warnVar.add(w);
@@ -1634,6 +1646,7 @@ inline void report(DiditagainProcessor& proc,
               << "neuralTexturePeakDb: "       << juce::String(neuralTexturePeakDb, 2) << "\n"
               << "neuralTextureGainDb: "       << juce::String(neuralTextureGainDb, 2) << "\n"
               << "neuralTextureContributionPercent: " << juce::String(neuralTextureContributionPercent, 1) << "\n"
+              << "neuralTextureContributionEstimated: " << (neuralTextureContributionEstimated ? "true" : "false") << "\n"
               << "neuralTextureSoloActive: "   << (neuralTextureSoloActive ? "true" : "false") << "\n"
               << "warnings: "                  << (warnings.isEmpty() ? juce::String("none") : warnings.joinIntoString(",")) << "\n"
               << "timestamp: "                 << timestamp            << "\n"
