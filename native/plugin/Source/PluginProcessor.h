@@ -65,6 +65,7 @@ private:
     SynthEngine synthEngine;
     PresetManager presetManager;
     LicenseClient licenseClient;
+    std::atomic<bool> aiTextureSolo { false };
     std::atomic<bool> presetLoadRequested { false };
     std::atomic<int> presetLoadSerial { 0 };
     int observedPresetLoadSerial = 0;
