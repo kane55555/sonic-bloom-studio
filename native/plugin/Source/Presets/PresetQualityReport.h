@@ -1276,6 +1276,7 @@ inline void report(DiditagainProcessor& proc,
         << " supportBodyGainDb=" << juce::String(supportBodyGainDb, 2)
         << " supportBodyActive=" << (supportBodyActive ? "true" : "false")
         << " supportBodyVoiceStarted=" << (supportBodyVoiceStarted ? "true" : "false")
+        << " supportBodyEnvelopeState=" << supportBodyEnvelopeState
         << " pluginVersion=" << pluginVersion
         << " timestamp=" << timestamp
         << " warnings=" << (warnings.isEmpty() ? juce::String("none")
