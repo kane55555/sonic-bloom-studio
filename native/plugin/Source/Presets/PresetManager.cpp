@@ -1927,8 +1927,14 @@ void PresetManager::seedAiTextureDemoPackIfMissing()
     auto dir  = root.getChildFile("AI Texture");
     dir.createDirectory();
 
-    auto seededMarker = dir.getChildFile(".seeded");
-    if (seededMarker.existsAsFile())
+    // v2 migration marker. Earlier builds seeded the demo textures to the wrong
+    // location / left {DIDA_DOCS} resolving incorrectly, so a plain ".seeded"
+    // marker would block the corrected install. We use a dedicated v2 marker so
+    // existing installs re-run this once and pick up the corrected texture WAVs.
+    // writeBinaryResourceToFile() never overwrites existing files, so any
+    // user-edited preset or texture is preserved untouched.
+    auto seededMarkerV2 = dir.getChildFile(".seeded_ai_texture_demo_v2");
+    if (seededMarkerV2.existsAsFile())
         return;
 
     auto docsRoot = dida::SampleLibrary::getSamplesRoot().getParentDirectory();
@@ -1937,6 +1943,8 @@ void PresetManager::seedAiTextureDemoPackIfMissing()
     int written = 0;
 
     // 1) Texture WAVs into the managed {DIDA_DOCS}/NeuralTextures/Demo tree.
+    //    These paths match the presets' {DIDA_DOCS}/NeuralTextures/Demo/<Type>/
+    //    texturePath tokens exactly, so they resolve on every machine.
     written += writeBinaryResourceToFile("dida_brass_air_C4.wav",
                    texRoot.getChildFile("BrassAir").getChildFile("dida_brass_air_C4.wav")) ? 1 : 0;
     written += writeBinaryResourceToFile("dida_choir_ghost_C4.wav",
@@ -1953,9 +1961,9 @@ void PresetManager::seedAiTextureDemoPackIfMissing()
     for (auto* name : presetFiles)
         written += writeBinaryResourceToFile(name, dir.getChildFile(name)) ? 1 : 0;
 
-    seededMarker.replaceWithText("1");
+    seededMarkerV2.replaceWithText("1");
 
-    didaPresetManagerLog("seeded AI Texture demo pack count=" + juce::String(written)
+    didaPresetManagerLog("seeded AI Texture demo pack (v2) count=" + juce::String(written)
         + " presets=" + dir.getFullPathName()
         + " textures=" + texRoot.getFullPathName());
 }

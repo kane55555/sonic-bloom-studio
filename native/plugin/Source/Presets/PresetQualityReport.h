@@ -214,8 +214,15 @@ inline void report(DiditagainProcessor& proc,
     int activeLayers = (up.main.enabled ? 1 : 0)
                      + ((up.layer2.enabled && ! naturalChoirSampleOnly) ? 1 : 0);
     int activePartials = 0;
-    if (! naturalChoirSampleOnly)
-        for (auto& p : up.partials) if (p.enabled) ++activePartials;
+    for (auto& p : up.partials)
+    {
+        if (! p.enabled) continue;
+        const bool isNeural = p.engineType.equalsIgnoreCase("neuralTextureCached")
+                           || p.engineType.equalsIgnoreCase("neuralTexture");
+        // In choir mode only the cached AI Texture partial survives (the synth
+        // support partials are clamped), so count neural partials regardless.
+        if (! naturalChoirSampleOnly || isNeural) ++activePartials;
+    }
 
     const juce::String engineType = up.engineType.isNotEmpty() ? up.engineType
                                   : (up.partials.size() > 0 ? juce::String("layered") : juce::String("pcm"));
@@ -289,6 +296,18 @@ inline void report(DiditagainProcessor& proc,
 
     // --- AI Texture v0.1 (cached) checks. Observation-only: these NEVER block
     //     preset load and never alter DSP. ---------------------------------
+    // AI Texture diagnostic detail (serialized so AI_TEXTURE_MISSING_FILE is
+    // actionable instead of opaque). Captured from the representative neural
+    // texture partial.
+    juce::String aiRawTexturePath, aiResolvedTexturePath, aiTextureInstallRoot;
+    bool aiTextureFileExists = false;
+    const juce::String aiProviderValue = up.ai.provider;
+    {
+        // {DIDA_DOCS} install root for textures, shown verbatim in the report.
+        auto docsRoot = dida::SampleLibrary::getSamplesRoot().getParentDirectory();
+        aiTextureInstallRoot = docsRoot.getChildFile("NeuralTextures")
+                                       .getFullPathName().replaceCharacter('\\', '/');
+    }
     {
         bool hasNeuralPartial = false;
         bool textureFileResolved = false;
@@ -305,7 +324,18 @@ inline void report(DiditagainProcessor& proc,
             const juce::String texPath = ep.getProperty("texturePath", "").toString();
             const juce::File texFile = texPath.isNotEmpty()
                 ? dida::userpreset::resolveSourcePath(texPath) : juce::File();
-            if (texPath.isEmpty() || ! texFile.existsAsFile())
+            const bool thisExists = texPath.isNotEmpty() && texFile.existsAsFile();
+
+            // Record detail from the first neural partial, or from the first
+            // missing one (so the report explains the failure).
+            if (aiRawTexturePath.isEmpty() || (! aiTextureFileExists && thisExists))
+            {
+                aiRawTexturePath      = texPath;
+                aiResolvedTexturePath = texFile.getFullPathName().replaceCharacter('\\', '/');
+                aiTextureFileExists   = thisExists;
+            }
+
+            if (! thisExists)
                 anyTextureMissing = true;
             else
             {
@@ -362,11 +392,21 @@ inline void report(DiditagainProcessor& proc,
         if (up.ai.enabled && up.ai.analysisFile.isNotEmpty()
             && ! dida::userpreset::resolveSourcePath(up.ai.analysisFile).existsAsFile())
             warnings.add("AI_ANALYSIS_MISSING");
-        // Only ddsp/rave/"" are recognised providers in v0.1.
-        if (up.ai.present && up.ai.provider.isNotEmpty()
-            && ! up.ai.provider.equalsIgnoreCase("ddsp")
-            && ! up.ai.provider.equalsIgnoreCase("rave"))
-            warnings.add("AI_PROVIDER_UNSUPPORTED");
+        // Recognised provider values for AI Texture v0.1/v0.2. cachedTexture and
+        // demoPack require no live AI runtime and are fully supported now;
+        // ddspOffline/raveFuture are reserved for later offline/online engines.
+        // The legacy neuralTextureCached / ddsp / rave values stay accepted.
+        {
+            static const char* kSupportedProviders[] = {
+                "cachedTexture", "neuralTextureCached", "demoPack",
+                "ddspOffline", "raveFuture", "ddsp", "rave"
+            };
+            bool providerSupported = up.ai.provider.isEmpty();
+            for (auto* sp : kSupportedProviders)
+                if (up.ai.provider.equalsIgnoreCase(sp)) { providerSupported = true; break; }
+            if (up.ai.present && ! providerSupported)
+                warnings.add("AI_PROVIDER_UNSUPPORTED");
+        }
     }
 
     const auto resolved = juce::File(resolvedFolderPath);
@@ -1151,6 +1191,12 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("wavZones",               wavZones);
     j->setProperty("activeLayers",           activeLayers);
     j->setProperty("activePartials",         activePartials);
+    // AI Texture diagnostics (actionable detail for AI_TEXTURE_MISSING_FILE).
+    j->setProperty("aiProvider",             aiProviderValue);
+    j->setProperty("rawTexturePath",         aiRawTexturePath);
+    j->setProperty("resolvedTexturePath",    aiResolvedTexturePath);
+    j->setProperty("textureFileExists",      aiTextureFileExists);
+    j->setProperty("textureInstallRoot",     aiTextureInstallRoot);
     j->setProperty("layerBusPeakDb",         busPeakDb);
     j->setProperty("fxInputPeakDb",          fxInDb);
     j->setProperty("fxOutputPeakDb",         fxOutDb);
@@ -1368,6 +1414,11 @@ inline void report(DiditagainProcessor& proc,
               << "wavZones: "                  << wavZones             << "\n"
               << "activeLayers: "              << activeLayers         << "\n"
               << "activePartials: "            << activePartials       << "\n"
+              << "aiProvider: "                << aiProviderValue      << "\n"
+              << "rawTexturePath: "            << aiRawTexturePath     << "\n"
+              << "resolvedTexturePath: "       << aiResolvedTexturePath << "\n"
+              << "textureFileExists: "         << (aiTextureFileExists ? "true" : "false") << "\n"
+              << "textureInstallRoot: "        << aiTextureInstallRoot << "\n"
               << "layerBusPeakDb: "            << juce::String(busPeakDb, 2) << "\n"
               << "fxInputPeakDb: "             << juce::String(fxInDb, 2)    << "\n"
               << "fxOutputPeakDb: "            << juce::String(fxOutDb, 2)   << "\n"

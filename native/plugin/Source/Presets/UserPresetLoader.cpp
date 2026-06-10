@@ -513,6 +513,13 @@ juce::File resolveSourcePath(const juce::String& rawPath)
         // base instrument samples live in Samples/<Category>/<Instrument>/.
         if (absFile.isDirectory())
             return absFile;
+        // AI Texture v0.2: a cached neural texture is a single WAV *file*, not a
+        // folder. The folder-oriented candidate search below (folderHasWavs)
+        // would otherwise discard a valid absolute file path and fall through to
+        // a category fallback, which is what produced AI_TEXTURE_MISSING_FILE.
+        // Return the file directly when it exists on disk.
+        if (absFile.existsAsFile())
+            return absFile;
         addCandidate(candidates, absFile);
     }
 
@@ -543,6 +550,11 @@ juce::File resolveSourcePath(const juce::String& rawPath)
                 addCandidate(candidates, samplesRoot.getChildFile(category + "s").getChildFile(rest));
         }
     }
+
+    // A directly-resolved file (e.g. a cached neural texture WAV) wins first.
+    for (auto& candidate : candidates)
+        if (candidate.existsAsFile())
+            return candidate;
 
     for (auto& candidate : candidates)
         if (folderHasWavs(candidate))
@@ -1528,22 +1540,32 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
             v.clearPartials();
             if (choirMode)
             {
+                // Choir mode clamps the main synth oscillators (unison/exciter/
+                // spread) for a natural vocal blend, but the cached AI Texture
+                // layer must STILL be installed — otherwise a choir preset with a
+                // neuralTextureCached partial reports activePartials: 0 even though
+                // the texture exists. We therefore apply the clamps and then fall
+                // through to install ONLY neural texture partials below.
                 v.setUnisonRender(1, 0.0f, 0.0f, 0.0f);
                 v.setExciterAmount(0.0f);
                 v.setStereoSpreadAmount(0.0f);
-                return;
             }
 
             const int count = juce::jmin((int) SynthVoice::kMaxPartials, p.partials.size());
             for (int i = 0; i < count; ++i)
             {
                 const auto& pb = p.partials.getReference(i);
-                auto eng = makeEngine(pb.engineType);
-                if (eng == nullptr) continue;
 
                 const bool isNeural =
                     dida::engines::engineTypeFromString(pb.engineType)
                         == dida::engines::EngineType::NeuralTextureCached;
+
+                // In choir mode only the neural texture partial is installed; the
+                // synth-support partials are intentionally muted by the choir path.
+                if (choirMode && ! isNeural) continue;
+
+                auto eng = makeEngine(pb.engineType);
+                if (eng == nullptr) continue;
 
                 if (isNeural)
                 {
