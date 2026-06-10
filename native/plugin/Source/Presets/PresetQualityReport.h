@@ -717,7 +717,14 @@ inline void report(DiditagainProcessor& proc,
         && blocksRenderedSincePresetLoad > 0
         && notesRenderedSincePresetLoad > 0;
     const bool  meterReflectsCurrentPreset = currentPresetHasRendered && meterAmpMatchesCurrentPreset;
-    const bool  reportEligible = currentPresetHasRendered && meterReflectsCurrentPreset;
+    // AI Texture stability gate (Task 5): an AI Texture preset must not publish a
+    // pass/fail-eligible report until its analog support/body voice has actually
+    // rendered at least one block after note-on. Otherwise a probe that captured
+    // only the cached texture (support voice not yet sounding) produces a false
+    // TOO_QUIET. Non-AI presets are unaffected.
+    const bool  aiSupportBodyRendered = engine.hasSupportBodyRenderedBlock();
+    const bool  reportEligible = currentPresetHasRendered && meterReflectsCurrentPreset
+        && (! aiTexturePreset || aiSupportBodyRendered);
     // End-to-end voice->dry accounting against the metered (real) amp gain. The
     // measured layer-bus glue gain is neutralised so the mismatch isolates the
     // amp + master stages (a correct render lands within a few dB of 0).
