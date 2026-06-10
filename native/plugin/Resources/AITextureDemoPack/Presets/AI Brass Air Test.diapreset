@@ -73,7 +73,7 @@
     {
       "enabled": true,
       "engineType": "sawBrassSupport",
-      "levelDb": -20.0,
+      "levelDb": -11.0,
       "pan": 0.0,
       "engineParams": {
         "role": "support",

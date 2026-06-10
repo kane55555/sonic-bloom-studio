@@ -73,7 +73,7 @@
     {
       "enabled": true,
       "engineType": "choirPadSupport",
-      "levelDb": -22.0,
+      "levelDb": -15.0,
       "pan": 0.0,
       "engineParams": {
         "role": "support",
