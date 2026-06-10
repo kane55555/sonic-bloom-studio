@@ -2092,14 +2092,12 @@ void PresetManager::seedAiTextureDemoPackIfMissing()
     auto dir  = root.getChildFile("AI Texture");
     dir.createDirectory();
 
-    // v2 migration marker. Earlier builds seeded the demo textures to the wrong
-    // location / left {DIDA_DOCS} resolving incorrectly, so a plain ".seeded"
-    // marker would block the corrected install. We use a dedicated v2 marker so
-    // existing installs re-run this once and pick up the corrected texture WAVs.
-    // writeBinaryResourceToFile() never overwrites existing files, so any
-    // user-edited preset or texture is preserved untouched.
-    auto seededMarkerV2 = dir.getChildFile(".seeded_ai_texture_demo_v4");
-    if (seededMarkerV2.existsAsFile())
+    // v6 migration marker. Earlier builds installed AI Texture demo presets with
+    // stale broad sourceInstrument paths (for example {DIDA_DOCS}/Samples/Choir)
+    // that resolved through legacy category guesses. Re-run once to overwrite the
+    // three managed demo .diapreset files with exact Presets/User multisample paths.
+    auto seededMarkerV6 = dir.getChildFile(".seeded_ai_texture_demo_v6");
+    if (seededMarkerV6.existsAsFile())
         return;
 
     auto docsRoot = dida::SampleLibrary::getSamplesRoot().getParentDirectory();
@@ -2123,9 +2121,9 @@ void PresetManager::seedAiTextureDemoPackIfMissing()
         "AI Choir Ghost Test.diapreset",
         "AI Guitar Dust Test.diapreset"
     };
-    // v3: the factory demo presets carry corrected gain staging, so refresh
-    // them in place. Only these three managed factory files are overwritten;
-    // user-created presets and textures are never touched.
+    // v6: refresh the three managed AI Texture demo presets in place so installed
+    // copies get the exact sourceInstrument.path values. This does not touch any
+    // other presets or non-managed user content.
     for (auto* name : presetFiles)
     {
         auto destFile = dir.getChildFile(name);
@@ -2134,9 +2132,9 @@ void PresetManager::seedAiTextureDemoPackIfMissing()
         written += writeBinaryResourceToFile(name, destFile) ? 1 : 0;
     }
 
-    seededMarkerV2.replaceWithText("1");
+    seededMarkerV6.replaceWithText("1");
 
-    didaPresetManagerLog("seeded AI Texture demo pack (v2) count=" + juce::String(written)
+    didaPresetManagerLog("seeded AI Texture demo pack (v6) count=" + juce::String(written)
         + " presets=" + dir.getFullPathName()
         + " textures=" + texRoot.getFullPathName());
 }
