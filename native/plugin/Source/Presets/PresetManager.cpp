@@ -1478,6 +1478,207 @@ void PresetManager::exportPreset(const juce::File& destination)
     }
 }
 
+//==============================================================================
+//  AI Texture Import + Freeze v0.2 — message-thread only. No realtime neural
+//  inference: we only validate, copy and reference a cached WAV texture.
+//==============================================================================
+static int aiFindNeuralPartialIndex(const dida::userpreset::UserPreset& p)
+{
+    for (int i = 0; i < p.partials.size(); ++i)
+    {
+        const auto& pb = p.partials.getReference(i);
+        if (pb.engineType.equalsIgnoreCase("neuralTextureCached")
+            || pb.engineType.equalsIgnoreCase("neuralTexture"))
+            return i;
+    }
+    return -1;
+}
+
+juce::File PresetManager::aiNeuralTextureFolder() const
+{
+    auto docsRoot = dida::SampleLibrary::getSamplesRoot().getParentDirectory();
+    const auto cat = juce::File::createLegalFileName(
+        pendingUserDiapreset.category.isNotEmpty() ? pendingUserDiapreset.category
+                                                   : juce::String("Uncategorized"));
+    const auto name = juce::File::createLegalFileName(
+        pendingUserDiapreset.presetName.isNotEmpty() ? pendingUserDiapreset.presetName
+                                                     : juce::String("Preset"));
+    return docsRoot.getChildFile("NeuralTextures").getChildFile(cat).getChildFile(name);
+}
+
+juce::String PresetManager::aiTextureStatus() const
+{
+    if (! aiHasEditablePreset()) return "Disabled";
+    const int idx = aiFindNeuralPartialIndex(pendingUserDiapreset);
+    if (idx < 0) return "Disabled";
+    const auto& pb = pendingUserDiapreset.partials.getReference(idx);
+    const juce::String texPath = pb.engineParams.getProperty("texturePath", "").toString();
+    if (texPath.isEmpty()) return "Missing";
+    const juce::File f = dida::userpreset::resolveSourcePath(texPath);
+    if (! f.existsAsFile()) return "Missing";
+    const auto norm = f.getFullPathName().replaceCharacter('\\', '/');
+    const bool managed = norm.containsIgnoreCase("/NeuralTextures/");
+    if (texPath.startsWithIgnoreCase("{DIDA_DOCS}") && managed) return "Cached";
+    if (managed) return "Imported";
+    return "External";
+}
+
+// Re-apply the on-disk preset after we mutated + wrote it, so the audio engine
+// picks up the new partial set. Uses the public diapreset load path by index.
+static void aiReloadByPath(PresetManager& pm, const juce::String& path)
+{
+    pm.scanPresetDirectory();
+    for (int i = 0; i < pm.getNumPresets(); ++i)
+        if (pm.getPresetUserFile(i) == path || pm.getPresetFilePath(i) == path)
+        { pm.loadPreset(i); return; }
+}
+
+PresetManager::AiTextureOpResult PresetManager::aiImportTextureWav(const juce::File& wav)
+{
+    AiTextureOpResult r;
+    if (! aiHasEditablePreset())
+    { r.status = "Disabled"; r.message = "No editable preset loaded."; return r; }
+
+    if (! wav.existsAsFile())
+    { r.status = aiTextureStatus(); r.message = "File not found."; return r; }
+
+    // Validate the audio is readable.
+    juce::AudioFormatManager fm; fm.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> reader(fm.createReaderFor(wav));
+    if (reader == nullptr || reader->lengthInSamples <= 0)
+    { r.status = aiTextureStatus(); r.message = "Unreadable / invalid audio."; return r; }
+    reader.reset();
+
+    // Copy into the managed folder.
+    auto folder = aiNeuralTextureFolder();
+    if (! folder.createDirectory())
+    { r.status = aiTextureStatus(); r.message = "Could not create texture folder."; return r; }
+
+    auto safeName = juce::File::createLegalFileName(wav.getFileName());
+    auto dest = folder.getChildFile(safeName);
+    if (dest.existsAsFile()) dest = folder.getNonexistentChildFile(
+        wav.getFileNameWithoutExtension(), "." + wav.getFileExtension().trimCharactersAtStart("."), false);
+    if (! wav.copyFileTo(dest))
+    { r.status = aiTextureStatus(); r.message = "Copy into managed folder failed."; return r; }
+
+    // Build a portable {DIDA_DOCS} token path.
+    auto docsRoot = dida::SampleLibrary::getSamplesRoot().getParentDirectory();
+    juce::String portable = "{DIDA_DOCS}/" + dest.getRelativePathFrom(docsRoot)
+                                                 .replaceCharacter('\\', '/');
+
+    // Attach / update the neuralTextureCached partial.
+    auto& up = pendingUserDiapreset;
+    int idx = aiFindNeuralPartialIndex(up);
+    if (idx < 0)
+    {
+        if (up.partials.size() >= 4)
+        { r.status = aiTextureStatus(); r.message = "Preset already has 4 partials."; return r; }
+        dida::userpreset::UserPreset::PartialBlock pb;
+        up.partials.add(pb);
+        idx = up.partials.size() - 1;
+    }
+    auto& pb = up.partials.getReference(idx);
+    pb.enabled            = true;
+    pb.engineType         = "neuralTextureCached";
+    pb.eqRole             = "neuralTexture";
+    pb.followMainEnvelope = true;
+    if (pb.amp.releaseMs <= 0.0f) pb.amp.releaseMs = 250.0f;
+
+    auto* ep = new juce::DynamicObject();
+    ep->setProperty("texturePath",   portable);
+    ep->setProperty("loop",          true);
+    ep->setProperty("rootMidi",      60);
+    ep->setProperty("pitchTracking", true);
+    ep->setProperty("levelDb",       -18.0);
+    pb.engineParams = juce::var(ep);
+
+    up.ai.present     = true;
+    up.ai.enabled     = true;
+    up.ai.textureMode = "cached";
+
+    // Persist + reload so the engine instantiates the new texture partial.
+    juce::File presetFile(requestedPresetFilePath);
+    presetFile.replaceWithText(dida::userpreset::toJson(up));
+    aiReloadByPath(*this, requestedPresetFilePath);
+
+    r.ok = true; r.status = "Imported";
+    r.message = "Imported texture: " + dest.getFileName();
+    return r;
+}
+
+PresetManager::AiTextureOpResult PresetManager::aiRemoveTexture()
+{
+    AiTextureOpResult r;
+    if (! aiHasEditablePreset())
+    { r.status = "Disabled"; r.message = "No editable preset loaded."; return r; }
+
+    auto& up = pendingUserDiapreset;
+    const int idx = aiFindNeuralPartialIndex(up);
+    if (idx < 0)
+    { r.status = "Disabled"; r.message = "No texture attached."; return r; }
+
+    up.partials.remove(idx);            // does NOT delete the WAV on disk
+    up.ai.enabled = false;
+
+    juce::File presetFile(requestedPresetFilePath);
+    presetFile.replaceWithText(dida::userpreset::toJson(up));
+    aiReloadByPath(*this, requestedPresetFilePath);
+
+    r.ok = true; r.status = "Disabled";
+    r.message = "Texture removed (WAV kept on disk).";
+    return r;
+}
+
+PresetManager::AiTextureOpResult PresetManager::aiFreezeTexture()
+{
+    AiTextureOpResult r;
+    if (! aiHasEditablePreset())
+    { r.status = "Disabled"; r.message = "No editable preset loaded."; return r; }
+
+    auto& up = pendingUserDiapreset;
+    const int idx = aiFindNeuralPartialIndex(up);
+    if (idx < 0)
+    { r.status = "Disabled"; r.message = "FREEZE_MISSING_SOURCE: no texture attached."; return r; }
+
+    auto& pb = up.partials.getReference(idx);
+    const juce::String texPath = pb.engineParams.getProperty("texturePath", "").toString();
+    juce::File srcFile = texPath.isNotEmpty() ? dida::userpreset::resolveSourcePath(texPath)
+                                              : juce::File();
+    if (texPath.isEmpty() || ! srcFile.existsAsFile())
+    { r.status = "Missing"; r.message = "FREEZE_MISSING_SOURCE: texture file missing."; return r; }
+
+    // Ensure the texture lives inside the managed folder; copy it in if external.
+    auto folder = aiNeuralTextureFolder();
+    const auto norm = srcFile.getFullPathName().replaceCharacter('\\', '/');
+    juce::String portable = texPath;
+    if (! norm.containsIgnoreCase("/NeuralTextures/"))
+    {
+        folder.createDirectory();
+        auto dest = folder.getChildFile(juce::File::createLegalFileName(srcFile.getFileName()));
+        if (dest != srcFile && ! dest.existsAsFile()) srcFile.copyFileTo(dest);
+        auto docsRoot = dida::SampleLibrary::getSamplesRoot().getParentDirectory();
+        portable = "{DIDA_DOCS}/" + dest.getRelativePathFrom(docsRoot).replaceCharacter('\\', '/');
+    }
+
+    if (auto* ep = pb.engineParams.getDynamicObject())
+        ep->setProperty("texturePath", portable);
+    pb.enabled = true;
+    pb.engineType = "neuralTextureCached";
+    up.ai.present     = true;
+    up.ai.enabled     = true;
+    up.ai.textureMode = "cached";
+
+    juce::File presetFile(requestedPresetFilePath);
+    presetFile.replaceWithText(dida::userpreset::toJson(up));
+    aiReloadByPath(*this, requestedPresetFilePath);
+
+    r.ok = true; r.status = "Cached";
+    r.message = "FREEZE_READY: texture frozen to preset.";
+    return r;
+}
+
+
+
 juce::String PresetManager::getPresetName(int index) const
 {
     if (index >= 0 && index < static_cast<int>(presets.size()))
