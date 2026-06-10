@@ -1645,7 +1645,7 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
                 // choir mode — otherwise the cached-texture choir preset renders
                 // texture-only and reports TOO_QUIET. Natural (non-AI) choir
                 // presets remain sample-only as before.
-                if (choirMode && ! isNeural && ! isAiTexturePreset(p)) continue;
+                if (choirMode && ! isNeural && ! aiTexturePresetForInstall) continue;
 
                 auto eng = makeEngine(pb.engineType);
                 if (eng == nullptr) continue;
