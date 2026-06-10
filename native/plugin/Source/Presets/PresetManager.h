@@ -222,4 +222,5 @@ private:
     void autoIndexUserInstrumentFolders();
     void seedGuitarPresetBankIfMissing();
     void seedVintageSynthBankIfMissing();
+    void seedAiTextureDemoPackIfMissing();
 };
