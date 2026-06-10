@@ -951,6 +951,16 @@ void clampEnvelopeForCategory(juce::AudioProcessor& proc, const UserPreset& p, F
 
 } // anonymous
 
+// Public: AI Texture (cached neural) preset detection. See header.
+bool isAiTexturePreset(const UserPreset& p) noexcept
+{
+    if (presetHasNeuralTexturePartial(p)) return true;
+    const auto pr = p.ai.provider.toLowerCase();
+    return p.ai.present && (pr == "cachedtexture" || pr == "demopack");
+}
+
+
+
 // Public: reproduce the engine's load-time gain trim so the quality report can
 // compute the true applied amp gain without a stale live read. Choir-mode
 // presets get the choir natural trim; AI Texture presets get a headroom trim;
