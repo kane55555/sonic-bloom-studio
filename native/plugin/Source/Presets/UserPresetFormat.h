@@ -259,10 +259,25 @@ struct UserPreset
         juce::String eqRole;
         bool         followMainEnvelope = true;
         float        maxGainDb = 0.0f;
+
+        // AI Texture demo-pack schema additive: some packs declare a neural
+        // texture partial with a top-level "levelDb" (instead of nesting it in
+        // engineParams) and a redundant "isNeuralTexture" hint. Both optional.
+        bool         hasLevelDb = false;
+        float        levelDb    = 0.0f;
+        bool         isNeuralTexture = false;
     };
 
     juce::String              engineType;   // optional; default "" => pcm
     juce::Array<PartialBlock> partials;     // optional; up to 4
+
+    // AI Texture demo-pack schema additive: a preset may declare its main
+    // multisample via a "samples" block ({ rootFolder, required,
+    // fallbackSynthIfMissing }) instead of "sourceInstrument". When the source
+    // folder is absent and required==false, the preset still loads and plays
+    // its self-contained partials (e.g. the cached neural texture layer).
+    bool sourceRequired           = true;   // false => missing source is OK
+    bool fallbackSynthIfMissing   = false;  // hint: fall back gracefully
 
     // ------- AI Texture v0.1 (cached) metadata (v2 additive) -------
     // Optional. Describes an offline-analysed timbre profile plus the cached

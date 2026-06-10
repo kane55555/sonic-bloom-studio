@@ -13,6 +13,7 @@
 #include "../DSP/SampleLibrary.h"
 #include "../PluginProcessor.h"
 #include "../DSP/SynthEngine.h"
+#include "BinaryData.h"
 #include <limits>
 #include <cmath>
 
@@ -49,6 +50,7 @@ PresetManager::PresetManager(juce::AudioProcessor& proc) : processor(proc)
 
     seedGuitarPresetBankIfMissing();
     seedVintageSynthBankIfMissing();
+    seedAiTextureDemoPackIfMissing();
 
     // Drop a one-time .seeded marker into every User category folder. Any
     // future auto-seeding logic for these folders must check this marker and
@@ -1874,6 +1876,170 @@ void PresetManager::seedVintageSynthBankIfMissing()
         didaPresetManagerLog("seeded vintage synth bank count=" + juce::String(written)
             + " dir=" + dir.getFullPathName());
 }
+
+//==============================================================================
+// Write an embedded BinaryData resource (looked up by its ORIGINAL filename,
+// e.g. "dida_brass_air_C4.wav") to disk, creating parent folders. Never
+// overwrites an existing file so the user's edits/imports are preserved.
+// Returns true when the destination exists after the call.
+//==============================================================================
+static bool writeBinaryResourceToFile(const juce::String& originalName,
+                                      const juce::File& dest)
+{
+    if (dest.existsAsFile())
+        return true;
+
+    for (int i = 0; i < BinaryData::namedResourceListSize; ++i)
+    {
+        if (juce::String(BinaryData::originalFilenames[i]) != originalName)
+            continue;
+
+        int size = 0;
+        if (const char* data = BinaryData::getNamedResource(BinaryData::namedResourceList[i], size))
+        {
+            dest.getParentDirectory().createDirectory();
+            juce::FileOutputStream os(dest);
+            if (os.openedOk())
+            {
+                os.write(data, (size_t) size);
+                return true;
+            }
+        }
+        return false;
+    }
+    return false;
+}
+
+//==============================================================================
+// One-time install of the bundled "AI Texture Demo Pack".
+//
+// Lays the pack out exactly where the engine expects to find it:
+//   <Samples>/Presets/User/AI Texture/*.diapreset        (browser category)
+//   <Docs>/NeuralTextures/Demo/<Type>/*.wav              ({DIDA_DOCS} target)
+//
+// The presets reference their textures with the portable {DIDA_DOCS} token, so
+// once the WAVs land under <Docs>/NeuralTextures/Demo/ they resolve cleanly on
+// any machine. Behind a .seeded marker so user deletions stay deleted.
+//==============================================================================
+void PresetManager::seedAiTextureDemoPackIfMissing()
+{
+    auto root = getUserPresetDirectory();
+    auto dir  = root.getChildFile("AI Texture");
+    dir.createDirectory();
+
+    auto seededMarker = dir.getChildFile(".seeded");
+    if (seededMarker.existsAsFile())
+        return;
+
+    auto docsRoot = dida::SampleLibrary::getSamplesRoot().getParentDirectory();
+    auto texRoot  = docsRoot.getChildFile("NeuralTextures").getChildFile("Demo");
+
+    int written = 0;
+
+    // 1) Texture WAVs into the managed {DIDA_DOCS}/NeuralTextures/Demo tree.
+    written += writeBinaryResourceToFile("dida_brass_air_C4.wav",
+                   texRoot.getChildFile("BrassAir").getChildFile("dida_brass_air_C4.wav")) ? 1 : 0;
+    written += writeBinaryResourceToFile("dida_choir_ghost_C4.wav",
+                   texRoot.getChildFile("ChoirGhost").getChildFile("dida_choir_ghost_C4.wav")) ? 1 : 0;
+    written += writeBinaryResourceToFile("dida_guitar_dust_C4.wav",
+                   texRoot.getChildFile("GuitarDust").getChildFile("dida_guitar_dust_C4.wav")) ? 1 : 0;
+
+    // 2) Preset JSON into the browser-visible "AI Texture" category folder.
+    const char* presetFiles[] = {
+        "AI Brass Air Test.diapreset",
+        "AI Choir Ghost Test.diapreset",
+        "AI Guitar Dust Test.diapreset"
+    };
+    for (auto* name : presetFiles)
+        written += writeBinaryResourceToFile(name, dir.getChildFile(name)) ? 1 : 0;
+
+    seededMarker.replaceWithText("1");
+
+    didaPresetManagerLog("seeded AI Texture demo pack count=" + juce::String(written)
+        + " presets=" + dir.getFullPathName()
+        + " textures=" + texRoot.getFullPathName());
+}
+
+//==============================================================================
+// installPresetPackFromZip
+//
+// Message-thread only. Extracts a DIDITAGAIN preset/audio pack ZIP and copies
+// its contents into the managed Documents tree so nothing ever references the
+// temporary extraction path:
+//   *.diapreset            -> <Samples>/Presets/User/AI Texture/
+//   NeuralTextures/**/*.wav -> <Docs>/NeuralTextures/**     (preserved subtree)
+//   <other>/*.wav under a NeuralTextures-less pack -> <Docs>/NeuralTextures/Imported/
+//
+// Presets keep their {DIDA_DOCS} texture tokens, so after install they resolve
+// against the managed folder, not the ZIP. Returns a short status/message.
+//==============================================================================
+PresetManager::AiTextureOpResult PresetManager::installPresetPackFromZip(const juce::File& zip)
+{
+    AiTextureOpResult r;
+
+    if (! zip.existsAsFile())
+    { r.status = "Missing ZIP"; r.message = "Pack file not found."; return r; }
+
+    juce::ZipFile archive(zip);
+    if (archive.getNumEntries() == 0)
+    { r.status = "Empty/invalid"; r.message = "Could not read the pack ZIP."; return r; }
+
+    auto temp = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                    .getChildFile("DIDA_PackImport_" + juce::String(juce::Time::getMillisecondCounter()));
+    temp.createDirectory();
+    auto cleanup = [&temp] { temp.deleteRecursively(); };
+
+    if (! archive.uncompressTo(temp, true).wasOk())
+    { cleanup(); r.status = "Extract failed"; r.message = "Could not extract the pack ZIP."; return r; }
+
+    auto docsRoot   = dida::SampleLibrary::getSamplesRoot().getParentDirectory();
+    auto presetDir  = getUserPresetDirectory().getChildFile("AI Texture");
+    auto texRoot    = docsRoot.getChildFile("NeuralTextures");
+    presetDir.createDirectory();
+    texRoot.createDirectory();
+
+    int presetsCopied = 0, texturesCopied = 0;
+
+    // Copy presets.
+    for (auto& f : temp.findChildFiles(juce::File::findFiles, true, "*.diapreset"))
+        if (f.copyFileTo(presetDir.getChildFile(f.getFileName())))
+            ++presetsCopied;
+
+    // Copy textures, preserving any "NeuralTextures/..." subtree from the pack
+    // so {DIDA_DOCS}/NeuralTextures/<...> tokens resolve. WAVs outside such a
+    // subtree go under NeuralTextures/Imported/.
+    for (auto& f : temp.findChildFiles(juce::File::findFiles, true, "*.wav"))
+    {
+        const auto norm = f.getFullPathName().replaceCharacter('\\', '/');
+        const int marker = norm.indexOfIgnoreCase("/NeuralTextures/");
+        juce::File dest;
+        if (marker >= 0)
+            dest = texRoot.getChildFile(norm.substring(marker + (int) juce::String("/NeuralTextures/").length()));
+        else
+            dest = texRoot.getChildFile("Imported").getChildFile(f.getFileName());
+
+        dest.getParentDirectory().createDirectory();
+        if (f.copyFileTo(dest))
+            ++texturesCopied;
+    }
+
+    cleanup();
+
+    if (presetsCopied == 0 && texturesCopied == 0)
+    { r.status = "Nothing installed"; r.message = "No presets or textures found in the ZIP."; return r; }
+
+    scanPresetDirectory();
+    if (onPresetLoaded) onPresetLoaded();
+
+    r.ok = true;
+    r.status = "Installed";
+    r.message = "Installed " + juce::String(presetsCopied) + " preset(s) and "
+              + juce::String(texturesCopied) + " texture(s).";
+    didaPresetManagerLog("installPresetPackFromZip " + r.message + " from " + zip.getFullPathName());
+    return r;
+}
+
+
 
 //==============================================================================
 // autoIndexUserInstrumentFolders

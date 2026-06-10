@@ -114,7 +114,9 @@ bool parseFile(const juce::File& file, UserPreset& out, juce::String& errorOut)
         return false;
     }
 
-    out.presetName = getS(json, "presetName", {});
+    // "presetName" is canonical; AI Texture demo-pack files use "name". Accept
+    // either so packs authored against the documented public schema still load.
+    out.presetName = getS(json, "presetName", getS(json, "name", {}));
     if (out.presetName.isEmpty())
     {
         errorOut = "missing presetName";
@@ -122,25 +124,58 @@ bool parseFile(const juce::File& file, UserPreset& out, juce::String& errorOut)
     }
     out.category = getS(json, "category", "User");
 
+    // Source resolution accepts two shapes:
+    //   1) "sourceInstrument": { type, path, mappingMode, rootNotePattern }
+    //   2) "samples":          { rootFolder, required, fallbackSynthIfMissing }
+    // (2) is used by self-contained AI Texture presets whose audible content is
+    // the cached neural texture partial; the multisample folder is optional.
     auto src = json.getProperty("sourceInstrument", juce::var());
-    if (! src.isObject())
+    auto samples = json.getProperty("samples", juce::var());
+    if (src.isObject())
     {
-        errorOut = "missing sourceInstrument";
-        return false;
+        out.source.type        = getS(src, "type", "multisampleFolder");
+        out.source.path        = getS(src, "path", {});
+        out.source.mappingMode = getS(src, "mappingMode", "hardZones");
+        out.source.rootNotePattern.clear();
+        if (auto* arr = src.getProperty("rootNotePattern", juce::var()).getArray())
+            for (auto& v : *arr) out.source.rootNotePattern.add(v.toString());
+        if (out.source.path.isEmpty())
+        {
+            errorOut = "missing sourceInstrument.path";
+            return false;
+        }
     }
-    out.source.type        = getS(src, "type", "multisampleFolder");
-    out.source.path        = getS(src, "path", {});
-    out.source.mappingMode = getS(src, "mappingMode", "hardZones");
-    out.source.rootNotePattern.clear();
-    if (auto* arr = src.getProperty("rootNotePattern", juce::var()).getArray())
-        for (auto& v : *arr) out.source.rootNotePattern.add(v.toString());
-    if (out.source.path.isEmpty())
+    else if (samples.isObject())
     {
-        errorOut = "missing sourceInstrument.path";
-        return false;
+        out.source.type        = "multisampleFolder";
+        out.source.path        = getS(samples, "rootFolder", {});
+        out.source.mappingMode = "nearest";
+        out.sourceRequired         = getB(samples, "required", false);
+        out.fallbackSynthIfMissing = getB(samples, "fallbackSynthIfMissing", true);
+        // An optional/self-contained source may legitimately be empty.
+        if (out.source.path.isEmpty() && out.sourceRequired)
+        {
+            errorOut = "missing samples.rootFolder";
+            return false;
+        }
+    }
+    else
+    {
+        // Neither block present. Only valid when the preset is fully partial-
+        // driven (e.g. a neural-texture-only demo). Otherwise reject.
+        const bool hasPartials = json.getProperty("partials", juce::var()).isArray();
+        if (! hasPartials)
+        {
+            errorOut = "missing sourceInstrument";
+            return false;
+        }
+        out.sourceRequired = false;
+        out.fallbackSynthIfMissing = true;
     }
 
+    // "amp" is canonical; AI Texture demo-pack files use "ampEnvelope".
     auto amp = json.getProperty("amp", juce::var());
+    if (! amp.isObject()) amp = json.getProperty("ampEnvelope", juce::var());
     out.amp.gainDb    = getF(amp, "gainDb",    out.amp.gainDb);
     out.amp.pan       = getF(amp, "pan",       out.amp.pan);
     out.amp.attackMs  = getF(amp, "attackMs",  out.amp.attackMs);
@@ -154,7 +189,8 @@ bool parseFile(const juce::File& file, UserPreset& out, juce::String& errorOut)
     out.filter.cutoffHz  = getF(flt, "cutoffHz",  out.filter.cutoffHz);
     out.filter.resonance = getF(flt, "resonance", out.filter.resonance);
     out.filter.drive     = getF(flt, "drive",     out.filter.drive);
-    out.filter.keytrack  = getF(flt, "keytrack",  out.filter.keytrack);
+    // accept both "keytrack" and the demo-pack "keyTrack" spelling.
+    out.filter.keytrack  = getF(flt, "keytrack",  getF(flt, "keyTrack", out.filter.keytrack));
 
     auto layers = json.getProperty("layers", juce::var());
     out.main   = parseLayer(layers.getProperty("main",   juce::var()), out.main);
@@ -303,6 +339,13 @@ bool parseFile(const juce::File& file, UserPreset& out, juce::String& errorOut)
             pb.eqRole             = getS(v, "eqRole",             pb.eqRole);
             pb.followMainEnvelope = getB(v, "followMainEnvelope", pb.followMainEnvelope);
             pb.maxGainDb          = getF(v, "maxGainDb",          pb.maxGainDb);
+            // Demo-pack additive: top-level levelDb + isNeuralTexture hint.
+            if (v.isObject() && v.hasProperty("levelDb"))
+            {
+                pb.hasLevelDb = true;
+                pb.levelDb    = getF(v, "levelDb", pb.levelDb);
+            }
+            pb.isNeuralTexture = getB(v, "isNeuralTexture", pb.isNeuralTexture);
             pb.engineParams = v.getProperty("engineParams", juce::var());
 
             auto pAmp = v.getProperty("amp", juce::var());
@@ -1520,10 +1563,12 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
                     nte->setEqRole(pb.eqRole.isNotEmpty() ? pb.eqRole : juce::String("neuralTexture"));
                     nte->setDebugName(p.presetName + "/p" + juce::String(i));
 
-                    // Gain safety: default quiet, hard cap at -9 dB. Use an
-                    // explicit levelDb if present, else amp.gainDb, else default.
+                    // Gain safety: default quiet, hard cap at -9 dB (enforced by
+                    // the engine). Priority: engineParams.levelDb, then the
+                    // demo-pack top-level partial levelDb, then amp.gainDb.
                     float levelDb = dida::engines::NeuralTextureEngine::kDefaultLevelDb;
                     if (ep.hasProperty("levelDb")) levelDb = (float) (double) ep.getProperty("levelDb", levelDb);
+                    else if (pb.hasLevelDb)        levelDb = pb.levelDb;
                     else if (pb.amp.gainDb != 0.0f) levelDb = pb.amp.gainDb;
                     nte->setLevelDb(levelDb);
 

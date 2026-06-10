@@ -60,8 +60,10 @@ public:
         setupButton(removeButton, "Remove Texture");
         setupButton(openFolderButton, "Open Texture Folder");
         setupButton(freezeButton, "Freeze Texture to Preset");
+        setupButton(installPackButton, "Install Pack ZIP");
 
         importButton.onClick      = [this] { doImport(); };
+        installPackButton.onClick = [this] { doInstallPack(); };
         removeButton.onClick      = [this] { showResult(processor.getPresetManager().aiRemoveTexture()); };
         freezeButton.onClick      = [this] { showResult(processor.getPresetManager().aiFreezeTexture()); };
         openFolderButton.onClick  = [this]
@@ -112,10 +114,11 @@ public:
         area.removeFromTop(8);
 
         const int bh = 30, gap = 6;
-        importButton.setBounds(area.removeFromTop(bh));     area.removeFromTop(gap);
-        freezeButton.setBounds(area.removeFromTop(bh));     area.removeFromTop(gap);
-        removeButton.setBounds(area.removeFromTop(bh));     area.removeFromTop(gap);
-        openFolderButton.setBounds(area.removeFromTop(bh)); area.removeFromTop(gap);
+        importButton.setBounds(area.removeFromTop(bh));      area.removeFromTop(gap);
+        installPackButton.setBounds(area.removeFromTop(bh));  area.removeFromTop(gap);
+        freezeButton.setBounds(area.removeFromTop(bh));       area.removeFromTop(gap);
+        removeButton.setBounds(area.removeFromTop(bh));       area.removeFromTop(gap);
+        openFolderButton.setBounds(area.removeFromTop(bh));   area.removeFromTop(gap);
 
         area.removeFromTop(8);
         statusLabel.setBounds(area.removeFromTop(22));
@@ -146,6 +149,19 @@ private:
             });
     }
 
+    void doInstallPack()
+    {
+        chooser = std::make_unique<juce::FileChooser>(
+            "Select a DIDITAGAIN preset/audio pack ZIP", juce::File(), "*.zip");
+        chooser->launchAsync(juce::FileBrowserComponent::openMode
+                             | juce::FileBrowserComponent::canSelectFiles,
+            [this](const juce::FileChooser& fc)
+            {
+                auto file = fc.getResult();
+                if (file == juce::File()) return;
+                showResult(processor.getPresetManager().installPresetPackFromZip(file));
+            });
+
     void showResult(const PresetManager::AiTextureOpResult& r)
     {
         messageLabel.setText(r.message, juce::dontSendNotification);
@@ -159,7 +175,7 @@ private:
     juce::Slider       amount;
     juce::Label        amountLabel;
     juce::ToggleButton soloToggle;
-    juce::TextButton   importButton, removeButton, openFolderButton, freezeButton;
+    juce::TextButton   importButton, removeButton, openFolderButton, freezeButton, installPackButton;
     juce::Label        statusLabel, messageLabel;
 
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> enabledAttach;

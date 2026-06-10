@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 2,
+  "name": "AI Brass Air Test",
+  "author": "DIDITAGAIN STUDIO / ChatGPT",
+  "category": "Brass",
+  "engineType": "hybrid",
+  "description": "Trap brass preset with a quiet cached AI air layer for breath, wobble, and horn movement.",
+  "ai": {
+    "enabled": true,
+    "profileVersion": 1,
+    "provider": "cachedTexture",
+    "analysisFile": "",
+    "textureMode": "cached",
+    "timbreProfile": {
+      "brightness": 0.64,
+      "harmonicDensity": 0.5,
+      "noiseAir": 0.34,
+      "attackNoise": 0.18,
+      "pitchInstability": 0.09,
+      "bodyWarmth": 0.46
+    },
+    "recommendedTexture": "brass_air",
+    "recommendedTextureAmount": 0.32
+  },
+  "macros": {
+    "tone": 0.56,
+    "character": 0.62,
+    "width": 0.58,
+    "texture": 0.32
+  },
+  "ampEnvelope": {
+    "attackMs": 12,
+    "decayMs": 180,
+    "sustain": 0.82,
+    "releaseMs": 220
+  },
+  "filter": {
+    "type": "lowpass",
+    "cutoffHz": 12000,
+    "resonance": 0.12,
+    "keyTrack": 0.18
+  },
+  "layerEq": {
+    "texture": {
+      "hpfHz": 500,
+      "lpfHz": 12000,
+      "trimDb": -8
+    },
+    "sample": {
+      "hpfHz": 35,
+      "lpfHz": 18000,
+      "trimDb": 0
+    }
+  },
+  "fx": {
+    "chorus": {
+      "enabled": true,
+      "mix": 0.08
+    },
+    "reverb": {
+      "enabled": true,
+      "mix": 0.16,
+      "decay": 0.42
+    }
+  },
+  "samples": {
+    "rootFolder": "{DIDA_DOCS}/Samples/Brass",
+    "required": false,
+    "fallbackSynthIfMissing": true,
+    "note": "Replace with your real multisample folder. AI texture layer is self-contained."
+  },
+  "partials": [
+    {
+      "enabled": true,
+      "engineType": "sawBrassSupport",
+      "levelDb": -20.0,
+      "pan": 0.0,
+      "engineParams": {
+        "role": "support",
+        "osc": "saw",
+        "unison": 3,
+        "detuneCents": 8,
+        "filterCutoffHz": 4200,
+        "attackMs": 8,
+        "releaseMs": 180
+      }
+    },
+    {
+      "enabled": true,
+      "engineType": "neuralTextureCached",
+      "isNeuralTexture": true,
+      "levelDb": -18.0,
+      "pan": 0.0,
+      "pitchSemis": 0,
+      "fineCents": 0,
+      "engineParams": {
+        "texturePath": "{DIDA_DOCS}/NeuralTextures/Demo/BrassAir/dida_brass_air_C4.wav",
+        "textureType": "brass_air",
+        "role": "texture",
+        "loop": true,
+        "rootMidi": 60,
+        "pitchTracking": true,
+        "followMainEnvelope": true,
+        "sampleRate": 48000,
+        "cached": true
+      }
+    }
+  ],
+  "qualityExpectations": [
+    "AI_TEXTURE_ENABLED",
+    "AI_TEXTURE_PARTIAL_PRESENT",
+    "AI_TEXTURE_IMPORTED_OK",
+    "AI_TEXTURE_FREEZE_READY",
+    "AI_TEXTURE_RENDERING_CACHED"
+  ]
+}

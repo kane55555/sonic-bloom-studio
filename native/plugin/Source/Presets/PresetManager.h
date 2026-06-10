@@ -90,6 +90,13 @@ public:
     // ai.textureMode=cached + ai.enabled=true, save + reload.
     AiTextureOpResult aiFreezeTexture();
 
+    // Install a DIDITAGAIN preset/audio pack ZIP into the managed Documents
+    // tree (presets -> Presets/User/AI Texture, textures -> NeuralTextures/**),
+    // then rescan. Message-thread only; nothing references the temp extraction.
+    AiTextureOpResult installPresetPackFromZip(const juce::File& zip);
+
+
+
     int getNumPresets() const { return static_cast<int>(presets.size()); }
     int getCurrentPresetIndex() const { return currentIndex; }
     juce::String getPresetName(int index) const;
@@ -215,4 +222,5 @@ private:
     void autoIndexUserInstrumentFolders();
     void seedGuitarPresetBankIfMissing();
     void seedVintageSynthBankIfMissing();
+    void seedAiTextureDemoPackIfMissing();
 };
