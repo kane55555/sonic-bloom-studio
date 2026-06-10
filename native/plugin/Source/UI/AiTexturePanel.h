@@ -149,6 +149,19 @@ private:
             });
     }
 
+    void doInstallPack()
+    {
+        chooser = std::make_unique<juce::FileChooser>(
+            "Select a DIDITAGAIN preset/audio pack ZIP", juce::File(), "*.zip");
+        chooser->launchAsync(juce::FileBrowserComponent::openMode
+                             | juce::FileBrowserComponent::canSelectFiles,
+            [this](const juce::FileChooser& fc)
+            {
+                auto file = fc.getResult();
+                if (file == juce::File()) return;
+                showResult(processor.getPresetManager().installPresetPackFromZip(file));
+            });
+
     void showResult(const PresetManager::AiTextureOpResult& r)
     {
         messageLabel.setText(r.message, juce::dontSendNotification);
