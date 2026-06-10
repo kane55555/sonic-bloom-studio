@@ -153,6 +153,17 @@ public:
         return pk;
     }
 
+    // Diagnostic-only: static intrinsic peak (linear) of the loaded neural
+    // texture buffer in this voice, available even when no note is sounding.
+    float getNeuralTextureIntrinsicPeakLinear() const noexcept
+    {
+        float pk = 0.0f;
+        for (const auto& slot : partials_)
+            if (slot.enabled && slot.isNeuralTexture && slot.engine != nullptr)
+                pk = juce::jmax(pk, slot.engine->getStaticPeakLinear());
+        return pk;
+    }
+
     // --- Crop / loop metadata (fractions of the buffer length, 0..1) ---
     void setCropRange(float start01, float end01) noexcept {
         cropStartFrac = juce::jlimit(0.0f, 1.0f, start01);
