@@ -87,6 +87,11 @@ public:
     // is the live (post-glide/drift) fundamental for this block.
     virtual void renderAdd(float* outL, float* outR, int numSamples,
                            float pitchHz, const ModSnapshot& mods) = 0;
+
+    // Diagnostic-only: the most recent block peak (linear) this engine produced.
+    // Read OFF the audio thread by the preset-quality reporter. Default 0 for
+    // engines that do not track it; the cached neural texture engine overrides it.
+    virtual float getLastPeakLinear() const noexcept { return 0.0f; }
 };
 
 }} // namespace dida::engines

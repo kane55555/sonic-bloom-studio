@@ -816,6 +816,34 @@ float choirNaturalReverbMix(const UserPreset& p) noexcept
     return isChoirWidePreset(p) ? 0.15f : 0.11f;
 }
 
+// True when this preset declares an enabled neuralTextureCached partial. File
+// scope (anonymous) so the public isAiTexturePreset() and the gain trim share it.
+bool presetHasNeuralTexturePartial(const UserPreset& p) noexcept
+{
+    for (const auto& pb : p.partials)
+        if (pb.enabled
+            && (pb.engineType.equalsIgnoreCase("neuralTextureCached")
+             || pb.engineType.equalsIgnoreCase("neuralTexture")))
+            return true;
+    return false;
+}
+
+// Headroom cleanup (v0.2 quality pass): some AI Texture demo presets render hot
+// because their fallback-synth body sits near 0 dBFS. Apply a per-preset amp
+// trim so the FINAL output lands inside the category target window. Only AI
+// Texture presets reach this (gated by loadTimeGainTrimDb).
+float aiTextureGainTrimDb(const UserPreset& p) noexcept
+{
+    const auto n = p.presetName.toLowerCase();
+    const auto c = p.category.toLowerCase();
+    // Guitar Dust reported LOW_HEADROOM with suggestedGainAdjustmentDb ~= -7.8.
+    if (n.contains("guitar dust") || (c.contains("guitar") && presetHasNeuralTexturePartial(p)))
+        return -8.0f;
+    return 0.0f;
+}
+
+
+
 juce::String fxSendReleaseSourceFor(const UserPreset& p, bool choirMode)
 {
     // BUG 1/7: a preset-supplied value is ALWAYS presetFxSend, even in choir
@@ -923,12 +951,25 @@ void clampEnvelopeForCategory(juce::AudioProcessor& proc, const UserPreset& p, F
 
 } // anonymous
 
+// Public: AI Texture (cached neural) preset detection. See header.
+bool isAiTexturePreset(const UserPreset& p) noexcept
+{
+    if (presetHasNeuralTexturePartial(p)) return true;
+    const auto pr = p.ai.provider.toLowerCase();
+    return p.ai.present && (pr == "cachedtexture" || pr == "demopack");
+}
+
+
+
 // Public: reproduce the engine's load-time gain trim so the quality report can
-// compute the true applied amp gain without a stale live read. Only choir-mode
-// presets get a trim; everything else returns 0.
+// compute the true applied amp gain without a stale live read. Choir-mode
+// presets get the choir natural trim; AI Texture presets get a headroom trim;
+// everything else returns 0.
 float loadTimeGainTrimDb(const UserPreset& p)
 {
-    return isChoirModePreset(p) ? choirNaturalGainTrimDb(p) : 0.0f;
+    if (isChoirModePreset(p)) return choirNaturalGainTrimDb(p);
+    if (isAiTexturePreset(p)) return aiTextureGainTrimDb(p);
+    return 0.0f;
 }
 
 void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)

@@ -38,4 +38,10 @@ juce::String toJson(const UserPreset& preset);
 // DIDITAGAIN STUDIO root. Returns the file as written if already absolute.
 juce::File resolveSourcePath(const juce::String& rawPath);
 
+// True when this preset is an AI Texture (cached neural) preset: it declares an
+// enabled neuralTextureCached partial, or a cachedTexture/demoPack AI provider.
+// Used by the preset-quality reporter to scope AI-Texture-only diagnostics and
+// warning suppression.
+bool isAiTexturePreset(const UserPreset& p) noexcept;
+
 }} // namespace dida::userpreset

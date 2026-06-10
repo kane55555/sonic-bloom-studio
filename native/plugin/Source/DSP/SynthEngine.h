@@ -61,6 +61,17 @@ public:
     FxChain&  getFx()       noexcept { return fx; }
     LayerBusProcessor& getLayerBus() noexcept { return layerBus; }
 
+    // Diagnostic-only: max recent neural-texture block peak (linear) across all
+    // voices. Used by the preset-quality reporter; reads atomics, no DSP change.
+    float getNeuralTexturePeakLinear() noexcept
+    {
+        float pk = 0.0f;
+        for (int i = 0; i < getNumVoices(); ++i)
+            if (auto* v = dynamic_cast<SynthVoice*>(getVoice(i)))
+                pk = juce::jmax(pk, v->getNeuralTexturePeakLinear());
+        return pk;
+    }
+
     // Set the active multisample instrument by folder name (under Documents/
     // DIDITAGAIN STUDIO/Samples). Empty name = silence. Returns true on success.
     bool setInstrument(const juce::String& instrumentName);

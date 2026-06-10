@@ -302,6 +302,11 @@ inline void report(DiditagainProcessor& proc,
     juce::String aiRawTexturePath, aiResolvedTexturePath, aiTextureInstallRoot;
     bool aiTextureFileExists = false;
     const juce::String aiProviderValue = up.ai.provider;
+    // AI Texture diagnostic capture (read at outer scope by the diagnostic block).
+    const bool   aiTexturePreset      = dida::userpreset::isAiTexturePreset(up);
+    bool         aiHasNeuralPartial   = false;
+    juce::String aiTextureType;
+    float        aiTextureBaseLevelDb = -18.0f; // engine texture trim before live amount
     {
         // {DIDA_DOCS} install root for textures, shown verbatim in the report.
         auto docsRoot = dida::SampleLibrary::getSamplesRoot().getParentDirectory();
@@ -356,6 +361,14 @@ inline void report(DiditagainProcessor& proc,
                         : (pb.hasLevelDb            ? pb.levelDb
                         : (pb.amp.gainDb != 0.0f    ? pb.amp.gainDb : -18.0f));
             if (lvlDb > -9.0f) warnings.add("AI_TEXTURE_TOO_LOUD");
+
+            // Capture diagnostic detail from the first neural texture partial.
+            if (! aiHasNeuralPartial)
+            {
+                aiHasNeuralPartial   = true;
+                aiTextureBaseLevelDb = lvlDb;
+                aiTextureType        = ep.getProperty("textureType", "").toString();
+            }
         }
 
         // Live panel state (observation-only; mirrors the audio-thread mapping).
@@ -654,7 +667,8 @@ inline void report(DiditagainProcessor& proc,
         : (std::abs(requestedAmpGainDb) < 0.01f ? juce::String("default") : juce::String("preset"));
     const juce::String loadTimeGainTrimSource =
           std::abs(loadTimeGainTrimDb) < 0.001f ? juce::String("disabled")
-                                                : juce::String("choirNaturalTrim");
+        : (choirMode                            ? juce::String("choirNaturalTrim")
+                                                : juce::String("aiTextureHeadroomTrim"));
     const float ampGainDb           = appliedAmpGainDb;        // alias reflects the REAL final amp gain
     const float mainLayerGainDb     = up.main.gainDb;
     const float layer2GainStageDb   = up.layer2.enabled ? up.layer2.gainDb : -120.0f;
@@ -888,7 +902,13 @@ inline void report(DiditagainProcessor& proc,
         if (! choirSyntheticLayerDisabled && effectiveLayer2GainDb > -120.0f)
             warnings.add("CHOIR_SYNTH_LAYER_ACTIVE");
         if (finalDb > -10.0f) warnings.add("CHOIR_TOO_HOT");
-        if (choirZoneTooFar)  warnings.add("CHOIR_ZONE_TOO_FAR");
+        // Zone-distance warnings are irrelevant for a texture-only AI choir
+        // preset (the body is the cached texture, not a multisample map), so
+        // suppress CHOIR_ZONE_TOO_FAR there. Genuine missing-file errors
+        // (AI_TEXTURE_MISSING_FILE / SOURCE_MISSING) are left untouched.
+        const bool aiChoirTextureOnly = aiTexturePreset
+            && aiTextureType.equalsIgnoreCase("choir_ghost");
+        if (choirZoneTooFar && ! aiChoirTextureOnly) warnings.add("CHOIR_ZONE_TOO_FAR");
         const float choirChorusCap = (nLow.contains("wide") || nLow.contains("heaven")) ? 0.015f : 0.0f;
         if (chorusMix > choirChorusCap + 0.001f) warnings.add("CHOIR_CHORUS_TOO_HIGH");
         if (std::abs(choirHumanizePitchCents) > 0.25f
@@ -933,11 +953,29 @@ inline void report(DiditagainProcessor& proc,
     if (up.layer2.enabled && up.layer2.gainDb > -18.0f && isBeepyRole(up.layer2.eqRole))
         beep = true;
     for (auto& p : up.partials)
-        if (p.enabled && isBeepyRole(p.eqRole))
-        {
-            const float g = juce::Decibels::gainToDecibels(juce::jmax(1.0e-6f, p.level));
-            if (g > -18.0f) { beep = true; break; }
-        }
+    {
+        if (! p.enabled) continue;
+        // Cached neural texture layers are pre-rendered audio played quietly
+        // under the main sample — never a synth reinforcement tone. Skip them
+        // so AI Texture presets never trip POSSIBLE_BEEP_LAYER.
+        if (p.engineType.equalsIgnoreCase("neuralTextureCached")
+            || p.engineType.equalsIgnoreCase("neuralTexture")
+            || p.isNeuralTexture) continue;
+        // engineParams.role of "support"/"texture" marks an intentional, quiet
+        // background layer (demo-pack fallback synth body), not a beep.
+        const juce::var ep = p.engineParams;
+        const juce::String role = ep.getProperty("role", "").toString();
+        if (role.equalsIgnoreCase("support") || role.equalsIgnoreCase("texture")) continue;
+        if (! isBeepyRole(p.eqRole)) continue;
+        // Use the partial's EFFECTIVE level in dB (matches the loader priority)
+        // instead of the raw 0 dB `level` default so a quiet layer never beeps.
+        const float effDb = ep.hasProperty("levelDb")
+                              ? (float) (double) ep.getProperty("levelDb", -18.0)
+                          : (p.hasLevelDb        ? p.levelDb
+                          : (p.amp.gainDb != 0.0f ? p.amp.gainDb
+                          : juce::Decibels::gainToDecibels(juce::jmax(1.0e-6f, p.level))));
+        if (effDb > -18.0f) { beep = true; break; }
+    }
     if (beep) warnings.add("POSSIBLE_BEEP_LAYER");
 
     if (! reportEligible)
@@ -1002,6 +1040,31 @@ inline void report(DiditagainProcessor& proc,
                                       ? bankCategoryIn : effectiveCategory;
 
     // --- Emit -------------------------------------------------------------
+    // --- AI Texture diagnostic section (Task 4) ---------------------------
+    // neuralTexturePeakDb: measured peak of the cached texture engine (linear
+    // atomic, read off the audio thread). neuralTextureGainDb: the effective
+    // applied texture gain (engine trim, hard-capped at -9 dB, times the live
+    // panel amount with the same quadratic taper the voice uses).
+    const float neuralTexturePeakLin = engine.getNeuralTexturePeakLinear();
+    const float neuralTexturePeakDb  = neuralTexturePeakLin > 1.0e-6f
+        ? juce::Decibels::gainToDecibels(neuralTexturePeakLin) : -120.0f;
+    const bool  aiPanelEnabled = paramValue(proc, "aiTextureEnabled") > 0.5f;
+    const float aiPanelAmount  = juce::jlimit(0.0f, 1.0f, paramValue(proc, "aiTextureAmount"));
+    const bool  neuralTextureSoloActive = proc.getAiTextureSolo();
+    const float textureSafeBaseDb = juce::jmin(-9.0f, aiTextureBaseLevelDb);
+    float neuralTextureGainDb = -120.0f;
+    if (aiHasNeuralPartial && aiPanelEnabled && aiPanelAmount > 0.0f)
+    {
+        const float liveGain = aiPanelAmount * aiPanelAmount; // matches Voice taper
+        neuralTextureGainDb = textureSafeBaseDb + juce::Decibels::gainToDecibels(liveGain);
+    }
+    // Rough contribution of the texture to the final output (peak ratio).
+    const float finalOutputLin = finalOutputDb > -120.0f
+        ? juce::Decibels::decibelsToGain(finalOutputDb) : 0.0f;
+    const float neuralTextureContributionPercent = (finalOutputLin > 1.0e-6f && neuralTexturePeakLin > 0.0f)
+        ? juce::jlimit(0.0f, 100.0f, 100.0f * neuralTexturePeakLin / finalOutputLin) : 0.0f;
+    const juce::String aiTextureTypeStr = aiTextureType.isNotEmpty() ? aiTextureType : juce::String("none");
+
     juce::String out;
     out << "[DIDITAGAIN preset-quality]"
         << " sessionId=" << sess.sessionId
@@ -1159,6 +1222,12 @@ inline void report(DiditagainProcessor& proc,
         << " categoryTargetMinDb=" << juce::String(target.minDb, 2)
         << " categoryTargetMaxDb=" << juce::String(target.maxDb, 2)
         << " suggestedGainAdjustmentDb=" << (notesPlaying ? juce::String(suggestedGainDb, 2) : juce::String("n/a"))
+        << " aiTexturePreset=" << (aiTexturePreset ? "true" : "false")
+        << " textureType=" << aiTextureTypeStr
+        << " neuralTexturePeakDb=" << juce::String(neuralTexturePeakDb, 2)
+        << " neuralTextureGainDb=" << juce::String(neuralTextureGainDb, 2)
+        << " neuralTextureContributionPercent=" << juce::String(neuralTextureContributionPercent, 1)
+        << " neuralTextureSoloActive=" << (neuralTextureSoloActive ? "true" : "false")
         << " pluginVersion=" << pluginVersion
         << " timestamp=" << timestamp
         << " warnings=" << (warnings.isEmpty() ? juce::String("none")
@@ -1343,6 +1412,13 @@ inline void report(DiditagainProcessor& proc,
         j->setProperty("suggestedGainAdjustmentDb", suggestedGainDb);
     else
         j->setProperty("suggestedGainAdjustmentDb", juce::var());
+    // AI Texture diagnostic section (Task 4).
+    j->setProperty("aiTexturePreset",                aiTexturePreset);
+    j->setProperty("textureType",                    aiTextureTypeStr);
+    j->setProperty("neuralTexturePeakDb",            neuralTexturePeakDb);
+    j->setProperty("neuralTextureGainDb",            neuralTextureGainDb);
+    j->setProperty("neuralTextureContributionPercent", neuralTextureContributionPercent);
+    j->setProperty("neuralTextureSoloActive",        neuralTextureSoloActive);
     juce::Array<juce::var> warnVar;
     for (auto& w : warnings) warnVar.add(w);
     j->setProperty("warnings",               warnVar);
@@ -1537,6 +1613,12 @@ inline void report(DiditagainProcessor& proc,
               << "categoryTargetMinDb: "       << juce::String(target.minDb, 2) << "\n"
               << "categoryTargetMaxDb: "       << juce::String(target.maxDb, 2) << "\n"
               << "suggestedGainAdjustmentDb: " << (notesPlaying ? juce::String(suggestedGainDb, 2) : juce::String("n/a")) << "\n"
+              << "aiTexturePreset: "           << (aiTexturePreset ? "true" : "false") << "\n"
+              << "textureType: "               << aiTextureTypeStr << "\n"
+              << "neuralTexturePeakDb: "       << juce::String(neuralTexturePeakDb, 2) << "\n"
+              << "neuralTextureGainDb: "       << juce::String(neuralTextureGainDb, 2) << "\n"
+              << "neuralTextureContributionPercent: " << juce::String(neuralTextureContributionPercent, 1) << "\n"
+              << "neuralTextureSoloActive: "   << (neuralTextureSoloActive ? "true" : "false") << "\n"
               << "warnings: "                  << (warnings.isEmpty() ? juce::String("none") : warnings.joinIntoString(",")) << "\n"
               << "timestamp: "                 << timestamp            << "\n"
               << "==================================================\n";
