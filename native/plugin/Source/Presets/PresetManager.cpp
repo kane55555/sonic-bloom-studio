@@ -1156,25 +1156,26 @@ void PresetManager::loadPreset(int index)
             }
         }
 
-        // STEP C — AI Texture enhancement presets reference a BASE multisample
-        // folder by a relative path (e.g. "Brass/Brass 1") that lives under the
-        // shared Samples root, NOT under this preset's hidden Presets/User source
-        // folder. STEP A/B never resolve that, so the multisample body went
-        // missing and the preset reported sourceRequiredForEngine=false /
-        // wavZones=0. Resolve it via the shared source-path resolver so the
-        // multisample becomes the main body and the AI texture blends on top.
-        // Scoped to AI Texture presets to avoid changing non-AI routing.
-        if (! resolved.isDirectory()
-            && rawSourcePath.isNotEmpty()
-            && dida::userpreset::isAiTexturePreset(up))
+        // STEP C — AI Texture enhancement presets use a real base multisample
+        // folder under <Documents>/DIDITAGAIN STUDIO/Samples as the main body.
+        // Resolve relative paths like "Brass/Brass 1" directly against Samples,
+        // and normalize old broad {DIDA_DOCS}/Samples/<Category> references to
+        // the exact shipped instrument folder. Scoped to AI Texture only.
+        if (aiTexturePresetForRouting && rawSourcePath.isNotEmpty())
         {
-            auto baseFolder = dida::userpreset::resolveSourcePath(rawSourcePath);
-            if (baseFolder.isDirectory())
+            aiTextureBaseSourceRaw = rawSourcePath;
+            auto baseFolder = resolveAiTextureBaseSourceCandidate(rawSourcePath, up);
+            aiTextureBaseSourceResolvedCandidate = baseFolder.getFullPathName().replaceCharacter('\\', '/');
+            aiTextureBaseSourceExists = baseFolder.isDirectory();
+            aiTextureBaseSourceWavCount = countWavFiles(baseFolder);
+
+            if (aiTextureBaseSourceExists && aiTextureBaseSourceWavCount > 0)
             {
                 resolved = baseFolder;
                 resolvedFrom = "aiTextureBaseMultisample";
                 didaPresetManagerLog("AI Texture preset using base multisample folder="
                     + resolved.getFullPathName() + " rawPath=" + rawSourcePath
+                    + " wavCount=" + juce::String(aiTextureBaseSourceWavCount)
                     + " name=" + up.presetName);
             }
         }
@@ -1213,6 +1214,10 @@ void PresetManager::loadPreset(int index)
         requestedExpectedSourceFolderName = expectedSourceFolderName;
         requestedAllowCrossCategorySource = allowCrossCategorySource;
         requestedSourceFolderWavCount    = 0;
+        requestedAiTextureBaseSourceRaw = aiTextureBaseSourceRaw;
+        requestedAiTextureBaseSourceResolvedCandidate = aiTextureBaseSourceResolvedCandidate;
+        requestedAiTextureBaseSourceExists = aiTextureBaseSourceExists;
+        requestedAiTextureBaseSourceWavCount = aiTextureBaseSourceWavCount;
         requestedExtraSourceWarnings     = extraSourceWarnings;
         macroMapper.clear();
         requestedPresetIsUserDiapreset = true;
