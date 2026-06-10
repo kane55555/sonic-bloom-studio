@@ -203,6 +203,29 @@ public:
         return false;
     }
 
+    // Diagnostic-only: the support/body partial's amp-envelope stage. Returns
+    // the first active support partial's stage, or "n/a" if none exist.
+    juce::String getSupportBodyEnvelopeState() const noexcept
+    {
+        for (const auto& slot : partials_)
+            if (slot.enabled && ! slot.isNeuralTexture && slot.engine != nullptr
+                && slot.engine->type() != dida::engines::EngineType::Pcm)
+                return slot.engine->getEnvelopeStateName();
+        return "n/a";
+    }
+
+    // Diagnostic-only: true once a support/body partial has rendered at least one
+    // block since its last noteOn. The reporter uses this to gate reportEligible.
+    bool hasSupportBodyRenderedBlock() const noexcept
+    {
+        for (const auto& slot : partials_)
+            if (slot.enabled && ! slot.isNeuralTexture && slot.engine != nullptr
+                && slot.engine->type() != dida::engines::EngineType::Pcm
+                && slot.engine->hasRenderedBlockSinceNoteOn())
+                return true;
+        return false;
+    }
+
     // --- Crop / loop metadata (fractions of the buffer length, 0..1) ---
     void setCropRange(float start01, float end01) noexcept {
         cropStartFrac = juce::jlimit(0.0f, 1.0f, start01);
