@@ -28,6 +28,12 @@ public:
 
     void prepare(double sr) { sampleRate = sr; recalculate(); }
 
+    void reset()
+    {
+        currentLevel = 0.0f;
+        stage = Stage::Idle;
+    }
+
     void setAttack(float seconds)  { attackTime  = std::max(0.0005f, seconds); recalculate(); }
     void setDecay(float seconds)   { decayTime   = std::max(0.001f,  seconds); recalculate(); }
     void setSustain(float level)   { sustainLevel = std::clamp(level, 0.0f, 1.0f); }

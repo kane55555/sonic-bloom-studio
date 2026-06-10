@@ -1090,6 +1090,12 @@ inline void report(DiditagainProcessor& proc,
     const float neuralTextureContributionPercent = (finalOutputLin > 1.0e-6f && contributionTexturePeakLin > 0.0f)
         ? juce::jlimit(0.0f, 100.0f, 100.0f * contributionTexturePeakLin / finalOutputLin) : 0.0f;
     const juce::String aiTextureTypeStr = aiTextureType.isNotEmpty() ? aiTextureType : juce::String("none");
+    const float supportBodyPeakLin = (aiTexturePreset && reportEligible) ? engine.getSupportBodyPeakLinear() : 0.0f;
+    const float supportBodyPeakDb  = supportBodyPeakLin > 1.0e-6f
+        ? juce::Decibels::gainToDecibels(supportBodyPeakLin) : -120.0f;
+    const float supportBodyGainDb = aiTexturePreset ? engine.getSupportBodyGainDb() : -120.0f;
+    const bool  supportBodyActive = aiTexturePreset && engine.isSupportBodyActive();
+    const bool  supportBodyVoiceStarted = aiTexturePreset && reportEligible && engine.hasSupportBodyVoiceStarted();
 
     juce::String out;
     out << "[DIDITAGAIN preset-quality]"
@@ -1255,6 +1261,10 @@ inline void report(DiditagainProcessor& proc,
         << " neuralTextureContributionPercent=" << juce::String(neuralTextureContributionPercent, 1)
         << " neuralTextureContributionEstimated=" << (neuralTextureContributionEstimated ? "true" : "false")
         << " neuralTextureSoloActive=" << (neuralTextureSoloActive ? "true" : "false")
+        << " supportBodyPeakDb=" << juce::String(supportBodyPeakDb, 2)
+        << " supportBodyGainDb=" << juce::String(supportBodyGainDb, 2)
+        << " supportBodyActive=" << (supportBodyActive ? "true" : "false")
+        << " supportBodyVoiceStarted=" << (supportBodyVoiceStarted ? "true" : "false")
         << " pluginVersion=" << pluginVersion
         << " timestamp=" << timestamp
         << " warnings=" << (warnings.isEmpty() ? juce::String("none")

@@ -8,7 +8,9 @@
 //  and slow per-voice drift.
 //==============================================================================
 #include "IEngineSource.h"
+#include "../Envelope.h"
 #include <array>
+#include <atomic>
 #include <random>
 
 namespace dida { namespace engines {
@@ -23,6 +25,7 @@ public:
     void prepare(double sr, int /*blockSize*/) override
     {
         sampleRate = sr > 0 ? sr : 44100.0;
+        ampEnv.prepare(sampleRate);
         reset();
     }
 
@@ -30,6 +33,9 @@ public:
     {
         for (auto& p : phases) p = 0.0;
         subPhase = 0.0;
+        ampEnv.reset();
+        lastPeak.store(0.0f);
+        voiceStarted.store(false);
     }
 
     void noteOn(int /*midi*/, float vel) override
@@ -39,8 +45,10 @@ public:
         std::uniform_real_distribution<double> d(0.0, 1.0);
         for (auto& p : phases) p = d(rng);
         subPhase = d(rng);
+        ampEnv.noteOn();
+        voiceStarted.store(true);
     }
-    void noteOff() override {}
+    void noteOff() override { ampEnv.noteOff(); }
 
     // Parameters
     void setShape(Shape s) noexcept             { shape = s; }
@@ -50,17 +58,28 @@ public:
     void setPulseWidth(float pw) noexcept       { pulseWidth = juce::jlimit(0.05f, 0.95f, pw); }
     void setSubLevel(float v) noexcept          { subLevel = juce::jlimit(0.0f, 1.0f, v); }
     void setDrift(float c) noexcept             { driftCents = juce::jlimit(0.0f, 20.0f, c); }
+    void setAmpEnvelopeMs(float attackMs, float decayMs, float sustain, float releaseMs) noexcept
+    {
+        ampEnv.setAttack (juce::jlimit(0.5f, 2000.0f, attackMs)  * 0.001f);
+        ampEnv.setDecay  (juce::jlimit(1.0f, 4000.0f, decayMs)   * 0.001f);
+        ampEnv.setSustain(juce::jlimit(0.0f, 1.0f, sustain));
+        ampEnv.setRelease(juce::jlimit(1.0f, 4000.0f, releaseMs) * 0.001f);
+    }
+    float getLastPeakLinear() const noexcept override { return lastPeak.load(); }
+    float getStaticPeakLinear() const noexcept override { return voiceStarted.load() ? 1.0f : 0.0f; }
 
     void renderAdd(float* outL, float* outR, int n, float pitchHz,
                    const ModSnapshot& mods) override
     {
-        if (n <= 0) return;
+        if (n <= 0 || ! ampEnv.isActive()) return;
         const double sr = sampleRate;
         const float vel = juce::jlimit(0.0f, 1.0f, velocity);
         const float invU = 1.0f / juce::jmax(1, unison);
 
+        float blockPeak = 0.0f;
         for (int i = 0; i < n; ++i)
         {
+            const float env = ampEnv.getNextSample();
             float l = 0.0f, r = 0.0f;
             for (int v = 0; v < unison; ++v)
             {
@@ -79,21 +98,23 @@ public:
                 l += s * gL;
                 r += s * gR;
             }
-            l *= invU * vel;
-            r *= invU * vel;
+            l *= invU * vel * env;
+            r *= invU * vel * env;
 
             if (subLevel > 0.0f)
             {
                 subPhase += (pitchHz * 0.5) / sr;
                 if (subPhase >= 1.0) subPhase -= 1.0;
                 const float sq = subPhase < 0.5 ? 1.0f : -1.0f;
-                const float s = sq * subLevel * vel * 0.7f;
+                const float s = sq * subLevel * vel * env * 0.7f;
                 l += s; r += s;
             }
 
             outL[i] += l;
             outR[i] += r;
+            blockPeak = juce::jmax(blockPeak, std::abs(l), std::abs(r));
         }
+        lastPeak.store(blockPeak);
     }
 
 private:
@@ -127,6 +148,9 @@ private:
     std::array<double, 8> phases {};
     double subPhase = 0.0;
     std::mt19937 rng { 0xA1A1B2B2u };
+    ADSREnvelope ampEnv;
+    std::atomic<float> lastPeak { 0.0f };
+    std::atomic<bool> voiceStarted { false };
 };
 
 }} // namespace dida::engines

@@ -164,6 +164,45 @@ public:
         return pk;
     }
 
+    float getSupportBodyPeakLinear() const noexcept
+    {
+        float pk = 0.0f;
+        for (const auto& slot : partials_)
+            if (slot.enabled && ! slot.isNeuralTexture && slot.engine != nullptr
+                && slot.engine->type() != dida::engines::EngineType::Pcm)
+                pk = juce::jmax(pk, slot.engine->getLastPeakLinear() * slot.level);
+        return pk;
+    }
+
+    float getSupportBodyGainDb() const noexcept
+    {
+        float gain = 0.0f;
+        for (const auto& slot : partials_)
+            if (slot.enabled && ! slot.isNeuralTexture && slot.engine != nullptr
+                && slot.engine->type() != dida::engines::EngineType::Pcm)
+                gain = juce::jmax(gain, slot.level);
+        return gain > 1.0e-6f ? juce::Decibels::gainToDecibels(gain) : -120.0f;
+    }
+
+    bool isSupportBodyActive() const noexcept
+    {
+        for (const auto& slot : partials_)
+            if (slot.enabled && ! slot.isNeuralTexture && slot.engine != nullptr
+                && slot.engine->type() != dida::engines::EngineType::Pcm)
+                return true;
+        return false;
+    }
+
+    bool hasSupportBodyVoiceStarted() const noexcept
+    {
+        for (const auto& slot : partials_)
+            if (slot.enabled && ! slot.isNeuralTexture && slot.engine != nullptr
+                && slot.engine->type() != dida::engines::EngineType::Pcm
+                && slot.engine->getStaticPeakLinear() > 0.0f)
+                return true;
+        return false;
+    }
+
     // --- Crop / loop metadata (fractions of the buffer length, 0..1) ---
     void setCropRange(float start01, float end01) noexcept {
         cropStartFrac = juce::jlimit(0.0f, 1.0f, start01);
