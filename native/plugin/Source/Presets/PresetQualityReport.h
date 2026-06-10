@@ -815,6 +815,27 @@ inline void report(DiditagainProcessor& proc,
     const int   zoneDistanceSemitones = (zoneProbe.hasZone && zoneProbe.selectedZoneRoot >= 0)
                                         ? std::abs(zoneProbe.selectedZoneRoot - silenceTestNote)
                                         : -1;
+    // ---- Selected-zone sample diagnostics (Choir zero-buffer investigation) ----
+    // These prove whether the chosen multisample file actually exists and carries
+    // signal BEFORE the render path is blamed for a silent dry bus.
+    const juce::String selectedZoneAbsolutePath = zoneProbe.selectedZoneFullPath;
+    const juce::File   selectedZoneFileRef(selectedZoneAbsolutePath);
+    const bool   selectedZoneFileExists   = selectedZoneAbsolutePath.isNotEmpty()
+                                            && selectedZoneFileRef.existsAsFile();
+    const juce::int64 selectedZoneFileSizeBytes = selectedZoneFileExists
+                                            ? selectedZoneFileRef.getSize() : 0;
+    const juce::String selectedZoneAudioFormat = selectedZoneFileRef.getFileExtension()
+                                            .removeCharacters(".").toUpperCase();
+    const int    selectedZoneNumSamples   = zoneProbe.selectedZoneNumSamples;
+    const int    selectedZoneNumChannels  = zoneProbe.selectedZoneNumChannels;
+    const float  selectedZoneDecodedPeakDb = zoneProbe.selectedZoneDecodedPeakDb;
+    const double selectedZoneReadPosition = zoneProbe.selectedZoneReadPosition;
+    // A decoded peak pinned near the -120 floor means the file decoded to silence
+    // (or the decode failed) — the sample is the culprit, not the render path.
+    const bool   selectedZoneDecodedSilent = zoneProbe.hasZone
+                                            && selectedZoneDecodedPeakDb <= -119.0f;
+    if (selectedZoneDecodedSilent)
+        warnings.addIfNotAlreadyThere("SAMPLE_FILE_SILENT_OR_DECODE_FAILED");
     // CRITICAL CHECK 6 (Report 79): voice/zone start proxies for DRY_BUS_SILENT
     // diagnosis. Derived from the zone probe + preset layer state (no extra RT
     // hooks): a voice can start when a real zone backs the test note AND the main
