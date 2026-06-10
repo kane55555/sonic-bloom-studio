@@ -118,6 +118,25 @@ public:
         return false;
     }
 
+    juce::String getSupportBodyEnvelopeState() noexcept
+    {
+        for (int i = 0; i < getNumVoices(); ++i)
+            if (auto* v = dynamic_cast<SynthVoice*>(getVoice(i)))
+            {
+                const auto s = v->getSupportBodyEnvelopeState();
+                if (s != "n/a") return s;
+            }
+        return "n/a";
+    }
+
+    bool hasSupportBodyRenderedBlock() noexcept
+    {
+        for (int i = 0; i < getNumVoices(); ++i)
+            if (auto* v = dynamic_cast<SynthVoice*>(getVoice(i)))
+                if (v->hasSupportBodyRenderedBlock()) return true;
+        return false;
+    }
+
     // Set the active multisample instrument by folder name (under Documents/
     // DIDITAGAIN STUDIO/Samples). Empty name = silence. Returns true on success.
     bool setInstrument(const juce::String& instrumentName);

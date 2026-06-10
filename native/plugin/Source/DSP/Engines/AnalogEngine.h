@@ -36,6 +36,8 @@ public:
         ampEnv.reset();
         lastPeak.store(0.0f);
         voiceStarted.store(false);
+        renderedBlock.store(false);
+        envStage.store((int) ADSREnvelope::Stage::Idle);
     }
 
     void noteOn(int /*midi*/, float vel) override
@@ -47,6 +49,10 @@ public:
         subPhase = d(rng);
         ampEnv.noteOn();
         voiceStarted.store(true);
+        // A fresh note has not produced a rendered block yet; the reporter waits
+        // for renderAdd() to flip this true before it trusts support-body meters.
+        renderedBlock.store(false);
+        envStage.store((int) ADSREnvelope::Stage::Attack);
     }
     void noteOff() override { ampEnv.noteOff(); }
 
@@ -68,9 +74,27 @@ public:
     float getLastPeakLinear() const noexcept override { return lastPeak.load(); }
     float getStaticPeakLinear() const noexcept override { return voiceStarted.load() ? 1.0f : 0.0f; }
 
+    juce::String getEnvelopeStateName() const noexcept override
+    {
+        switch ((ADSREnvelope::Stage) envStage.load())
+        {
+            case ADSREnvelope::Stage::Attack:  return "attack";
+            case ADSREnvelope::Stage::Decay:   return "decay";
+            case ADSREnvelope::Stage::Sustain: return "sustain";
+            case ADSREnvelope::Stage::Release: return "release";
+            case ADSREnvelope::Stage::Idle:
+            default:                           return "idle";
+        }
+    }
+
+    bool hasRenderedBlockSinceNoteOn() const noexcept override { return renderedBlock.load(); }
+
     void renderAdd(float* outL, float* outR, int n, float pitchHz,
                    const ModSnapshot& mods) override
     {
+        // Mirror the live envelope stage for diagnostics even on an early return
+        // (e.g. the voice released and the envelope has gone idle).
+        envStage.store((int) ampEnv.getStage());
         if (n <= 0 || ! ampEnv.isActive()) return;
         const double sr = sampleRate;
         const float vel = juce::jlimit(0.0f, 1.0f, velocity);
@@ -115,6 +139,8 @@ public:
             blockPeak = juce::jmax(blockPeak, std::abs(l), std::abs(r));
         }
         lastPeak.store(blockPeak);
+        renderedBlock.store(true);
+        envStage.store((int) ampEnv.getStage());
     }
 
 private:
@@ -151,6 +177,8 @@ private:
     ADSREnvelope ampEnv;
     std::atomic<float> lastPeak { 0.0f };
     std::atomic<bool> voiceStarted { false };
+    std::atomic<bool> renderedBlock { false };
+    std::atomic<int>  envStage { (int) ADSREnvelope::Stage::Idle };
 };
 
 }} // namespace dida::engines

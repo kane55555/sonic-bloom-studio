@@ -717,7 +717,14 @@ inline void report(DiditagainProcessor& proc,
         && blocksRenderedSincePresetLoad > 0
         && notesRenderedSincePresetLoad > 0;
     const bool  meterReflectsCurrentPreset = currentPresetHasRendered && meterAmpMatchesCurrentPreset;
-    const bool  reportEligible = currentPresetHasRendered && meterReflectsCurrentPreset;
+    // AI Texture stability gate (Task 5): an AI Texture preset must not publish a
+    // pass/fail-eligible report until its analog support/body voice has actually
+    // rendered at least one block after note-on. Otherwise a probe that captured
+    // only the cached texture (support voice not yet sounding) produces a false
+    // TOO_QUIET. Non-AI presets are unaffected.
+    const bool  aiSupportBodyRendered = engine.hasSupportBodyRenderedBlock();
+    const bool  reportEligible = currentPresetHasRendered && meterReflectsCurrentPreset
+        && (! aiTexturePreset || aiSupportBodyRendered);
     // End-to-end voice->dry accounting against the metered (real) amp gain. The
     // measured layer-bus glue gain is neutralised so the mismatch isolates the
     // amp + master stages (a correct render lands within a few dB of 0).
@@ -731,6 +738,8 @@ inline void report(DiditagainProcessor& proc,
     {
         warnings.addIfNotAlreadyThere("REPORT_PENDING_NO_CURRENT_RENDER");
         warnings.addIfNotAlreadyThere("METERS_PRE_PRESET_RENDER");
+        if (aiTexturePreset && currentPresetHasRendered && ! aiSupportBodyRendered)
+            warnings.addIfNotAlreadyThere("AI_TEXTURE_SUPPORT_BODY_NOT_RENDERED");
     }
 
     if (fx.wasMasterGainClamped())
@@ -1096,6 +1105,8 @@ inline void report(DiditagainProcessor& proc,
     const float supportBodyGainDb = aiTexturePreset ? engine.getSupportBodyGainDb() : -120.0f;
     const bool  supportBodyActive = aiTexturePreset && engine.isSupportBodyActive();
     const bool  supportBodyVoiceStarted = aiTexturePreset && reportEligible && engine.hasSupportBodyVoiceStarted();
+    const juce::String supportBodyEnvelopeState = aiTexturePreset
+        ? engine.getSupportBodyEnvelopeState() : juce::String("n/a");
 
     juce::String out;
     out << "[DIDITAGAIN preset-quality]"
@@ -1265,6 +1276,7 @@ inline void report(DiditagainProcessor& proc,
         << " supportBodyGainDb=" << juce::String(supportBodyGainDb, 2)
         << " supportBodyActive=" << (supportBodyActive ? "true" : "false")
         << " supportBodyVoiceStarted=" << (supportBodyVoiceStarted ? "true" : "false")
+        << " supportBodyEnvelopeState=" << supportBodyEnvelopeState
         << " pluginVersion=" << pluginVersion
         << " timestamp=" << timestamp
         << " warnings=" << (warnings.isEmpty() ? juce::String("none")
@@ -1457,6 +1469,11 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("neuralTextureContributionPercent", neuralTextureContributionPercent);
     j->setProperty("neuralTextureContributionEstimated", neuralTextureContributionEstimated);
     j->setProperty("neuralTextureSoloActive",        neuralTextureSoloActive);
+    j->setProperty("supportBodyPeakDb",              supportBodyPeakDb);
+    j->setProperty("supportBodyGainDb",              supportBodyGainDb);
+    j->setProperty("supportBodyActive",              supportBodyActive);
+    j->setProperty("supportBodyVoiceStarted",        supportBodyVoiceStarted);
+    j->setProperty("supportBodyEnvelopeState",       supportBodyEnvelopeState);
     juce::Array<juce::var> warnVar;
     for (auto& w : warnings) warnVar.add(w);
     j->setProperty("warnings",               warnVar);
@@ -1658,6 +1675,11 @@ inline void report(DiditagainProcessor& proc,
               << "neuralTextureContributionPercent: " << juce::String(neuralTextureContributionPercent, 1) << "\n"
               << "neuralTextureContributionEstimated: " << (neuralTextureContributionEstimated ? "true" : "false") << "\n"
               << "neuralTextureSoloActive: "   << (neuralTextureSoloActive ? "true" : "false") << "\n"
+              << "supportBodyPeakDb: "         << juce::String(supportBodyPeakDb, 2) << "\n"
+              << "supportBodyGainDb: "         << juce::String(supportBodyGainDb, 2) << "\n"
+              << "supportBodyActive: "         << (supportBodyActive ? "true" : "false") << "\n"
+              << "supportBodyVoiceStarted: "   << (supportBodyVoiceStarted ? "true" : "false") << "\n"
+              << "supportBodyEnvelopeState: "  << supportBodyEnvelopeState << "\n"
               << "warnings: "                  << (warnings.isEmpty() ? juce::String("none") : warnings.joinIntoString(",")) << "\n"
               << "timestamp: "                 << timestamp            << "\n"
               << "==================================================\n";

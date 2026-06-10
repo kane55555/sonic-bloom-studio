@@ -100,6 +100,18 @@ public:
     // Default 0 for engines without a cached source; NeuralTextureEngine
     // overrides it with the decoded texture's measured peak.
     virtual float getStaticPeakLinear() const noexcept { return 0.0f; }
+
+    // Diagnostic-only: the engine's current amp-envelope stage as a short label
+    // ("idle"/"attack"/"decay"/"sustain"/"release"). Read OFF the audio thread by
+    // the preset-quality reporter. Default "n/a" for engines without an internal
+    // envelope; AnalogEngine (the AI Texture support/body layer) overrides it.
+    virtual juce::String getEnvelopeStateName() const noexcept { return "n/a"; }
+
+    // Diagnostic-only: true once this engine has rendered at least one audible
+    // block since the most recent noteOn. Used to gate reportEligible so an AI
+    // Texture report never publishes before the support/body voice has actually
+    // produced a rendered block. Default false; AnalogEngine overrides it.
+    virtual bool hasRenderedBlockSinceNoteOn() const noexcept { return false; }
 };
 
 }} // namespace dida::engines
