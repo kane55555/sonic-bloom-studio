@@ -620,6 +620,7 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         // voice has its own slight analog character (pitch, pan, drift, etc).
         v.setVoiceCardIndex(voiceCardCounter++);
         v.setVintageAmount(vintageAmt);
+        v.setNeuralTextureLiveGain(aiTexEnabled, aiTexAmount);
 
         v.setEngineMode(engineMode);
         v.setOscALevel(oscALevel);
