@@ -249,12 +249,12 @@ static juce::String exactAiTextureBaseRelativePath(const dida::userpreset::UserP
     const auto cat  = up.category.toLowerCase();
     const auto raw  = up.source.path.replaceCharacter('\\', '/').toLowerCase();
     if (name.contains("brass") || cat.contains("brass") || raw.contains("/brass") || raw.startsWith("brass"))
-        return "Brass/Brass 1";
+        return "Presets/User/Brass/Brass 1";
     if (name.contains("choir") || cat.contains("choir") || cat.contains("vox")
         || raw.contains("/choir") || raw.startsWith("choir"))
-        return "ChoirsVox/Choir 1";
+        return "Presets/User/Choir Ohhh";
     if (name.contains("guitar") || cat.contains("guitar") || raw.contains("/guitar") || raw.startsWith("guitar"))
-        return "Guitars/Guitar 1";
+        return "Presets/User/Acoustic Guitars/Acoustic Guitar 1";
     return {};
 }
 
@@ -290,11 +290,10 @@ static juce::File resolveAiTextureBaseSourceCandidate(const juce::String& rawPat
             ? samplesRoot.getChildFile(expanded.substring(8))
             : samplesRoot.getChildFile(expanded));
 
-    // STEP C resolution: required AI Texture multisample sources are resolved
-    // against <Samples>/Presets/User first, then the broader <Samples> root.
-    // When the primary candidate is not a real folder, retry the relative tail
-    // under Presets/User so paths like "Brass/Brass 1" or
-    // "{DIDA_DOCS}/Samples/Presets/User/Choir Ohhh" resolve correctly.
+    // STEP C resolution: first honour the preset's exact sourceInstrument.path
+    // after token expansion. Only when that exact path fails do we retry a
+    // relative tail under <Samples>/Presets/User and, finally, a known legacy
+    // broad-category path mapped to the current Presets/User multisample.
     if (! candidate.isDirectory())
     {
         auto rel = expanded;
