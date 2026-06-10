@@ -92,6 +92,9 @@ public:
     void renderAdd(float* outL, float* outR, int n, float pitchHz,
                    const ModSnapshot& mods) override
     {
+        // Mirror the live envelope stage for diagnostics even on an early return
+        // (e.g. the voice released and the envelope has gone idle).
+        envStage.store((int) ampEnv.getStage());
         if (n <= 0 || ! ampEnv.isActive()) return;
         const double sr = sampleRate;
         const float vel = juce::jlimit(0.0f, 1.0f, velocity);
