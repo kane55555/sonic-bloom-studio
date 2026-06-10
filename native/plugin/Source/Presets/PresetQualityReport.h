@@ -362,11 +362,21 @@ inline void report(DiditagainProcessor& proc,
         if (up.ai.enabled && up.ai.analysisFile.isNotEmpty()
             && ! dida::userpreset::resolveSourcePath(up.ai.analysisFile).existsAsFile())
             warnings.add("AI_ANALYSIS_MISSING");
-        // Only ddsp/rave/"" are recognised providers in v0.1.
-        if (up.ai.present && up.ai.provider.isNotEmpty()
-            && ! up.ai.provider.equalsIgnoreCase("ddsp")
-            && ! up.ai.provider.equalsIgnoreCase("rave"))
-            warnings.add("AI_PROVIDER_UNSUPPORTED");
+        // Recognised provider values for AI Texture v0.1/v0.2. cachedTexture and
+        // demoPack require no live AI runtime and are fully supported now;
+        // ddspOffline/raveFuture are reserved for later offline/online engines.
+        // The legacy neuralTextureCached / ddsp / rave values stay accepted.
+        {
+            static const char* kSupportedProviders[] = {
+                "cachedTexture", "neuralTextureCached", "demoPack",
+                "ddspOffline", "raveFuture", "ddsp", "rave"
+            };
+            bool providerSupported = up.ai.provider.isEmpty();
+            for (auto* sp : kSupportedProviders)
+                if (up.ai.provider.equalsIgnoreCase(sp)) { providerSupported = true; break; }
+            if (up.ai.present && ! providerSupported)
+                warnings.add("AI_PROVIDER_UNSUPPORTED");
+        }
     }
 
     const auto resolved = juce::File(resolvedFolderPath);
