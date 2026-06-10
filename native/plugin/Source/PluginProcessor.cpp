@@ -623,6 +623,7 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         v.setVoiceCardIndex(voiceCardCounter++);
         v.setVintageAmount(vintageAmt);
         v.setNeuralTextureLiveGain(aiTexEnabled, aiTexAmount);
+        v.setNeuralTextureSolo(aiTexSolo);
 
         v.setEngineMode(engineMode);
         v.setOscALevel(oscALevel);
