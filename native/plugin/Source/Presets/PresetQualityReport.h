@@ -293,6 +293,7 @@ inline void report(DiditagainProcessor& proc,
         bool hasNeuralPartial = false;
         bool textureFileResolved = false;
         bool anyTextureMissing = false;
+        bool textureInManagedFolder = false;
         for (const auto& pb : up.partials)
         {
             if (! pb.enabled) continue;
@@ -307,7 +308,16 @@ inline void report(DiditagainProcessor& proc,
             if (texPath.isEmpty() || ! texFile.existsAsFile())
                 anyTextureMissing = true;
             else
+            {
                 textureFileResolved = true;
+                // A texture is "managed/imported" when its resolved path lives
+                // inside the DIDITAGAIN STUDIO NeuralTextures folder. The portable
+                // {DIDA_DOCS} token also signals an import-managed reference.
+                const juce::String norm = texFile.getFullPathName().replaceCharacter('\\', '/');
+                if (norm.containsIgnoreCase("/NeuralTextures/")
+                    || texPath.startsWithIgnoreCase("{DIDA_DOCS}"))
+                    textureInManagedFolder = true;
+            }
 
             // Gain safety: a neural texture must stay quiet under the main sample.
             float lvlDb = ep.hasProperty("levelDb") ? (float) (double) ep.getProperty("levelDb", -18.0)
