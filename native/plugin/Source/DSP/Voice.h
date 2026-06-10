@@ -140,6 +140,19 @@ public:
     // override (never written to a preset) so it cannot permanently alter sound.
     void setNeuralTextureSolo(bool s) noexcept { soloNeuralTexture = s; }
 
+    // Diagnostic-only (off the audio thread): the most recent block peak (linear)
+    // produced by any active neural texture partial in this voice. Used by the
+    // preset-quality reporter for the AI Texture diagnostic section. Reads an
+    // atomic from the engine; never alters DSP state.
+    float getNeuralTexturePeakLinear() const noexcept
+    {
+        float pk = 0.0f;
+        for (const auto& slot : partials_)
+            if (slot.enabled && slot.isNeuralTexture && slot.engine != nullptr)
+                pk = juce::jmax(pk, slot.engine->getLastPeakLinear());
+        return pk;
+    }
+
     // --- Crop / loop metadata (fractions of the buffer length, 0..1) ---
     void setCropRange(float start01, float end01) noexcept {
         cropStartFrac = juce::jlimit(0.0f, 1.0f, start01);
