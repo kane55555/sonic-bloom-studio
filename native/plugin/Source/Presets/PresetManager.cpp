@@ -1014,6 +1014,7 @@ void PresetManager::loadPreset(int index)
         const bool rawIsAbsolute = rawSourcePath.isNotEmpty()
                                 && juce::File::isAbsolutePath(rawNormSlash);
         const bool rawIsInsidePresetsUser = rawNormSlash.containsIgnoreCase("/Samples/Presets/User/");
+        const bool aiTexturePresetForRouting = dida::userpreset::isAiTexturePreset(up);
 
         // The .diapreset's parent folder is the default authoritative category.
         // EXCEPTION: when sourceInstrument.path explicitly points inside a
@@ -1067,8 +1068,17 @@ void PresetManager::loadPreset(int index)
         juce::String resolvedFrom;
         juce::StringArray extraSourceWarnings;
 
+        juce::String aiTextureBaseSourceRaw;
+        juce::String aiTextureBaseSourceResolvedCandidate;
+        bool aiTextureBaseSourceExists = false;
+        int aiTextureBaseSourceWavCount = 0;
+
         // STEP A — search ONLY inside the .diapreset's own category folder.
+        // AI Texture presets are routed by STEP C instead: their source path is
+        // a real base multisample under <Documents>/DIDITAGAIN STUDIO/Samples,
+        // not a hidden source folder beside the preset JSON.
         bool multipleFound = false;
+        if (! aiTexturePresetForRouting)
         {
             auto picked = findStrictCategorySourceFolder(presetCategoryFolder,
                                                         effectiveCategory,
@@ -1089,7 +1099,7 @@ void PresetManager::loadPreset(int index)
 
         // STEP B — honour an absolute sourceInstrument.path only if it points
         // INSIDE the same category folder. Otherwise reject as cross-category.
-        if (rawIsAbsolute)
+        if (rawIsAbsolute && ! aiTexturePresetForRouting)
         {
             auto abs = dida::userpreset::resolveSourcePath(rawSourcePath);
             if (abs.isDirectory())
