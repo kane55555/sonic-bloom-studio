@@ -233,6 +233,7 @@ void DiditagainEditor::openMenu()
                 case 4: showOverlay(settingsPanel.get(), "MIDI / PERFORMANCE"); break;
                 case 5: showOverlay(settingsPanel.get(), "LIBRARY / SETTINGS"); break;
                 case 6: showOverlay(accountPanel.get(),  "ACCOUNT"); break;
+                case 8: showOverlay(aiTexturePanel.get(), "AI TEXTURE v0.1"); break;
                 default: break;
             }
         });
