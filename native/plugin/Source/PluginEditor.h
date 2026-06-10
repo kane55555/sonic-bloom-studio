@@ -58,6 +58,7 @@ private:
     std::unique_ptr<ImportReviewPanel> importPanel;
     std::unique_ptr<SettingsPanel>    settingsPanel;
     std::unique_ptr<AccountPanel>     accountPanel;
+    std::unique_ptr<AiTexturePanel>   aiTexturePanel;
     std::unique_ptr<AudioCropPanel>   audioCropPanel;
 
     // Modal overlay state
