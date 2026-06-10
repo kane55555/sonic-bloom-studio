@@ -452,9 +452,14 @@ juce::File resolveSourcePath(const juce::String& rawPath)
     juce::Array<juce::File> candidates;
 
     auto expanded = src;
-    expanded = expanded.replace("{DocsRoot}", docsRoot.getFullPathName().replaceCharacter('\\', '/'), true);
-    expanded = expanded.replace("{Docs}",     docsRoot.getFullPathName().replaceCharacter('\\', '/'), true);
-    expanded = expanded.replace("{Documents}", docsRoot.getFullPathName().replaceCharacter('\\', '/'), true);
+    const auto docsPath = docsRoot.getFullPathName().replaceCharacter('\\', '/');
+    // {DIDA_DOCS} is the portable token preferred by AI Texture Import v0.2 — it
+    // expands to the user's "Documents/DIDITAGAIN STUDIO" root so imported
+    // texture paths survive moving the project between machines.
+    expanded = expanded.replace("{DIDA_DOCS}", docsPath, true);
+    expanded = expanded.replace("{DocsRoot}", docsPath, true);
+    expanded = expanded.replace("{Docs}",     docsPath, true);
+    expanded = expanded.replace("{Documents}", docsPath, true);
     expanded = expanded.replace("{Samples}",  samplesRoot.getFullPathName().replaceCharacter('\\', '/'), true);
 
     if (juce::File::isAbsolutePath(expanded))
