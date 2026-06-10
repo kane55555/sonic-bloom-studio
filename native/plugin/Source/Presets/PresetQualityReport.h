@@ -1258,6 +1258,14 @@ inline void report(DiditagainProcessor& proc,
         << " lastZoneRoot=" << lastZoneRoot
         << " selectedZoneRoot=" << selectedZoneRoot
         << " selectedZoneFile=" << (selectedZoneFile.isNotEmpty() ? selectedZoneFile : juce::String("none"))
+        << " selectedZoneAbsolutePath=" << (selectedZoneAbsolutePath.isNotEmpty() ? selectedZoneAbsolutePath : juce::String("none"))
+        << " selectedZoneFileExists=" << (selectedZoneFileExists ? "true" : "false")
+        << " selectedZoneFileSizeBytes=" << selectedZoneFileSizeBytes
+        << " selectedZoneAudioFormat=" << (selectedZoneAudioFormat.isNotEmpty() ? selectedZoneAudioFormat : juce::String("none"))
+        << " selectedZoneNumSamples=" << selectedZoneNumSamples
+        << " selectedZoneNumChannels=" << selectedZoneNumChannels
+        << " selectedZoneDecodedPeakDb=" << juce::String(selectedZoneDecodedPeakDb, 2)
+        << " selectedZoneReadPosition=" << juce::String(selectedZoneReadPosition, 1)
         << " zoneFallbackUsed=" << (zoneFallbackUsed ? "true" : "false")
         << " zoneDistanceSemitones=" << zoneDistanceSemitones
         << " activeZoneCount=" << zoneCount
@@ -1447,6 +1455,14 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("lastZoneRoot",           lastZoneRoot);
     j->setProperty("selectedZoneRoot",       selectedZoneRoot);
     j->setProperty("selectedZoneFile",       selectedZoneFile.isNotEmpty() ? selectedZoneFile : juce::String("none"));
+    j->setProperty("selectedZoneAbsolutePath", selectedZoneAbsolutePath.isNotEmpty() ? selectedZoneAbsolutePath : juce::String("none"));
+    j->setProperty("selectedZoneFileExists",  selectedZoneFileExists);
+    j->setProperty("selectedZoneFileSizeBytes", (double) selectedZoneFileSizeBytes);
+    j->setProperty("selectedZoneAudioFormat", selectedZoneAudioFormat.isNotEmpty() ? selectedZoneAudioFormat : juce::String("none"));
+    j->setProperty("selectedZoneNumSamples",  selectedZoneNumSamples);
+    j->setProperty("selectedZoneNumChannels", selectedZoneNumChannels);
+    j->setProperty("selectedZoneDecodedPeakDb", selectedZoneDecodedPeakDb);
+    j->setProperty("selectedZoneReadPosition", selectedZoneReadPosition);
     j->setProperty("zoneFallbackUsed",       zoneFallbackUsed);
     j->setProperty("zoneDistanceSemitones",  zoneDistanceSemitones);
     j->setProperty("activeZoneCount",        zoneCount);
@@ -1689,6 +1705,14 @@ inline void report(DiditagainProcessor& proc,
               << "lastZoneRoot: "              << lastZoneRoot << "\n"
               << "selectedZoneRoot: "          << selectedZoneRoot << "\n"
               << "selectedZoneFile: "          << (selectedZoneFile.isNotEmpty() ? selectedZoneFile : juce::String("none")) << "\n"
+              << "selectedZoneAbsolutePath: "  << (selectedZoneAbsolutePath.isNotEmpty() ? selectedZoneAbsolutePath : juce::String("none")) << "\n"
+              << "selectedZoneFileExists: "    << (selectedZoneFileExists ? "true" : "false") << "\n"
+              << "selectedZoneFileSizeBytes: " << selectedZoneFileSizeBytes << "\n"
+              << "selectedZoneAudioFormat: "   << (selectedZoneAudioFormat.isNotEmpty() ? selectedZoneAudioFormat : juce::String("none")) << "\n"
+              << "selectedZoneNumSamples: "    << selectedZoneNumSamples << "\n"
+              << "selectedZoneNumChannels: "   << selectedZoneNumChannels << "\n"
+              << "selectedZoneDecodedPeakDb: " << juce::String(selectedZoneDecodedPeakDb, 2) << "\n"
+              << "selectedZoneReadPosition: "  << juce::String(selectedZoneReadPosition, 1) << "\n"
               << "zoneFallbackUsed: "          << (zoneFallbackUsed ? "true" : "false") << "\n"
               << "zoneDistanceSemitones: "     << zoneDistanceSemitones << "\n"
               << "presetJsonReverbMix: "       << juce::String(presetJsonReverbMix, 3) << "\n"
