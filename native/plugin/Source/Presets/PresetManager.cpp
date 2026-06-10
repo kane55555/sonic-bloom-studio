@@ -322,7 +322,8 @@ static juce::File resolveAiTextureBaseSourceCandidate(const juce::String& rawPat
     const auto exactRel = exactAiTextureBaseRelativePath(up);
     const auto srcNorm = src.replaceCharacter('\\', '/');
     const auto expandedNorm = expanded.replaceCharacter('\\', '/');
-    if (exactRel.isNotEmpty()
+    if (! candidate.isDirectory()
+        && exactRel.isNotEmpty()
         && (srcNorm.equalsIgnoreCase("Brass")
             || srcNorm.equalsIgnoreCase("Choir")
             || srcNorm.equalsIgnoreCase("Choirs")
@@ -346,7 +347,7 @@ static juce::File resolveAiTextureBaseSourceCandidate(const juce::String& rawPat
     if (candidate.isDirectory())
     {
         const auto norm = candidate.getFullPathName().replaceCharacter('\\', '/');
-        if (exactRel.isNotEmpty()
+        if (false && exactRel.isNotEmpty()
             && (norm.endsWithIgnoreCase("/Samples/Brass")
                 || norm.endsWithIgnoreCase("/Samples/Choir")
                 || norm.endsWithIgnoreCase("/Samples/Choirs")
