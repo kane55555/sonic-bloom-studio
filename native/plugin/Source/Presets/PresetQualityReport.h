@@ -1191,6 +1191,12 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("wavZones",               wavZones);
     j->setProperty("activeLayers",           activeLayers);
     j->setProperty("activePartials",         activePartials);
+    // AI Texture diagnostics (actionable detail for AI_TEXTURE_MISSING_FILE).
+    j->setProperty("aiProvider",             aiProviderValue);
+    j->setProperty("rawTexturePath",         aiRawTexturePath);
+    j->setProperty("resolvedTexturePath",    aiResolvedTexturePath);
+    j->setProperty("textureFileExists",      aiTextureFileExists);
+    j->setProperty("textureInstallRoot",     aiTextureInstallRoot);
     j->setProperty("layerBusPeakDb",         busPeakDb);
     j->setProperty("fxInputPeakDb",          fxInDb);
     j->setProperty("fxOutputPeakDb",         fxOutDb);
