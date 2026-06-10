@@ -763,7 +763,11 @@ inline void report(DiditagainProcessor& proc,
     {
         warnings.addIfNotAlreadyThere("REPORT_PENDING_NO_CURRENT_RENDER");
         warnings.addIfNotAlreadyThere("METERS_PRE_PRESET_RENDER");
-        if (aiTexturePreset && currentPresetHasRendered && ! aiSupportBodyRendered)
+        // Only warn that the support body never rendered when there is ALSO no
+        // multisample body loaded. With analog support disabled and a real
+        // multisample body present, this is an expected, healthy configuration.
+        if (aiTexturePreset && currentPresetHasRendered
+            && ! aiSupportBodyRendered && ! aiMultisampleBodyRendered)
             warnings.addIfNotAlreadyThere("AI_TEXTURE_SUPPORT_BODY_NOT_RENDERED");
     }
 
