@@ -85,6 +85,9 @@ public:
     bool isMissing() const noexcept { return missing.load(); }
     float getLastPeak() const noexcept { return lastPeak.load(); }
 
+    // Diagnostic peak shared with the preset-quality reporter via IEngineSource.
+    float getLastPeakLinear() const noexcept override { return lastPeak.load(); }
+
 private:
     inline float readInterp(int channel, double pos) const noexcept;
 
