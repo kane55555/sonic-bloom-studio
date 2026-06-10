@@ -263,6 +263,43 @@ struct UserPreset
 
     juce::String              engineType;   // optional; default "" => pcm
     juce::Array<PartialBlock> partials;     // optional; up to 4
+
+    // ------- AI Texture v0.1 (cached) metadata (v2 additive) -------
+    // Optional. Describes an offline-analysed timbre profile plus the cached
+    // neural texture provider. v0.1 only CONSUMES cached WAV textures referenced
+    // by a neuralTextureCached partial — there is NO realtime neural inference.
+    //
+    //   ai.enabled .................. master switch (default false => disabled)
+    //   ai.profileVersion ........... DDSP/RAVE profile schema revision
+    //   ai.provider ................. "ddsp" | "rave" | "" (analysis source)
+    //   ai.analysisFile ............. path to the offline DDSP analysis json
+    //   ai.textureMode .............. "cached" (only supported mode in v0.1)
+    //   ai.timbreProfile.* .......... 0..1 descriptors from offline analysis
+    //
+    // A MISSING ai block parses to AiBlock{} which defaults to disabled, so
+    // every existing .diapreset behaves exactly as before.
+    struct AiTimbreProfile
+    {
+        float brightness       = 0.5f;
+        float harmonicDensity  = 0.5f;
+        float noiseAir         = 0.5f;
+        float attackNoise      = 0.5f;
+        float pitchInstability = 0.0f;
+        float bodyWarmth       = 0.5f;
+    };
+
+    struct AiBlock
+    {
+        bool         present        = false;   // true when JSON contained an "ai" object
+        bool         enabled        = false;
+        int          profileVersion = 0;
+        juce::String provider;                 // "ddsp" | "rave" | ""
+        juce::String analysisFile;             // offline DDSP analysis path
+        juce::String textureMode   = "cached"; // only "cached" supported in v0.1
+        AiTimbreProfile timbreProfile;
+    };
+
+    AiBlock ai;
 };
 
 }} // namespace dida::userpreset

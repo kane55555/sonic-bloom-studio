@@ -97,6 +97,9 @@ public:
         float pan        = 0.0f;
         int   pitchSemis = 0;
         float fineCents  = 0.0f;
+        // AI Texture v0.1: neural texture partials are scaled by a live UI
+        // "Texture Amount" so amount=0 fully mutes the cached texture.
+        bool  isNeuralTexture = false;
     };
     static constexpr int kMaxPartials = 4;
 
@@ -104,8 +107,16 @@ public:
     void setPartial(int idx,
                     std::unique_ptr<dida::engines::IEngineSource> engine,
                     bool enabled, float level, float pan,
-                    int pitchSemis, float fineCents) noexcept;
+                    int pitchSemis, float fineCents,
+                    bool isNeuralTexture = false) noexcept;
     bool hasActivePartials() const noexcept;
+
+    // AI Texture v0.1 — live "Texture Amount" (0..1) applied to neural texture
+    // partials only. enabled=false or amount=0 fully mutes the cached texture.
+    void setNeuralTextureLiveGain(bool enabled, float amount01) noexcept
+    {
+        neuralTextureLiveGain = enabled ? juce::jlimit(0.0f, 1.0f, amount01) : 0.0f;
+    }
 
     // --- Crop / loop metadata (fractions of the buffer length, 0..1) ---
     void setCropRange(float start01, float end01) noexcept {
@@ -332,6 +343,8 @@ private:
     std::array<PartialSlot, kMaxPartials> partials_;
     juce::AudioBuffer<float> partialScratch;
     int preparedBlockSize = 512;
+    // AI Texture v0.1 live amount (0..1) — scales neural texture partials only.
+    float neuralTextureLiveGain = 1.0f;
 
     // Per-layer peak metering — logged ~once per second per voice.
     float peakSamp = 0.0f, peakOscB = 0.0f, peakSub = 0.0f, peakNoise = 0.0f, peakOut = 0.0f;

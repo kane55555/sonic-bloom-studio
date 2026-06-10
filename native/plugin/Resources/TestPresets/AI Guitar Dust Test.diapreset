@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 2,
+  "presetName": "AI Guitar Dust Test",
+  "category": "Guitars",
+  "sourceInstrument": {
+    "type": "multisampleFolder",
+    "path": "Guitars/Guitar 1",
+    "mappingMode": "nearest",
+    "rootNotePattern": ["C"]
+  },
+  "amp": { "gainDb": 0.0, "pan": 0.0, "attackMs": 5.0, "decayMs": 250.0, "sustain": 0.8, "releaseMs": 400.0 },
+  "filter": { "enabled": true, "type": "lowpass", "cutoffHz": 17000.0, "resonance": 0.1, "drive": 0.0, "keytrack": 0.0 },
+  "ai": {
+    "enabled": true,
+    "provider": "ddsp",
+    "profileVersion": 1,
+    "textureMode": "cached",
+    "analysisFile": "Samples/AITextures/guitar_dust.ddsp.json",
+    "timbreProfile": { "brightness": 0.55, "harmonicDensity": 0.5, "noiseAir": 0.7, "attackNoise": 0.6, "pitchInstability": 0.06, "bodyWarmth": 0.45 }
+  },
+  "partials": [
+    {
+      "enabled": true,
+      "engineType": "neuralTextureCached",
+      "followMainEnvelope": true,
+      "eqRole": "neuralTexture",
+      "pan": 0.0,
+      "pitchSemis": 0,
+      "fineCents": 0.0,
+      "amp": { "releaseMs": 220.0 },
+      "engineParams": {
+        "texturePath": "Samples/AITextures/guitar_dust.wav",
+        "loop": true,
+        "rootMidi": 60,
+        "pitchTracking": false,
+        "levelDb": -18.0
+      }
+    }
+  ]
+}
