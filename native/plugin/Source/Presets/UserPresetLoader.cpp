@@ -1603,7 +1603,11 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
 
                 // In choir mode only the neural texture partial is installed; the
                 // synth-support partials are intentionally muted by the choir path.
-                if (choirMode && ! isNeural) continue;
+                // AI Texture presets keep their support/body partial even in
+                // choir mode — otherwise the cached-texture choir preset renders
+                // texture-only and reports TOO_QUIET. Natural (non-AI) choir
+                // presets remain sample-only as before.
+                if (choirMode && ! isNeural && ! isAiTexturePreset(p)) continue;
 
                 auto eng = makeEngine(pb.engineType);
                 if (eng == nullptr) continue;
