@@ -153,6 +153,11 @@ public:
         return pk;
     }
 
+    // Diagnostic-only: peak (linear) of the main multisample / PCM body of this
+    // voice since the last noteOn. Lets the reporter prove the multisample is the
+    // primary sound and measure the neural texture's relative contribution.
+    float getMainSamplePeakLinear() const noexcept { return mainSamplePeakLin_.load(); }
+
     // Diagnostic-only: static intrinsic peak (linear) of the loaded neural
     // texture buffer in this voice, available even when no note is sounding.
     float getNeuralTextureIntrinsicPeakLinear() const noexcept
