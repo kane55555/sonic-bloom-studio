@@ -612,6 +612,8 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     // texture partials only. Off or 0 fully mutes the cached texture.
     const bool  aiTexEnabled = getF("aiTextureEnabled") > 0.5f;
     const float aiTexAmount  = juce::jlimit(0.0f, 1.0f, getF("aiTextureAmount"));
+    // AI Texture v0.2 — transient DEBUG solo (not an APVTS param, never saved).
+    const bool  aiTexSolo    = aiTextureSolo.load();
 
     int voiceCardCounter = 0;
     synthEngine.forEachSynthVoice([&](SynthVoice& v)
