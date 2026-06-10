@@ -177,6 +177,8 @@ private:
     ADSREnvelope ampEnv;
     std::atomic<float> lastPeak { 0.0f };
     std::atomic<bool> voiceStarted { false };
+    std::atomic<bool> renderedBlock { false };
+    std::atomic<int>  envStage { (int) ADSREnvelope::Stage::Idle };
 };
 
 }} // namespace dida::engines
