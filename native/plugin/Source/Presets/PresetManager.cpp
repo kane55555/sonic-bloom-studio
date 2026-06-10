@@ -236,6 +236,97 @@ static bool folderHasAnyAudio(const juce::File& folder, bool recursive)
     return false;
 }
 
+static int countWavFiles(const juce::File& folder)
+{
+    return folder.isDirectory()
+        ? folder.findChildFiles(juce::File::findFiles, true, "*.wav").size()
+        : 0;
+}
+
+static juce::String exactAiTextureBaseRelativePath(const dida::userpreset::UserPreset& up)
+{
+    const auto name = up.presetName.toLowerCase();
+    const auto cat  = up.category.toLowerCase();
+    const auto raw  = up.source.path.replaceCharacter('\\', '/').toLowerCase();
+    if (name.contains("brass") || cat.contains("brass") || raw.contains("/brass") || raw.startsWith("brass"))
+        return "Brass/Brass 1";
+    if (name.contains("choir") || cat.contains("choir") || cat.contains("vox")
+        || raw.contains("/choir") || raw.startsWith("choir"))
+        return "ChoirsVox/Choir 1";
+    if (name.contains("guitar") || cat.contains("guitar") || raw.contains("/guitar") || raw.startsWith("guitar"))
+        return "Guitars/Guitar 1";
+    return {};
+}
+
+static juce::File resolveAiTextureBaseSourceCandidate(const juce::String& rawPath,
+                                                      const dida::userpreset::UserPreset& up)
+{
+    auto src = rawPath.replaceCharacter('\\', '/').trim();
+    while ((src.startsWithChar('"') && src.endsWithChar('"'))
+        || (src.startsWithChar('\'') && src.endsWithChar('\'')))
+        src = src.substring(1, src.length() - 1).trim();
+    while (src.endsWithChar('/') && src.length() > 1)
+        src = src.dropLastCharacters(1);
+    if (src.isEmpty()) return {};
+
+    const auto samplesRoot = dida::SampleLibrary::getSamplesRoot();
+    const auto docsRoot = samplesRoot.getParentDirectory();
+    const auto docsPath = docsRoot.getFullPathName().replaceCharacter('\\', '/');
+    const auto samplesPath = samplesRoot.getFullPathName().replaceCharacter('\\', '/');
+
+    auto expanded = src;
+    expanded = expanded.replace("{DIDA_DOCS}", docsPath, true)
+                       .replace("{DocsRoot}", docsPath, true)
+                       .replace("{Docs}", docsPath, true)
+                       .replace("{Documents}", docsPath, true)
+                       .replace("{Samples}", samplesPath, true);
+
+    auto candidate = juce::File::isAbsolutePath(expanded)
+        ? juce::File(expanded)
+        : (expanded.startsWithIgnoreCase("Samples/")
+            ? samplesRoot.getChildFile(expanded.substring(8))
+            : samplesRoot.getChildFile(expanded));
+
+    const auto exactRel = exactAiTextureBaseRelativePath(up);
+    const auto srcNorm = src.replaceCharacter('\\', '/');
+    const auto expandedNorm = expanded.replaceCharacter('\\', '/');
+    if (exactRel.isNotEmpty()
+        && (srcNorm.equalsIgnoreCase("Brass")
+            || srcNorm.equalsIgnoreCase("Choir")
+            || srcNorm.equalsIgnoreCase("Choirs")
+            || srcNorm.equalsIgnoreCase("ChoirsVox")
+            || srcNorm.equalsIgnoreCase("Guitar")
+            || srcNorm.equalsIgnoreCase("Guitars")
+            || srcNorm.endsWithIgnoreCase("/Samples/Brass")
+            || srcNorm.endsWithIgnoreCase("/Samples/Choir")
+            || srcNorm.endsWithIgnoreCase("/Samples/Choirs")
+            || srcNorm.endsWithIgnoreCase("/Samples/ChoirsVox")
+            || srcNorm.endsWithIgnoreCase("/Samples/Guitar")
+            || srcNorm.endsWithIgnoreCase("/Samples/Guitars")
+            || expandedNorm.endsWithIgnoreCase("/Samples/Brass")
+            || expandedNorm.endsWithIgnoreCase("/Samples/Choir")
+            || expandedNorm.endsWithIgnoreCase("/Samples/Choirs")
+            || expandedNorm.endsWithIgnoreCase("/Samples/ChoirsVox")
+            || expandedNorm.endsWithIgnoreCase("/Samples/Guitar")
+            || expandedNorm.endsWithIgnoreCase("/Samples/Guitars")))
+        candidate = samplesRoot.getChildFile(exactRel);
+
+    if (candidate.isDirectory())
+    {
+        const auto norm = candidate.getFullPathName().replaceCharacter('\\', '/');
+        if (exactRel.isNotEmpty()
+            && (norm.endsWithIgnoreCase("/Samples/Brass")
+                || norm.endsWithIgnoreCase("/Samples/Choir")
+                || norm.endsWithIgnoreCase("/Samples/Choirs")
+                || norm.endsWithIgnoreCase("/Samples/ChoirsVox")
+                || norm.endsWithIgnoreCase("/Samples/Guitar")
+                || norm.endsWithIgnoreCase("/Samples/Guitars")))
+            candidate = samplesRoot.getChildFile(exactRel);
+    }
+
+    return candidate;
+}
+
 static bool pathLivesInCategory(const juce::File& folder, const juce::String& category)
 {
     if (! folder.isDirectory() || category.trim().isEmpty()) return false;
@@ -782,6 +873,10 @@ void PresetManager::emitCurrentUserDiapresetQualityReport()
                                    requestedExpectedSourceFolderName,
                                    requestedAllowCrossCategorySource,
                                    requestedSourceFolderWavCount,
+                                    requestedAiTextureBaseSourceRaw,
+                                    requestedAiTextureBaseSourceResolvedCandidate,
+                                    requestedAiTextureBaseSourceExists,
+                                    requestedAiTextureBaseSourceWavCount,
                                    requestedExtraSourceWarnings);
 }
 
@@ -946,6 +1041,7 @@ void PresetManager::loadPreset(int index)
         const bool rawIsAbsolute = rawSourcePath.isNotEmpty()
                                 && juce::File::isAbsolutePath(rawNormSlash);
         const bool rawIsInsidePresetsUser = rawNormSlash.containsIgnoreCase("/Samples/Presets/User/");
+        const bool aiTexturePresetForRouting = dida::userpreset::isAiTexturePreset(up);
 
         // The .diapreset's parent folder is the default authoritative category.
         // EXCEPTION: when sourceInstrument.path explicitly points inside a
@@ -999,8 +1095,17 @@ void PresetManager::loadPreset(int index)
         juce::String resolvedFrom;
         juce::StringArray extraSourceWarnings;
 
+        juce::String aiTextureBaseSourceRaw;
+        juce::String aiTextureBaseSourceResolvedCandidate;
+        bool aiTextureBaseSourceExists = false;
+        int aiTextureBaseSourceWavCount = 0;
+
         // STEP A — search ONLY inside the .diapreset's own category folder.
+        // AI Texture presets are routed by STEP C instead: their source path is
+        // a real base multisample under <Documents>/DIDITAGAIN STUDIO/Samples,
+        // not a hidden source folder beside the preset JSON.
         bool multipleFound = false;
+        if (! aiTexturePresetForRouting)
         {
             auto picked = findStrictCategorySourceFolder(presetCategoryFolder,
                                                         effectiveCategory,
@@ -1021,7 +1126,7 @@ void PresetManager::loadPreset(int index)
 
         // STEP B — honour an absolute sourceInstrument.path only if it points
         // INSIDE the same category folder. Otherwise reject as cross-category.
-        if (rawIsAbsolute)
+        if (rawIsAbsolute && ! aiTexturePresetForRouting)
         {
             auto abs = dida::userpreset::resolveSourcePath(rawSourcePath);
             if (abs.isDirectory())
@@ -1078,25 +1183,26 @@ void PresetManager::loadPreset(int index)
             }
         }
 
-        // STEP C — AI Texture enhancement presets reference a BASE multisample
-        // folder by a relative path (e.g. "Brass/Brass 1") that lives under the
-        // shared Samples root, NOT under this preset's hidden Presets/User source
-        // folder. STEP A/B never resolve that, so the multisample body went
-        // missing and the preset reported sourceRequiredForEngine=false /
-        // wavZones=0. Resolve it via the shared source-path resolver so the
-        // multisample becomes the main body and the AI texture blends on top.
-        // Scoped to AI Texture presets to avoid changing non-AI routing.
-        if (! resolved.isDirectory()
-            && rawSourcePath.isNotEmpty()
-            && dida::userpreset::isAiTexturePreset(up))
+        // STEP C — AI Texture enhancement presets use a real base multisample
+        // folder under <Documents>/DIDITAGAIN STUDIO/Samples as the main body.
+        // Resolve relative paths like "Brass/Brass 1" directly against Samples,
+        // and normalize old broad {DIDA_DOCS}/Samples/<Category> references to
+        // the exact shipped instrument folder. Scoped to AI Texture only.
+        if (aiTexturePresetForRouting && rawSourcePath.isNotEmpty())
         {
-            auto baseFolder = dida::userpreset::resolveSourcePath(rawSourcePath);
-            if (baseFolder.isDirectory())
+            aiTextureBaseSourceRaw = rawSourcePath;
+            auto baseFolder = resolveAiTextureBaseSourceCandidate(rawSourcePath, up);
+            aiTextureBaseSourceResolvedCandidate = baseFolder.getFullPathName().replaceCharacter('\\', '/');
+            aiTextureBaseSourceExists = baseFolder.isDirectory();
+            aiTextureBaseSourceWavCount = countWavFiles(baseFolder);
+
+            if (aiTextureBaseSourceExists && aiTextureBaseSourceWavCount > 0)
             {
                 resolved = baseFolder;
                 resolvedFrom = "aiTextureBaseMultisample";
                 didaPresetManagerLog("AI Texture preset using base multisample folder="
                     + resolved.getFullPathName() + " rawPath=" + rawSourcePath
+                    + " wavCount=" + juce::String(aiTextureBaseSourceWavCount)
                     + " name=" + up.presetName);
             }
         }
@@ -1135,6 +1241,10 @@ void PresetManager::loadPreset(int index)
         requestedExpectedSourceFolderName = expectedSourceFolderName;
         requestedAllowCrossCategorySource = allowCrossCategorySource;
         requestedSourceFolderWavCount    = 0;
+        requestedAiTextureBaseSourceRaw = aiTextureBaseSourceRaw;
+        requestedAiTextureBaseSourceResolvedCandidate = aiTextureBaseSourceResolvedCandidate;
+        requestedAiTextureBaseSourceExists = aiTextureBaseSourceExists;
+        requestedAiTextureBaseSourceWavCount = aiTextureBaseSourceWavCount;
         requestedExtraSourceWarnings     = extraSourceWarnings;
         macroMapper.clear();
         requestedPresetIsUserDiapreset = true;

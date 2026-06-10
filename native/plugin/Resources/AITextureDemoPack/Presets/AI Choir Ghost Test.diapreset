@@ -34,6 +34,12 @@
     "sustain": 0.82,
     "releaseMs": 850
   },
+  "sourceInstrument": {
+    "type": "multisampleFolder",
+    "path": "ChoirsVox/Choir 1",
+    "mappingMode": "nearest",
+    "rootNotePattern": ["C"]
+  },
   "filter": {
     "type": "lowpass",
     "cutoffHz": 12000,
