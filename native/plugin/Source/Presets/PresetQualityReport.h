@@ -1679,6 +1679,7 @@ inline void report(DiditagainProcessor& proc,
               << "suggestedGainAdjustmentDb: " << (notesPlaying ? juce::String(suggestedGainDb, 2) : juce::String("n/a")) << "\n"
               << "aiTexturePreset: "           << (aiTexturePreset ? "true" : "false") << "\n"
               << "textureType: "               << aiTextureTypeStr << "\n"
+              << "mainSamplePeakDb: "          << juce::String(mainSamplePeakDb, 2) << "\n"
               << "neuralTexturePeakDb: "       << juce::String(neuralTexturePeakDb, 2) << "\n"
               << "neuralTextureGainDb: "       << juce::String(neuralTextureGainDb, 2) << "\n"
               << "neuralTextureContributionPercent: " << juce::String(neuralTextureContributionPercent, 1) << "\n"
