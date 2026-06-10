@@ -259,6 +259,13 @@ struct UserPreset
         juce::String eqRole;
         bool         followMainEnvelope = true;
         float        maxGainDb = 0.0f;
+
+        // AI Texture demo-pack schema additive: some packs declare a neural
+        // texture partial with a top-level "levelDb" (instead of nesting it in
+        // engineParams) and a redundant "isNeuralTexture" hint. Both optional.
+        bool         hasLevelDb = false;
+        float        levelDb    = 0.0f;
+        bool         isNeuralTexture = false;
     };
 
     juce::String              engineType;   // optional; default "" => pcm
