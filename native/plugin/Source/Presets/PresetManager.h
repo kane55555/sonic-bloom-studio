@@ -201,6 +201,10 @@ private:
     juce::String requestedExpectedSourceFolderName;
     bool         requestedAllowCrossCategorySource = false;
     int          requestedSourceFolderWavCount = 0;
+    juce::String requestedAiTextureBaseSourceRaw;
+    juce::String requestedAiTextureBaseSourceResolvedCandidate;
+    bool         requestedAiTextureBaseSourceExists = false;
+    int          requestedAiTextureBaseSourceWavCount = 0;
     juce::StringArray requestedExtraSourceWarnings;
     dida::preset::MacroMapper macroMapper;
     bool requestedPresetIsUserDiapreset = false;
