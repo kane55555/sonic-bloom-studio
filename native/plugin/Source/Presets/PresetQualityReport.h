@@ -1469,6 +1469,11 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("neuralTextureContributionPercent", neuralTextureContributionPercent);
     j->setProperty("neuralTextureContributionEstimated", neuralTextureContributionEstimated);
     j->setProperty("neuralTextureSoloActive",        neuralTextureSoloActive);
+    j->setProperty("supportBodyPeakDb",              supportBodyPeakDb);
+    j->setProperty("supportBodyGainDb",              supportBodyGainDb);
+    j->setProperty("supportBodyActive",              supportBodyActive);
+    j->setProperty("supportBodyVoiceStarted",        supportBodyVoiceStarted);
+    j->setProperty("supportBodyEnvelopeState",       supportBodyEnvelopeState);
     juce::Array<juce::var> warnVar;
     for (auto& w : warnings) warnVar.add(w);
     j->setProperty("warnings",               warnVar);
