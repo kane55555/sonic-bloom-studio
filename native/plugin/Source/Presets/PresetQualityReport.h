@@ -214,8 +214,15 @@ inline void report(DiditagainProcessor& proc,
     int activeLayers = (up.main.enabled ? 1 : 0)
                      + ((up.layer2.enabled && ! naturalChoirSampleOnly) ? 1 : 0);
     int activePartials = 0;
-    if (! naturalChoirSampleOnly)
-        for (auto& p : up.partials) if (p.enabled) ++activePartials;
+    for (auto& p : up.partials)
+    {
+        if (! p.enabled) continue;
+        const bool isNeural = p.engineType.equalsIgnoreCase("neuralTextureCached")
+                           || p.engineType.equalsIgnoreCase("neuralTexture");
+        // In choir mode only the cached AI Texture partial survives (the synth
+        // support partials are clamped), so count neural partials regardless.
+        if (! naturalChoirSampleOnly || isNeural) ++activePartials;
+    }
 
     const juce::String engineType = up.engineType.isNotEmpty() ? up.engineType
                                   : (up.partials.size() > 0 ? juce::String("layered") : juce::String("pcm"));
