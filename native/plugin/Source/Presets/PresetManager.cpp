@@ -249,12 +249,12 @@ static juce::String exactAiTextureBaseRelativePath(const dida::userpreset::UserP
     const auto cat  = up.category.toLowerCase();
     const auto raw  = up.source.path.replaceCharacter('\\', '/').toLowerCase();
     if (name.contains("brass") || cat.contains("brass") || raw.contains("/brass") || raw.startsWith("brass"))
-        return "Brass/Brass 1";
+        return "Presets/User/Brass/Brass 1";
     if (name.contains("choir") || cat.contains("choir") || cat.contains("vox")
         || raw.contains("/choir") || raw.startsWith("choir"))
-        return "ChoirsVox/Choir 1";
+        return "Presets/User/Choir Ohhh";
     if (name.contains("guitar") || cat.contains("guitar") || raw.contains("/guitar") || raw.startsWith("guitar"))
-        return "Guitars/Guitar 1";
+        return "Presets/User/Acoustic Guitars/Acoustic Guitar 1";
     return {};
 }
 
@@ -290,11 +290,10 @@ static juce::File resolveAiTextureBaseSourceCandidate(const juce::String& rawPat
             ? samplesRoot.getChildFile(expanded.substring(8))
             : samplesRoot.getChildFile(expanded));
 
-    // STEP C resolution: required AI Texture multisample sources are resolved
-    // against <Samples>/Presets/User first, then the broader <Samples> root.
-    // When the primary candidate is not a real folder, retry the relative tail
-    // under Presets/User so paths like "Brass/Brass 1" or
-    // "{DIDA_DOCS}/Samples/Presets/User/Choir Ohhh" resolve correctly.
+    // STEP C resolution: first honour the preset's exact sourceInstrument.path
+    // after token expansion. Only when that exact path fails do we retry a
+    // relative tail under <Samples>/Presets/User and, finally, a known legacy
+    // broad-category path mapped to the current Presets/User multisample.
     if (! candidate.isDirectory())
     {
         auto rel = expanded;
@@ -323,7 +322,8 @@ static juce::File resolveAiTextureBaseSourceCandidate(const juce::String& rawPat
     const auto exactRel = exactAiTextureBaseRelativePath(up);
     const auto srcNorm = src.replaceCharacter('\\', '/');
     const auto expandedNorm = expanded.replaceCharacter('\\', '/');
-    if (exactRel.isNotEmpty()
+    if (! candidate.isDirectory()
+        && exactRel.isNotEmpty()
         && (srcNorm.equalsIgnoreCase("Brass")
             || srcNorm.equalsIgnoreCase("Choir")
             || srcNorm.equalsIgnoreCase("Choirs")
@@ -343,19 +343,6 @@ static juce::File resolveAiTextureBaseSourceCandidate(const juce::String& rawPat
             || expandedNorm.endsWithIgnoreCase("/Samples/Guitar")
             || expandedNorm.endsWithIgnoreCase("/Samples/Guitars")))
         candidate = samplesRoot.getChildFile(exactRel);
-
-    if (candidate.isDirectory())
-    {
-        const auto norm = candidate.getFullPathName().replaceCharacter('\\', '/');
-        if (exactRel.isNotEmpty()
-            && (norm.endsWithIgnoreCase("/Samples/Brass")
-                || norm.endsWithIgnoreCase("/Samples/Choir")
-                || norm.endsWithIgnoreCase("/Samples/Choirs")
-                || norm.endsWithIgnoreCase("/Samples/ChoirsVox")
-                || norm.endsWithIgnoreCase("/Samples/Guitar")
-                || norm.endsWithIgnoreCase("/Samples/Guitars")))
-            candidate = samplesRoot.getChildFile(exactRel);
-    }
 
     return candidate;
 }
@@ -2076,6 +2063,50 @@ static bool writeBinaryResourceToFile(const juce::String& originalName,
     return false;
 }
 
+static juce::String aiTextureDemoSourcePathForFile(const juce::String& fileName)
+{
+    const auto n = fileName.toLowerCase();
+    if (n.contains("brass air"))
+        return "{DIDA_DOCS}/Samples/Presets/User/Brass/Brass 1";
+    if (n.contains("choir ghost"))
+        return "{DIDA_DOCS}/Samples/Presets/User/Choir Ohhh";
+    if (n.contains("guitar dust"))
+        return "{DIDA_DOCS}/Samples/Presets/User/Acoustic Guitars/Acoustic Guitar 1";
+    return {};
+}
+
+static void forceAiTextureDemoSourcePath(const juce::File& presetFile)
+{
+    const auto targetPath = aiTextureDemoSourcePathForFile(presetFile.getFileName());
+    if (targetPath.isEmpty() || ! presetFile.existsAsFile()) return;
+
+    auto json = juce::JSON::parse(presetFile);
+    auto* obj = json.getDynamicObject();
+    if (obj == nullptr) return;
+
+    auto src = obj->getProperty("sourceInstrument");
+    juce::DynamicObject::Ptr newSrc;
+    auto* srcObj = src.getDynamicObject();
+    if (srcObj == nullptr)
+    {
+        newSrc = new juce::DynamicObject();
+        srcObj = newSrc.get();
+    }
+    srcObj->setProperty("type", "multisampleFolder");
+    srcObj->setProperty("path", targetPath);
+    srcObj->setProperty("mappingMode", "nearest");
+    juce::Array<juce::var> roots;
+    roots.add("C");
+    srcObj->setProperty("rootNotePattern", roots);
+    if (newSrc != nullptr)
+        obj->setProperty("sourceInstrument", juce::var(newSrc.get()));
+
+    if (auto* samplesObj = obj->getProperty("samples").getDynamicObject())
+        samplesObj->setProperty("rootFolder", targetPath);
+
+    presetFile.replaceWithText(juce::JSON::toString(json, false));
+}
+
 //==============================================================================
 // One-time install of the bundled "AI Texture Demo Pack".
 //
@@ -2093,14 +2124,12 @@ void PresetManager::seedAiTextureDemoPackIfMissing()
     auto dir  = root.getChildFile("AI Texture");
     dir.createDirectory();
 
-    // v2 migration marker. Earlier builds seeded the demo textures to the wrong
-    // location / left {DIDA_DOCS} resolving incorrectly, so a plain ".seeded"
-    // marker would block the corrected install. We use a dedicated v2 marker so
-    // existing installs re-run this once and pick up the corrected texture WAVs.
-    // writeBinaryResourceToFile() never overwrites existing files, so any
-    // user-edited preset or texture is preserved untouched.
-    auto seededMarkerV2 = dir.getChildFile(".seeded_ai_texture_demo_v4");
-    if (seededMarkerV2.existsAsFile())
+    // v6 migration marker. Earlier builds installed AI Texture demo presets with
+    // stale broad sourceInstrument paths (for example {DIDA_DOCS}/Samples/Choir)
+    // that resolved through legacy category guesses. Re-run once to overwrite the
+    // three managed demo .diapreset files with exact Presets/User multisample paths.
+    auto seededMarkerV6 = dir.getChildFile(".seeded_ai_texture_demo_v6");
+    if (seededMarkerV6.existsAsFile())
         return;
 
     auto docsRoot = dida::SampleLibrary::getSamplesRoot().getParentDirectory();
@@ -2124,20 +2153,25 @@ void PresetManager::seedAiTextureDemoPackIfMissing()
         "AI Choir Ghost Test.diapreset",
         "AI Guitar Dust Test.diapreset"
     };
-    // v3: the factory demo presets carry corrected gain staging, so refresh
-    // them in place. Only these three managed factory files are overwritten;
-    // user-created presets and textures are never touched.
+    // v6: refresh the three managed AI Texture demo presets in place so installed
+    // copies get the exact sourceInstrument.path values. This does not touch any
+    // other presets or non-managed user content.
     for (auto* name : presetFiles)
     {
         auto destFile = dir.getChildFile(name);
         if (destFile.existsAsFile())
             destFile.deleteFile();
-        written += writeBinaryResourceToFile(name, destFile) ? 1 : 0;
+        const bool installed = writeBinaryResourceToFile(name, destFile);
+        if (installed)
+        {
+            forceAiTextureDemoSourcePath(destFile);
+            ++written;
+        }
     }
 
-    seededMarkerV2.replaceWithText("1");
+    seededMarkerV6.replaceWithText("1");
 
-    didaPresetManagerLog("seeded AI Texture demo pack (v2) count=" + juce::String(written)
+    didaPresetManagerLog("seeded AI Texture demo pack (v6) count=" + juce::String(written)
         + " presets=" + dir.getFullPathName()
         + " textures=" + texRoot.getFullPathName());
 }

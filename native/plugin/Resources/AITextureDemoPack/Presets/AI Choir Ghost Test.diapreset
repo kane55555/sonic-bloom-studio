@@ -70,7 +70,7 @@
     }
   },
   "samples": {
-    "rootFolder": "ChoirsVox/Choir 1",
+    "rootFolder": "{DIDA_DOCS}/Samples/Presets/User/Choir Ohhh",
     "required": true,
     "fallbackSynthIfMissing": true,
     "note": "Main sound body = real Choir multisample. The AI texture only blends on top. If the folder is missing, the optional analog support partial below can be enabled as a fallback."

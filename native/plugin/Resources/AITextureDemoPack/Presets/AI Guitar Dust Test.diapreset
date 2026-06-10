@@ -70,7 +70,7 @@
     }
   },
   "samples": {
-    "rootFolder": "Guitars/Guitar 1",
+    "rootFolder": "{DIDA_DOCS}/Samples/Presets/User/Acoustic Guitars/Acoustic Guitar 1",
     "required": true,
     "fallbackSynthIfMissing": true,
     "note": "Main sound body = real Guitar multisample. The AI texture only blends on top. If the folder is missing, the optional analog support partial below can be enabled as a fallback."
