@@ -1677,6 +1677,10 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
                 }
                 else
                 {
+                    if (isAiTexturePreset(p))
+                        if (auto* analog = dynamic_cast<dida::engines::AnalogEngine*>(eng.get()))
+                            configureAiTextureSupportAnalog(*analog, pb);
+
                     // Demo-pack support/body partials declare their level in dB
                     // ("levelDb"). Honour it so the support body sits at the
                     // intended level instead of full-scale; fall back to the
