@@ -175,7 +175,7 @@ private:
     juce::Slider       amount;
     juce::Label        amountLabel;
     juce::ToggleButton soloToggle;
-    juce::TextButton   importButton, removeButton, openFolderButton, freezeButton;
+    juce::TextButton   importButton, removeButton, openFolderButton, freezeButton, installPackButton;
     juce::Label        statusLabel, messageLabel;
 
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> enabledAttach;
