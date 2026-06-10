@@ -1040,6 +1040,31 @@ inline void report(DiditagainProcessor& proc,
                                       ? bankCategoryIn : effectiveCategory;
 
     // --- Emit -------------------------------------------------------------
+    // --- AI Texture diagnostic section (Task 4) ---------------------------
+    // neuralTexturePeakDb: measured peak of the cached texture engine (linear
+    // atomic, read off the audio thread). neuralTextureGainDb: the effective
+    // applied texture gain (engine trim, hard-capped at -9 dB, times the live
+    // panel amount with the same quadratic taper the voice uses).
+    const float neuralTexturePeakLin = engine.getNeuralTexturePeakLinear();
+    const float neuralTexturePeakDb  = neuralTexturePeakLin > 1.0e-6f
+        ? juce::Decibels::gainToDecibels(neuralTexturePeakLin) : -120.0f;
+    const bool  aiPanelEnabled = paramValue(proc, "aiTextureEnabled") > 0.5f;
+    const float aiPanelAmount  = juce::jlimit(0.0f, 1.0f, paramValue(proc, "aiTextureAmount"));
+    const bool  neuralTextureSoloActive = proc.getAiTextureSolo();
+    const float textureSafeBaseDb = juce::jmin(-9.0f, aiTextureBaseLevelDb);
+    float neuralTextureGainDb = -120.0f;
+    if (aiHasNeuralPartial && aiPanelEnabled && aiPanelAmount > 0.0f)
+    {
+        const float liveGain = aiPanelAmount * aiPanelAmount; // matches Voice taper
+        neuralTextureGainDb = textureSafeBaseDb + juce::Decibels::gainToDecibels(liveGain);
+    }
+    // Rough contribution of the texture to the final output (peak ratio).
+    const float finalOutputLin = finalOutputDb > -120.0f
+        ? juce::Decibels::decibelsToGain(finalOutputDb) : 0.0f;
+    const float neuralTextureContributionPercent = (finalOutputLin > 1.0e-6f && neuralTexturePeakLin > 0.0f)
+        ? juce::jlimit(0.0f, 100.0f, 100.0f * neuralTexturePeakLin / finalOutputLin) : 0.0f;
+    const juce::String aiTextureTypeStr = aiTextureType.isNotEmpty() ? aiTextureType : juce::String("none");
+
     juce::String out;
     out << "[DIDITAGAIN preset-quality]"
         << " sessionId=" << sess.sessionId
