@@ -194,6 +194,7 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
     fxSendReleaseCounter = 0;
     fxSendActive = true;
     noteReleasedForFxSend = false;
+    mainSamplePeakLin_.store(0.0f);
     recalcGlideCoeff();
 
     loZone = hiZone = nullptr;
