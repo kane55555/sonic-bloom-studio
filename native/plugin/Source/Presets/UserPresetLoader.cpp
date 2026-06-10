@@ -845,6 +845,31 @@ float aiTextureGainTrimDb(const UserPreset& p) noexcept
     return 0.0f;
 }
 
+void configureAiTextureSupportAnalog(dida::engines::AnalogEngine& analog,
+                                      const UserPreset::PartialBlock& pb) noexcept
+{
+    const juce::var ep = pb.engineParams;
+    const auto osc = ep.getProperty("osc", "saw").toString().trim().toLowerCase();
+    if (osc.contains("tri"))      analog.setShape(dida::engines::AnalogEngine::Shape::Tri);
+    else if (osc.contains("square")) analog.setShape(dida::engines::AnalogEngine::Shape::Square);
+    else if (osc.contains("pulse"))  analog.setShape(dida::engines::AnalogEngine::Shape::Pulse);
+    else if (osc.contains("sine"))   analog.setShape(dida::engines::AnalogEngine::Shape::Sine);
+    else if (osc.contains("noise"))  analog.setShape(dida::engines::AnalogEngine::Shape::Noise);
+    else                             analog.setShape(dida::engines::AnalogEngine::Shape::Saw);
+
+    analog.setUnison((int) ep.getProperty("unison", 1));
+    analog.setDetune((float) (double) ep.getProperty("detuneCents", 0.0));
+    analog.setStereoSpread((float) (double) ep.getProperty("spread", 0.25));
+    analog.setSubLevel((float) (double) ep.getProperty("subLevel", 0.0));
+    analog.setDrift((float) (double) ep.getProperty("driftCents", 0.0));
+
+    const float attackMs  = juce::jlimit(5.0f, 20.0f,  (float) (double) ep.getProperty("attackMs", 12.0));
+    const float decayMs   = juce::jlimit(1.0f, 300.0f, (float) (double) ep.getProperty("decayMs", 180.0));
+    const float sustain   = juce::jlimit(0.65f, 1.0f,  (float) (double) ep.getProperty("sustain", 0.82));
+    const float releaseMs = juce::jlimit(120.0f, 400.0f, (float) (double) ep.getProperty("releaseMs", 220.0));
+    analog.setAmpEnvelopeMs(attackMs, decayMs, sustain, releaseMs);
+}
+
 
 
 juce::String fxSendReleaseSourceFor(const UserPreset& p, bool choirMode)
