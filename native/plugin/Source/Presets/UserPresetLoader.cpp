@@ -836,9 +836,12 @@ float aiTextureGainTrimDb(const UserPreset& p) noexcept
 {
     const auto n = p.presetName.toLowerCase();
     const auto c = p.category.toLowerCase();
-    // Guitar Dust reported LOW_HEADROOM with suggestedGainAdjustmentDb ~= -7.8.
+    // Guitar Dust originally reported LOW_HEADROOM (~-7.8) when its body sat near
+    // 0 dBFS. Now that the support is a controlled analog partial (-8 dB), a full
+    // -8 dB global cut pushed the whole preset into TOO_QUIET, so a lighter -3 dB
+    // headroom trim keeps it inside the -18..-8 dB window without going quiet.
     if (n.contains("guitar dust") || (c.contains("guitar") && presetHasNeuralTexturePartial(p)))
-        return -8.0f;
+        return -3.0f;
     return 0.0f;
 }
 
@@ -967,8 +970,11 @@ bool isAiTexturePreset(const UserPreset& p) noexcept
 // everything else returns 0.
 float loadTimeGainTrimDb(const UserPreset& p)
 {
-    if (isChoirModePreset(p)) return choirNaturalGainTrimDb(p);
+    // AI Texture presets take priority over the choir path: a cached-texture
+    // choir preset (e.g. "AI Choir Ghost Test") must use the AI texture trim so
+    // its installed support body is not also cut by the natural-choir trim.
     if (isAiTexturePreset(p)) return aiTextureGainTrimDb(p);
+    if (isChoirModePreset(p)) return choirNaturalGainTrimDb(p);
     return 0.0f;
 }
 
@@ -1603,7 +1609,11 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
 
                 // In choir mode only the neural texture partial is installed; the
                 // synth-support partials are intentionally muted by the choir path.
-                if (choirMode && ! isNeural) continue;
+                // AI Texture presets keep their support/body partial even in
+                // choir mode — otherwise the cached-texture choir preset renders
+                // texture-only and reports TOO_QUIET. Natural (non-AI) choir
+                // presets remain sample-only as before.
+                if (choirMode && ! isNeural && ! isAiTexturePreset(p)) continue;
 
                 auto eng = makeEngine(pb.engineType);
                 if (eng == nullptr) continue;
