@@ -161,6 +161,7 @@ private:
                 if (file == juce::File()) return;
                 showResult(processor.getPresetManager().installPresetPackFromZip(file));
             });
+    }
 
     void showResult(const PresetManager::AiTextureOpResult& r)
     {
