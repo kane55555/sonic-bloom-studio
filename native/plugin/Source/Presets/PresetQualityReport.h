@@ -1472,6 +1472,7 @@ inline void report(DiditagainProcessor& proc,
     // AI Texture diagnostic section (Task 4).
     j->setProperty("aiTexturePreset",                aiTexturePreset);
     j->setProperty("textureType",                    aiTextureTypeStr);
+    j->setProperty("mainSamplePeakDb",               mainSamplePeakDb);
     j->setProperty("neuralTexturePeakDb",            neuralTexturePeakDb);
     j->setProperty("neuralTextureGainDb",            neuralTextureGainDb);
     j->setProperty("neuralTextureContributionPercent", neuralTextureContributionPercent);
