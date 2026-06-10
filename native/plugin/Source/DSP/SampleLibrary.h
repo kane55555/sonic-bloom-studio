@@ -40,6 +40,7 @@ struct SampleZone
     int loVel = 0;
     int hiVel = 127;
     juce::String fileName;
+    juce::String fullPath;   // absolute path the zone was decoded from (diagnostics)
 };
 
 class Multisample
