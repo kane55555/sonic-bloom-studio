@@ -361,6 +361,14 @@ inline void report(DiditagainProcessor& proc,
                         : (pb.hasLevelDb            ? pb.levelDb
                         : (pb.amp.gainDb != 0.0f    ? pb.amp.gainDb : -18.0f));
             if (lvlDb > -9.0f) warnings.add("AI_TEXTURE_TOO_LOUD");
+
+            // Capture diagnostic detail from the first neural texture partial.
+            if (! aiHasNeuralPartial)
+            {
+                aiHasNeuralPartial   = true;
+                aiTextureBaseLevelDb = lvlDb;
+                aiTextureType        = ep.getProperty("textureType", "").toString();
+            }
         }
 
         // Live panel state (observation-only; mirrors the audio-thread mapping).
