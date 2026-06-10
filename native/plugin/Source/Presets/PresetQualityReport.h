@@ -151,6 +151,13 @@ inline bool engineRequiresSource(const dida::userpreset::UserPreset& up)
         const auto x = e.trim().toLowerCase();
         return x.isEmpty() || x == "pcm" || x == "sample" || x == "multisample";
     };
+    // AI-enhanced multisample presets: the multisample folder IS the main body,
+    // so the source is required whenever the preset declares a required source
+    // path (even when the audible "engineType" is "hybrid"/texture-led). This is
+    // what makes sourceRequiredForEngine=true for AI Texture presets that sit on
+    // top of a real sampled instrument.
+    if (up.sourceRequired && up.source.path.isNotEmpty())
+        return true;
     if (up.partials.size() == 0) return needsPcm(up.engineType);
     if (up.engineType.equalsIgnoreCase("layered") || up.engineType.isEmpty())
     {
