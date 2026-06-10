@@ -50,6 +50,7 @@ PresetManager::PresetManager(juce::AudioProcessor& proc) : processor(proc)
 
     seedGuitarPresetBankIfMissing();
     seedVintageSynthBankIfMissing();
+    seedAiTextureDemoPackIfMissing();
 
     // Drop a one-time .seeded marker into every User category folder. Any
     // future auto-seeding logic for these folders must check this marker and
