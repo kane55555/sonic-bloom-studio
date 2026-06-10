@@ -339,6 +339,13 @@ bool parseFile(const juce::File& file, UserPreset& out, juce::String& errorOut)
             pb.eqRole             = getS(v, "eqRole",             pb.eqRole);
             pb.followMainEnvelope = getB(v, "followMainEnvelope", pb.followMainEnvelope);
             pb.maxGainDb          = getF(v, "maxGainDb",          pb.maxGainDb);
+            // Demo-pack additive: top-level levelDb + isNeuralTexture hint.
+            if (v.isObject() && v.hasProperty("levelDb"))
+            {
+                pb.hasLevelDb = true;
+                pb.levelDb    = getF(v, "levelDb", pb.levelDb);
+            }
+            pb.isNeuralTexture = getB(v, "isNeuralTexture", pb.isNeuralTexture);
             pb.engineParams = v.getProperty("engineParams", juce::var());
 
             auto pAmp = v.getProperty("amp", juce::var());
