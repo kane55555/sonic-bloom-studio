@@ -4,7 +4,7 @@
   "category": "ChoirsVox",
   "sourceInstrument": {
     "type": "multisampleFolder",
-    "path": "ChoirsVox/Choir 1",
+    "path": "{DIDA_DOCS}/Samples/Presets/User/Choir Ohhh",
     "mappingMode": "nearest",
     "rootNotePattern": ["C"]
   },
