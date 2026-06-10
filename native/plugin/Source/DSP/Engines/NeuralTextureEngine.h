@@ -88,6 +88,11 @@ public:
     // Diagnostic peak shared with the preset-quality reporter via IEngineSource.
     float getLastPeakLinear() const noexcept override { return lastPeak.load(); }
 
+    // Static intrinsic peak of the decoded texture (linear), measured once at
+    // load time off the audio thread. Available even when no note is sounding,
+    // so the reporter can estimate the texture's contribution at report time.
+    float getStaticPeakLinear() const noexcept override { return texturePeakLin.load(); }
+
 private:
     inline float readInterp(int channel, double pos) const noexcept;
 
