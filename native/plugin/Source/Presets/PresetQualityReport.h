@@ -1058,7 +1058,7 @@ inline void report(DiditagainProcessor& proc,
         effTextureGainLin = juce::Decibels::decibelsToGain(textureSafeBaseDb) * liveGain;
         neuralTextureGainDb = textureSafeBaseDb + juce::Decibels::gainToDecibels(liveGain);
     }
-    juce::ignoreUnused(aiPanelAmountSq);
+    
 
     // Peak of the cached texture layer. Prefer the LIVE measured block peak
     // (taken in renderAdd after texture playback + engine gain, before the bus
