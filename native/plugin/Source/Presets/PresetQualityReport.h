@@ -946,11 +946,29 @@ inline void report(DiditagainProcessor& proc,
     if (up.layer2.enabled && up.layer2.gainDb > -18.0f && isBeepyRole(up.layer2.eqRole))
         beep = true;
     for (auto& p : up.partials)
-        if (p.enabled && isBeepyRole(p.eqRole))
-        {
-            const float g = juce::Decibels::gainToDecibels(juce::jmax(1.0e-6f, p.level));
-            if (g > -18.0f) { beep = true; break; }
-        }
+    {
+        if (! p.enabled) continue;
+        // Cached neural texture layers are pre-rendered audio played quietly
+        // under the main sample — never a synth reinforcement tone. Skip them
+        // so AI Texture presets never trip POSSIBLE_BEEP_LAYER.
+        if (p.engineType.equalsIgnoreCase("neuralTextureCached")
+            || p.engineType.equalsIgnoreCase("neuralTexture")
+            || p.isNeuralTexture) continue;
+        // engineParams.role of "support"/"texture" marks an intentional, quiet
+        // background layer (demo-pack fallback synth body), not a beep.
+        const juce::var ep = p.engineParams;
+        const juce::String role = ep.getProperty("role", "").toString();
+        if (role.equalsIgnoreCase("support") || role.equalsIgnoreCase("texture")) continue;
+        if (! isBeepyRole(p.eqRole)) continue;
+        // Use the partial's EFFECTIVE level in dB (matches the loader priority)
+        // instead of the raw 0 dB `level` default so a quiet layer never beeps.
+        const float effDb = ep.hasProperty("levelDb")
+                              ? (float) (double) ep.getProperty("levelDb", -18.0)
+                          : (p.hasLevelDb        ? p.levelDb
+                          : (p.amp.gainDb != 0.0f ? p.amp.gainDb
+                          : juce::Decibels::gainToDecibels(juce::jmax(1.0e-6f, p.level))));
+        if (effDb > -18.0f) { beep = true; break; }
+    }
     if (beep) warnings.add("POSSIBLE_BEEP_LAYER");
 
     if (! reportEligible)
