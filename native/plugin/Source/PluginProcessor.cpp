@@ -277,6 +277,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createP
         juce::StringArray{"I", "II", "I+II"}, 0));
 
 
+    // AI Texture v0.1 — live, global control over the cached neural texture
+    // layer. These do not create textures; they only scale the neural texture
+    // partials a preset already loaded. enabled=false or amount=0 fully mutes
+    // the texture, leaving the main sample/synth untouched. Presets without a
+    // neural texture partial are unaffected (sound identical to before).
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{"aiTextureEnabled", 1}, "AI Texture", true));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"aiTextureAmount", 1}, "Texture Amount",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 1.0f));
+
     // Global oversampling quality (anti-aliasing for the synthesis engines).
     // Off is bit-identical to the legacy render path; 2x/4x reduce oscillator
     // aliasing at the cost of CPU + a little latency.
