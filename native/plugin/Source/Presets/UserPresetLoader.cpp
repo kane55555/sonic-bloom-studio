@@ -1696,12 +1696,12 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
                     if (pb.hasLevelDb)
                         partialLevel = juce::Decibels::decibelsToGain(pb.levelDb);
 
-                    // AI Texture support/body partials must never be silently
-                    // dropped: force-enable them so supportBodyActive=true is
-                    // guaranteed even if the source "enabled" flag is missing or
-                    // a natural-choir path would otherwise mute them. Non-AI
-                    // partials still honour their declared enabled flag.
-                    const bool partialEnabled = aiTexturePresetForInstall ? true : pb.enabled;
+                    // Optional analog support for AI-enhanced multisample presets:
+                    // the multisample folder is the main body, so a synthetic
+                    // support/body partial is NOT force-enabled anymore. It plays
+                    // only when the preset explicitly requests it (pb.enabled),
+                    // e.g. as extra synthetic support or a missing-source fallback.
+                    const bool partialEnabled = pb.enabled;
                     v.setPartial(i, std::move(eng), partialEnabled, partialLevel, pb.pan,
                                  pb.pitchSemis, pb.fineCents);
                 }
