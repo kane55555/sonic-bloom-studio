@@ -320,8 +320,11 @@ inline void report(DiditagainProcessor& proc,
             }
 
             // Gain safety: a neural texture must stay quiet under the main sample.
+            // Priority mirrors the loader: engineParams.levelDb, then the
+            // demo-pack top-level partial levelDb, then amp.gainDb, else -18.
             float lvlDb = ep.hasProperty("levelDb") ? (float) (double) ep.getProperty("levelDb", -18.0)
-                                                     : (pb.amp.gainDb != 0.0f ? pb.amp.gainDb : -18.0f);
+                        : (pb.hasLevelDb            ? pb.levelDb
+                        : (pb.amp.gainDb != 0.0f    ? pb.amp.gainDb : -18.0f));
             if (lvlDb > -9.0f) warnings.add("AI_TEXTURE_TOO_LOUD");
         }
 
