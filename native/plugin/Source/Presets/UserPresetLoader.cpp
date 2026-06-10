@@ -513,6 +513,13 @@ juce::File resolveSourcePath(const juce::String& rawPath)
         // base instrument samples live in Samples/<Category>/<Instrument>/.
         if (absFile.isDirectory())
             return absFile;
+        // AI Texture v0.2: a cached neural texture is a single WAV *file*, not a
+        // folder. The folder-oriented candidate search below (folderHasWavs)
+        // would otherwise discard a valid absolute file path and fall through to
+        // a category fallback, which is what produced AI_TEXTURE_MISSING_FILE.
+        // Return the file directly when it exists on disk.
+        if (absFile.existsAsFile())
+            return absFile;
         addCandidate(candidates, absFile);
     }
 
