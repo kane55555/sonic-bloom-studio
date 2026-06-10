@@ -1105,6 +1105,8 @@ inline void report(DiditagainProcessor& proc,
     const float supportBodyGainDb = aiTexturePreset ? engine.getSupportBodyGainDb() : -120.0f;
     const bool  supportBodyActive = aiTexturePreset && engine.isSupportBodyActive();
     const bool  supportBodyVoiceStarted = aiTexturePreset && reportEligible && engine.hasSupportBodyVoiceStarted();
+    const juce::String supportBodyEnvelopeState = aiTexturePreset
+        ? engine.getSupportBodyEnvelopeState() : juce::String("n/a");
 
     juce::String out;
     out << "[DIDITAGAIN preset-quality]"
