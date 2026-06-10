@@ -1684,7 +1684,7 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
                 }
                 else
                 {
-                    if (isAiTexturePreset(p))
+                    if (aiTexturePresetForInstall)
                         if (auto* analog = dynamic_cast<dida::engines::AnalogEngine*>(eng.get()))
                             configureAiTextureSupportAnalog(*analog, pb);
 
@@ -1695,7 +1695,14 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
                     float partialLevel = pb.level;
                     if (pb.hasLevelDb)
                         partialLevel = juce::Decibels::decibelsToGain(pb.levelDb);
-                    v.setPartial(i, std::move(eng), pb.enabled, partialLevel, pb.pan,
+
+                    // AI Texture support/body partials must never be silently
+                    // dropped: force-enable them so supportBodyActive=true is
+                    // guaranteed even if the source "enabled" flag is missing or
+                    // a natural-choir path would otherwise mute them. Non-AI
+                    // partials still honour their declared enabled flag.
+                    const bool partialEnabled = aiTexturePresetForInstall ? true : pb.enabled;
+                    v.setPartial(i, std::move(eng), partialEnabled, partialLevel, pb.pan,
                                  pb.pitchSemis, pb.fineCents);
                 }
             }
