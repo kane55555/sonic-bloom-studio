@@ -1108,6 +1108,13 @@ inline void report(DiditagainProcessor& proc,
     const juce::String supportBodyEnvelopeState = aiTexturePreset
         ? engine.getSupportBodyEnvelopeState() : juce::String("n/a");
 
+    // mainSamplePeakDb: peak of the main multisample/PCM body. For AI-enhanced
+    // multisample presets this proves the sampled instrument — not the texture
+    // or analog support — is the primary sound.
+    const float mainSamplePeakLin = engine.getMainSamplePeakLinear();
+    const float mainSamplePeakDb  = mainSamplePeakLin > 1.0e-6f
+        ? juce::Decibels::gainToDecibels(mainSamplePeakLin) : -120.0f;
+
     juce::String out;
     out << "[DIDITAGAIN preset-quality]"
         << " sessionId=" << sess.sessionId
