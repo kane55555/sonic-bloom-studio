@@ -2153,9 +2153,9 @@ void PresetManager::seedAiTextureDemoPackIfMissing()
         "AI Choir Ghost Test.diapreset",
         "AI Guitar Dust Test.diapreset"
     };
-    // v6: refresh the three managed AI Texture demo presets in place so installed
-    // copies get the exact sourceInstrument.path values. This does not touch any
-    // other presets or non-managed user content.
+    // v7: refresh the three managed AI Texture demo presets in place so installed
+    // copies get the recalibrated gains (and exact sourceInstrument.path values).
+    // This does not touch any other presets or non-managed user content.
     for (auto* name : presetFiles)
     {
         auto destFile = dir.getChildFile(name);
