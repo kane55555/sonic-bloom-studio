@@ -4,7 +4,7 @@
   "author": "DIDITAGAIN STUDIO / ChatGPT",
   "category": "Choir",
   "engineType": "hybrid",
-  "description": "Ethereal choir/pad preset with a ghost-vowel cached AI texture for width and emotional smear.",
+  "description": "Real choir multisample as the main body, enhanced with a subtle ghost-vowel cached AI texture for width and emotional smear.",
   "ai": {
     "enabled": true,
     "profileVersion": 1,
@@ -20,13 +20,13 @@
       "bodyWarmth": 0.58
     },
     "recommendedTexture": "choir_ghost",
-    "recommendedTextureAmount": 0.38
+    "recommendedTextureAmount": 0.25
   },
   "macros": {
     "tone": 0.56,
     "character": 0.62,
     "width": 0.74,
-    "texture": 0.38
+    "texture": 0.25
   },
   "ampEnvelope": {
     "attackMs": 90,
@@ -64,14 +64,14 @@
     }
   },
   "samples": {
-    "rootFolder": "{DIDA_DOCS}/Samples/Choir",
-    "required": false,
+    "rootFolder": "ChoirsVox/Choir 1",
+    "required": true,
     "fallbackSynthIfMissing": true,
-    "note": "Replace with your real multisample folder. AI texture layer is self-contained."
+    "note": "Main sound body = real Choir multisample. The AI texture only blends on top. If the folder is missing, the optional analog support partial below can be enabled as a fallback."
   },
   "partials": [
     {
-      "enabled": true,
+      "enabled": false,
       "engineType": "analog",
       "levelDb": -6.0,
       "pan": 0.0,
@@ -82,17 +82,20 @@
         "detuneCents": 6,
         "filterCutoffHz": 6800,
         "attackMs": 120,
-        "releaseMs": 900
+        "releaseMs": 900,
+        "note": "Optional synthetic support — only enable if the multisample folder is missing or extra body is wanted."
       }
     },
     {
       "enabled": true,
       "engineType": "neuralTextureCached",
       "isNeuralTexture": true,
-      "levelDb": -18.0,
+      "levelDb": -14.0,
       "pan": 0.0,
       "pitchSemis": 0,
       "fineCents": 0,
+      "followMainEnvelope": true,
+      "eqRole": "neuralTexture",
       "engineParams": {
         "texturePath": "{DIDA_DOCS}/NeuralTextures/Demo/ChoirGhost/dida_choir_ghost_C4.wav",
         "textureType": "choir_ghost",
