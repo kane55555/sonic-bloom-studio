@@ -1933,7 +1933,7 @@ void PresetManager::seedAiTextureDemoPackIfMissing()
     // existing installs re-run this once and pick up the corrected texture WAVs.
     // writeBinaryResourceToFile() never overwrites existing files, so any
     // user-edited preset or texture is preserved untouched.
-    auto seededMarkerV2 = dir.getChildFile(".seeded_ai_texture_demo_v2");
+    auto seededMarkerV2 = dir.getChildFile(".seeded_ai_texture_demo_v3");
     if (seededMarkerV2.existsAsFile())
         return;
 
