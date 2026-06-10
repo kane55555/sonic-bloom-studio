@@ -4,7 +4,7 @@
   "category": "Brass",
   "sourceInstrument": {
     "type": "multisampleFolder",
-    "path": "Brass/Brass 1",
+    "path": "{DIDA_DOCS}/Samples/Presets/User/Brass/Brass 1",
     "mappingMode": "nearest",
     "rootNotePattern": ["C"]
   },

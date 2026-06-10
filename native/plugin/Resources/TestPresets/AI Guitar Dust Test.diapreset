@@ -4,7 +4,7 @@
   "category": "Guitars",
   "sourceInstrument": {
     "type": "multisampleFolder",
-    "path": "Guitars/Guitar 1",
+    "path": "{DIDA_DOCS}/Samples/Presets/User/Acoustic Guitars/Acoustic Guitar 1",
     "mappingMode": "nearest",
     "rootNotePattern": ["C"]
   },
