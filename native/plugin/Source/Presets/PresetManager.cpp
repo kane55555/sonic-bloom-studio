@@ -287,9 +287,32 @@ static juce::File resolveAiTextureBaseSourceCandidate(const juce::String& rawPat
             ? samplesRoot.getChildFile(expanded.substring(8))
             : samplesRoot.getChildFile(expanded));
 
+    const auto exactRel = exactAiTextureBaseRelativePath(up);
+    const auto srcNorm = src.replaceCharacter('\\', '/');
+    const auto expandedNorm = expanded.replaceCharacter('\\', '/');
+    if (exactRel.isNotEmpty()
+        && (srcNorm.equalsIgnoreCase("Brass")
+            || srcNorm.equalsIgnoreCase("Choir")
+            || srcNorm.equalsIgnoreCase("Choirs")
+            || srcNorm.equalsIgnoreCase("ChoirsVox")
+            || srcNorm.equalsIgnoreCase("Guitar")
+            || srcNorm.equalsIgnoreCase("Guitars")
+            || srcNorm.endsWithIgnoreCase("/Samples/Brass")
+            || srcNorm.endsWithIgnoreCase("/Samples/Choir")
+            || srcNorm.endsWithIgnoreCase("/Samples/Choirs")
+            || srcNorm.endsWithIgnoreCase("/Samples/ChoirsVox")
+            || srcNorm.endsWithIgnoreCase("/Samples/Guitar")
+            || srcNorm.endsWithIgnoreCase("/Samples/Guitars")
+            || expandedNorm.endsWithIgnoreCase("/Samples/Brass")
+            || expandedNorm.endsWithIgnoreCase("/Samples/Choir")
+            || expandedNorm.endsWithIgnoreCase("/Samples/Choirs")
+            || expandedNorm.endsWithIgnoreCase("/Samples/ChoirsVox")
+            || expandedNorm.endsWithIgnoreCase("/Samples/Guitar")
+            || expandedNorm.endsWithIgnoreCase("/Samples/Guitars")))
+        candidate = samplesRoot.getChildFile(exactRel);
+
     if (candidate.isDirectory())
     {
-        const auto exactRel = exactAiTextureBaseRelativePath(up);
         const auto norm = candidate.getFullPathName().replaceCharacter('\\', '/');
         if (exactRel.isNotEmpty()
             && (norm.endsWithIgnoreCase("/Samples/Brass")
