@@ -341,6 +341,17 @@ inline void report(DiditagainProcessor& proc,
         if (hasNeuralPartial && textureFileResolved && panelEnabled && panelAmount > 0.0f)
             warnings.add("AI_TEXTURE_RENDERING_CACHED");
 
+        // Import + Freeze v0.2: a texture that resolved AND lives inside the
+        // managed NeuralTextures folder was successfully imported/managed.
+        if (hasNeuralPartial && textureFileResolved && textureInManagedFolder)
+            warnings.add("AI_TEXTURE_IMPORTED_OK");
+
+        // Freeze-ready: the managed texture is attached, resolved, and the
+        // preset is already in cached mode with AI enabled — safe to ship.
+        if (hasNeuralPartial && textureFileResolved && textureInManagedFolder
+            && up.ai.enabled && up.ai.textureMode.equalsIgnoreCase("cached"))
+            warnings.add("AI_TEXTURE_FREEZE_READY");
+
         // textureMode must be the only mode the plugin can consume in v0.1.
         if (up.ai.present && ! up.ai.textureMode.equalsIgnoreCase("cached"))
             warnings.add("AI_TEXTURE_NOT_CACHED");
