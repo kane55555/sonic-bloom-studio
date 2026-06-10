@@ -1412,6 +1412,13 @@ inline void report(DiditagainProcessor& proc,
         j->setProperty("suggestedGainAdjustmentDb", suggestedGainDb);
     else
         j->setProperty("suggestedGainAdjustmentDb", juce::var());
+    // AI Texture diagnostic section (Task 4).
+    j->setProperty("aiTexturePreset",                aiTexturePreset);
+    j->setProperty("textureType",                    aiTextureTypeStr);
+    j->setProperty("neuralTexturePeakDb",            neuralTexturePeakDb);
+    j->setProperty("neuralTextureGainDb",            neuralTextureGainDb);
+    j->setProperty("neuralTextureContributionPercent", neuralTextureContributionPercent);
+    j->setProperty("neuralTextureSoloActive",        neuralTextureSoloActive);
     juce::Array<juce::var> warnVar;
     for (auto& w : warnings) warnVar.add(w);
     j->setProperty("warnings",               warnVar);
