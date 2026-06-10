@@ -1607,6 +1607,13 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
             }
         }
 
+        // Hoisted ONCE so the choir-skip guard and the support-install branch
+        // below share a single, unambiguous AI-texture decision. AI Texture
+        // presets (cached neural texture, incl. choir_ghost) must ALWAYS keep
+        // their analog support/body partial regardless of choir natural-mode,
+        // sample-only filtering, nearest-fallback or zone-too-far conditions.
+        const bool aiTexturePresetForInstall = isAiTexturePreset(p);
+
         dp->getSynthEngine().forEachSynthVoice([&](SynthVoice& v)
         {
             v.clearPartials();
@@ -1638,7 +1645,7 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
                 // choir mode — otherwise the cached-texture choir preset renders
                 // texture-only and reports TOO_QUIET. Natural (non-AI) choir
                 // presets remain sample-only as before.
-                if (choirMode && ! isNeural && ! isAiTexturePreset(p)) continue;
+                if (choirMode && ! isNeural && ! aiTexturePresetForInstall) continue;
 
                 auto eng = makeEngine(pb.engineType);
                 if (eng == nullptr) continue;
@@ -1677,7 +1684,7 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
                 }
                 else
                 {
-                    if (isAiTexturePreset(p))
+                    if (aiTexturePresetForInstall)
                         if (auto* analog = dynamic_cast<dida::engines::AnalogEngine*>(eng.get()))
                             configureAiTextureSupportAnalog(*analog, pb);
 
@@ -1688,7 +1695,14 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
                     float partialLevel = pb.level;
                     if (pb.hasLevelDb)
                         partialLevel = juce::Decibels::decibelsToGain(pb.levelDb);
-                    v.setPartial(i, std::move(eng), pb.enabled, partialLevel, pb.pan,
+
+                    // AI Texture support/body partials must never be silently
+                    // dropped: force-enable them so supportBodyActive=true is
+                    // guaranteed even if the source "enabled" flag is missing or
+                    // a natural-choir path would otherwise mute them. Non-AI
+                    // partials still honour their declared enabled flag.
+                    const bool partialEnabled = aiTexturePresetForInstall ? true : pb.enabled;
+                    v.setPartial(i, std::move(eng), partialEnabled, partialLevel, pb.pan,
                                  pb.pitchSemis, pb.fineCents);
                 }
             }
