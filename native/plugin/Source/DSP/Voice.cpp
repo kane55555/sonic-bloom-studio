@@ -539,6 +539,11 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         {
             if (! (slot.enabled && slot.engine)) continue;
             if (slot.engine->type() == dida::engines::EngineType::Pcm) continue;
+            // AI Texture v0.1 — FX-send safety: when the live "Texture Amount"
+            // is 0 or the panel toggle is off, neuralTextureLiveGain == 0. Skip
+            // the neural render ENTIRELY so the cached texture contributes zero
+            // signal and can never reach the reverb/delay/chorus sends.
+            if (slot.isNeuralTexture && neuralTextureLiveGain <= 0.0f) continue;
             const double midi = (double) currentMidiNote + (double) slot.pitchSemis
                               + (double) slot.fineCents / 100.0;
             const float pitchHz = (float) midiToHzD(midi);
@@ -554,7 +559,9 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
                 std::fill_n(tR.data(), n, 0.0f);
                 slot.engine->renderAdd(tL.data(), tR.data(), n, pitchHz, mod);
                 // AI Texture v0.1: scale neural texture partials by the live
-                // "Texture Amount" (0..1). amount=0 fully mutes the texture.
+                // shaped "Texture Amount" (0..1). The texture's absolute level
+                // (and the -9 dB safe ceiling) is owned by NeuralTextureEngine;
+                // this multiplier can only attenuate further. amount=0 -> 0.
                 const float liveGain = slot.isNeuralTexture ? neuralTextureLiveGain : 1.0f;
                 const float panAng = (slot.pan + 1.0f) * 0.25f * juce::MathConstants<float>::pi;
                 const float gL = std::cos(panAng) * 1.41421356f * slot.level * liveGain;

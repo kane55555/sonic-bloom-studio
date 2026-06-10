@@ -111,11 +111,27 @@ public:
                     bool isNeuralTexture = false) noexcept;
     bool hasActivePartials() const noexcept;
 
-    // AI Texture v0.1 — live "Texture Amount" (0..1) applied to neural texture
-    // partials only. enabled=false or amount=0 fully mutes the cached texture.
+    // AI Texture v0.1 — live "Texture Amount" applied to neural texture partials
+    // only. This setter is real-time-safe: it only writes a single float. It
+    // NEVER allocates, locks, parses JSON, loads files, or touches the UI.
+    //
+    // Gain mapping (gain hardening):
+    //   * enabled == false   -> 0.0  (fully muted, never feeds FX sends)
+    //   * amount01 <= 0       -> 0.0  (fully muted, never feeds FX sends)
+    //   * amount01 in (0, 1]  -> shaped, dimensionless 0..1 reducer
+    //
+    // The amount uses a quadratic taper for finer low-level control. It is a
+    // PURE REDUCER (never above 1.0), so it can only attenuate. amount=1 is the
+    // preset's intended texture level, NOT unity output: the per-preset texture
+    // trim (default -18 dB, hard-capped at the safe max -9 dB) is owned by
+    // NeuralTextureEngine, so the audible texture can never exceed -9 dB and
+    // amount=1 still sits comfortably under the main sample.
+    static constexpr float kNeuralSafeMaxLin = 0.354813389f; // -9 dBFS (engine cap)
     void setNeuralTextureLiveGain(bool enabled, float amount01) noexcept
     {
-        neuralTextureLiveGain = enabled ? juce::jlimit(0.0f, 1.0f, amount01) : 0.0f;
+        if (! enabled || amount01 <= 0.0f) { neuralTextureLiveGain = 0.0f; return; }
+        const float a = juce::jlimit(0.0f, 1.0f, amount01);
+        neuralTextureLiveGain = a * a; // shaped curve: finer control at low levels
     }
 
     // --- Crop / loop metadata (fractions of the buffer length, 0..1) ---

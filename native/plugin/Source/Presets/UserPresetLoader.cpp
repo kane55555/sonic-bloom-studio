@@ -1432,6 +1432,15 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
                     }
                 }
             }
+            // AI Texture v0.1 debug: log once per unique texture path whether the
+            // cached WAV resolved. This happens at preset-apply time only (message
+            // thread), never per audio block, so it cannot spam the log.
+            didaUserPresetLog(juce::String("aiTexture resolve path=\"") + rawPath + "\""
+                + " resolved=" + (entry.missing ? "false" : "true")
+                + (entry.missing ? juce::String("")
+                                 : " sr=" + juce::String(entry.sampleRate, 0)
+                                   + " samples=" + juce::String(entry.buffer != nullptr
+                                        ? entry.buffer->getNumSamples() : 0)));
             auto res = textureCache.emplace(rawPath, std::move(entry));
             return res.first->second;
         };
