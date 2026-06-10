@@ -816,6 +816,43 @@ float choirNaturalReverbMix(const UserPreset& p) noexcept
     return isChoirWidePreset(p) ? 0.15f : 0.11f;
 }
 
+// True when this preset is an AI Texture (cached neural) preset: it either
+// declares an enabled neuralTextureCached partial or a cachedTexture/demoPack
+// AI provider. Used to scope AI-Texture-only gain/headroom cleanup so ordinary
+// presets are never touched.
+bool presetHasNeuralTexturePartial(const UserPreset& p) noexcept
+{
+    for (const auto& pb : p.partials)
+        if (pb.enabled
+            && (pb.engineType.equalsIgnoreCase("neuralTextureCached")
+             || pb.engineType.equalsIgnoreCase("neuralTexture")))
+            return true;
+    return false;
+}
+
+bool isAiTexturePreset(const UserPreset& p) noexcept
+{
+    if (presetHasNeuralTexturePartial(p)) return true;
+    const auto pr = p.ai.provider.toLowerCase();
+    return p.ai.present && (pr == "cachedtexture" || pr == "demopack");
+}
+
+// Headroom cleanup (v0.2 quality pass): some AI Texture demo presets render hot
+// because their fallback-synth body sits near 0 dBFS. Apply a per-preset amp
+// trim so the FINAL output lands inside the category target window. Only AI
+// Texture presets receive this; everything else returns 0.
+float aiTextureGainTrimDb(const UserPreset& p) noexcept
+{
+    if (! isAiTexturePreset(p)) return 0.0f;
+    const auto n = p.presetName.toLowerCase();
+    const auto c = p.category.toLowerCase();
+    // Guitar Dust reported LOW_HEADROOM with suggestedGainAdjustmentDb ~= -7.8.
+    if (n.contains("guitar dust") || (c.contains("guitar") && presetHasNeuralTexturePartial(p)))
+        return -8.0f;
+    return 0.0f;
+}
+
+
 juce::String fxSendReleaseSourceFor(const UserPreset& p, bool choirMode)
 {
     // BUG 1/7: a preset-supplied value is ALWAYS presetFxSend, even in choir
