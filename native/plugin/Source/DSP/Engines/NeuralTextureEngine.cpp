@@ -39,6 +39,15 @@ void NeuralTextureEngine::setSharedTexture(std::shared_ptr<const juce::AudioBuff
     const bool ok = texture != nullptr && texture->getNumSamples() > 0;
     hasTexture.store(ok);
     missing.store(! ok);
+
+    // Measure the static intrinsic peak once (off the audio thread) so the
+    // preset-quality reporter can estimate the texture's contribution even when
+    // no note is sounding during the report probe.
+    float pk = 0.0f;
+    if (ok)
+        for (int ch = 0; ch < texture->getNumChannels(); ++ch)
+            pk = juce::jmax(pk, texture->getMagnitude(ch, 0, texture->getNumSamples()));
+    texturePeakLin.store(pk);
 }
 
 bool NeuralTextureEngine::loadTextureFile(const juce::File& file)

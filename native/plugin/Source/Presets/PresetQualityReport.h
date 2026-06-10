@@ -1045,19 +1045,35 @@ inline void report(DiditagainProcessor& proc,
     // atomic, read off the audio thread). neuralTextureGainDb: the effective
     // applied texture gain (engine trim, hard-capped at -9 dB, times the live
     // panel amount with the same quadratic taper the voice uses).
-    const float neuralTexturePeakLin = engine.getNeuralTexturePeakLinear();
-    const float neuralTexturePeakDb  = neuralTexturePeakLin > 1.0e-6f
-        ? juce::Decibels::gainToDecibels(neuralTexturePeakLin) : -120.0f;
+    // (texture peak diagnostic computed below)
     const bool  aiPanelEnabled = paramValue(proc, "aiTextureEnabled") > 0.5f;
     const float aiPanelAmount  = juce::jlimit(0.0f, 1.0f, paramValue(proc, "aiTextureAmount"));
     const bool  neuralTextureSoloActive = proc.getAiTextureSolo();
     const float textureSafeBaseDb = juce::jmin(-9.0f, aiTextureBaseLevelDb);
     float neuralTextureGainDb = -120.0f;
+    float effTextureGainLin = 0.0f;
     if (aiHasNeuralPartial && aiPanelEnabled && aiPanelAmount > 0.0f)
     {
         const float liveGain = aiPanelAmount * aiPanelAmount; // matches Voice taper
+        effTextureGainLin = juce::Decibels::decibelsToGain(textureSafeBaseDb) * liveGain;
         neuralTextureGainDb = textureSafeBaseDb + juce::Decibels::gainToDecibels(liveGain);
     }
+    
+
+    // Peak of the cached texture layer. Prefer the LIVE measured block peak
+    // (taken in renderAdd after texture playback + engine gain, before the bus
+    // mix) when a note is actually sounding. At report time the probe holds no
+    // note, so fall back to a deterministic estimate from the decoded texture's
+    // static intrinsic peak times the effective texture gain — this is what the
+    // engine would produce at sustain, full velocity.
+    const float liveTexturePeakLin    = engine.getNeuralTexturePeakLinear();
+    const float staticTexturePeakLin  = engine.getNeuralTextureIntrinsicPeakLinear();
+    const float estTexturePeakLin     = staticTexturePeakLin * effTextureGainLin;
+    const float neuralTexturePeakLin  = liveTexturePeakLin > 1.0e-4f
+        ? liveTexturePeakLin : estTexturePeakLin;
+    const float neuralTexturePeakDb  = neuralTexturePeakLin > 1.0e-6f
+        ? juce::Decibels::gainToDecibels(neuralTexturePeakLin) : -120.0f;
+
     // Rough contribution of the texture to the final output (peak ratio).
     const float finalOutputLin = finalOutputDb > -120.0f
         ? juce::Decibels::decibelsToGain(finalOutputDb) : 0.0f;

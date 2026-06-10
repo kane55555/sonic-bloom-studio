@@ -72,6 +72,18 @@ public:
         return pk;
     }
 
+    // Diagnostic-only: static intrinsic peak (linear) of the loaded neural
+    // texture across all voices. Non-zero whenever a texture is loaded, even
+    // when no note is sounding (used as a fallback by the reporter).
+    float getNeuralTextureIntrinsicPeakLinear() noexcept
+    {
+        float pk = 0.0f;
+        for (int i = 0; i < getNumVoices(); ++i)
+            if (auto* v = dynamic_cast<SynthVoice*>(getVoice(i)))
+                pk = juce::jmax(pk, v->getNeuralTextureIntrinsicPeakLinear());
+        return pk;
+    }
+
     // Set the active multisample instrument by folder name (under Documents/
     // DIDITAGAIN STUDIO/Samples). Empty name = silence. Returns true on success.
     bool setInstrument(const juce::String& instrumentName);
