@@ -73,7 +73,7 @@
     {
       "enabled": true,
       "engineType": "analog",
-      "levelDb": -4.0,
+      "levelDb": -8.0,
       "pan": 0.0,
       "engineParams": {
         "role": "support",
