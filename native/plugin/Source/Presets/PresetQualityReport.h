@@ -1045,7 +1045,7 @@ inline void report(DiditagainProcessor& proc,
     // atomic, read off the audio thread). neuralTextureGainDb: the effective
     // applied texture gain (engine trim, hard-capped at -9 dB, times the live
     // panel amount with the same quadratic taper the voice uses).
-    const float aiPanelAmountSq = 0.0f; // placeholder (computed below)
+    // (texture peak diagnostic computed below)
     const bool  aiPanelEnabled = paramValue(proc, "aiTextureEnabled") > 0.5f;
     const float aiPanelAmount  = juce::jlimit(0.0f, 1.0f, paramValue(proc, "aiTextureAmount"));
     const bool  neuralTextureSoloActive = proc.getAiTextureSolo();
