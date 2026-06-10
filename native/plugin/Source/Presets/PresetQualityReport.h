@@ -667,7 +667,8 @@ inline void report(DiditagainProcessor& proc,
         : (std::abs(requestedAmpGainDb) < 0.01f ? juce::String("default") : juce::String("preset"));
     const juce::String loadTimeGainTrimSource =
           std::abs(loadTimeGainTrimDb) < 0.001f ? juce::String("disabled")
-                                                : juce::String("choirNaturalTrim");
+        : (choirMode                            ? juce::String("choirNaturalTrim")
+                                                : juce::String("aiTextureHeadroomTrim"));
     const float ampGainDb           = appliedAmpGainDb;        // alias reflects the REAL final amp gain
     const float mainLayerGainDb     = up.main.gainDb;
     const float layer2GainStageDb   = up.layer2.enabled ? up.layer2.gainDb : -120.0f;
