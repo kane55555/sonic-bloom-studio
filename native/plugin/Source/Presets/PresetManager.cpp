@@ -2124,12 +2124,12 @@ void PresetManager::seedAiTextureDemoPackIfMissing()
     auto dir  = root.getChildFile("AI Texture");
     dir.createDirectory();
 
-    // v8 migration marker. v6 fixed the multisample source paths; v7 recalibrated
-    // loudness; v8 re-balances the final output (Brass +3 dB, Guitar +12 dB) so the
-    // multisample body is no longer hot, and keeps the cached texture subtle. Re-run
-    // once to overwrite the three managed demo .diapreset files with the new gains.
-    auto seededMarkerV8 = dir.getChildFile(".seeded_ai_texture_demo_v8");
-    if (seededMarkerV8.existsAsFile())
+    // v9 migration marker. v6 fixed the multisample source paths; v7 recalibrated
+    // loudness; v8 re-balanced the output; v9 sets AI Guitar Dust Test body gain to
+    // 0 dB (was +12, which clipped TOO_HOT) while keeping its cached texture subtle
+    // (<= -20 dB). Re-run once to overwrite the managed demo .diapreset files.
+    auto seededMarkerV9 = dir.getChildFile(".seeded_ai_texture_demo_v9");
+    if (seededMarkerV9.existsAsFile())
         return;
 
 
@@ -2170,7 +2170,7 @@ void PresetManager::seedAiTextureDemoPackIfMissing()
         }
     }
 
-    seededMarkerV8.replaceWithText("1");
+    seededMarkerV9.replaceWithText("1");
 
     didaPresetManagerLog("seeded AI Texture demo pack (v8) count=" + juce::String(written)
         + " presets=" + dir.getFullPathName()
