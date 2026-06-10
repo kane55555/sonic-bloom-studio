@@ -1078,6 +1078,29 @@ void PresetManager::loadPreset(int index)
             }
         }
 
+        // STEP C — AI Texture enhancement presets reference a BASE multisample
+        // folder by a relative path (e.g. "Brass/Brass 1") that lives under the
+        // shared Samples root, NOT under this preset's hidden Presets/User source
+        // folder. STEP A/B never resolve that, so the multisample body went
+        // missing and the preset reported sourceRequiredForEngine=false /
+        // wavZones=0. Resolve it via the shared source-path resolver so the
+        // multisample becomes the main body and the AI texture blends on top.
+        // Scoped to AI Texture presets to avoid changing non-AI routing.
+        if (! resolved.isDirectory()
+            && rawSourcePath.isNotEmpty()
+            && dida::userpreset::isAiTexturePreset(up))
+        {
+            auto baseFolder = dida::userpreset::resolveSourcePath(rawSourcePath);
+            if (baseFolder.isDirectory())
+            {
+                resolved = baseFolder;
+                resolvedFrom = "aiTextureBaseMultisample";
+                didaPresetManagerLog("AI Texture preset using base multisample folder="
+                    + resolved.getFullPathName() + " rawPath=" + rawSourcePath
+                    + " name=" + up.presetName);
+            }
+        }
+
         const bool sourceRequiredForEngine = dida::presetreport::engineRequiresSource(up);
 
         if (! resolved.isDirectory() && sourceRequiredForEngine)
