@@ -539,6 +539,9 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         {
             if (! (slot.enabled && slot.engine)) continue;
             if (slot.engine->type() == dida::engines::EngineType::Pcm) continue;
+            // AI Texture v0.2 — DEBUG solo: when soloing the neural texture, skip
+            // every non-neural partial so only the cached texture is audible.
+            if (soloNeuralTexture && ! slot.isNeuralTexture) continue;
             // AI Texture v0.1 — FX-send safety: when the live "Texture Amount"
             // is 0 or the panel toggle is off, neuralTextureLiveGain == 0. Skip
             // the neural render ENTIRELY so the cached texture contributes zero
