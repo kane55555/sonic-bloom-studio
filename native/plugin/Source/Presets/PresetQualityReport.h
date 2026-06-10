@@ -296,6 +296,18 @@ inline void report(DiditagainProcessor& proc,
 
     // --- AI Texture v0.1 (cached) checks. Observation-only: these NEVER block
     //     preset load and never alter DSP. ---------------------------------
+    // AI Texture diagnostic detail (serialized so AI_TEXTURE_MISSING_FILE is
+    // actionable instead of opaque). Captured from the representative neural
+    // texture partial.
+    juce::String aiRawTexturePath, aiResolvedTexturePath, aiTextureInstallRoot;
+    bool aiTextureFileExists = false;
+    const juce::String aiProviderValue = up.ai.provider;
+    {
+        // {DIDA_DOCS} install root for textures, shown verbatim in the report.
+        auto docsRoot = dida::SampleLibrary::getSamplesRoot().getParentDirectory();
+        aiTextureInstallRoot = docsRoot.getChildFile("NeuralTextures")
+                                       .getFullPathName().replaceCharacter('\\', '/');
+    }
     {
         bool hasNeuralPartial = false;
         bool textureFileResolved = false;
@@ -312,7 +324,18 @@ inline void report(DiditagainProcessor& proc,
             const juce::String texPath = ep.getProperty("texturePath", "").toString();
             const juce::File texFile = texPath.isNotEmpty()
                 ? dida::userpreset::resolveSourcePath(texPath) : juce::File();
-            if (texPath.isEmpty() || ! texFile.existsAsFile())
+            const bool thisExists = texPath.isNotEmpty() && texFile.existsAsFile();
+
+            // Record detail from the first neural partial, or from the first
+            // missing one (so the report explains the failure).
+            if (aiRawTexturePath.isEmpty() || (! aiTextureFileExists && thisExists))
+            {
+                aiRawTexturePath      = texPath;
+                aiResolvedTexturePath = texFile.getFullPathName().replaceCharacter('\\', '/');
+                aiTextureFileExists   = thisExists;
+            }
+
+            if (! thisExists)
                 anyTextureMissing = true;
             else
             {
