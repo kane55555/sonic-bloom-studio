@@ -139,6 +139,8 @@ public:
             blockPeak = juce::jmax(blockPeak, std::abs(l), std::abs(r));
         }
         lastPeak.store(blockPeak);
+        renderedBlock.store(true);
+        envStage.store((int) ampEnv.getStage());
     }
 
 private:
