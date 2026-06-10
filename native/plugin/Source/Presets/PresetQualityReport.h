@@ -207,6 +207,10 @@ inline void report(DiditagainProcessor& proc,
                    const juce::String& expectedSourceFolderNameIn = {},
                    bool allowCrossCategorySourceIn             = false,
                    int sourceFolderWavCountIn                  = 0,
+                   const juce::String& aiTextureBaseSourceRawIn = {},
+                   const juce::String& aiTextureBaseSourceResolvedCandidateIn = {},
+                   bool aiTextureBaseSourceExistsIn             = false,
+                   int aiTextureBaseSourceWavCountIn            = 0,
                    const juce::StringArray& extraSourceWarningsIn = {})
 {
     auto& engine = proc.getSynthEngine();
@@ -1143,6 +1147,10 @@ inline void report(DiditagainProcessor& proc,
         << " hiddenSourceFolder=" << (hiddenSourceFolder ? "true" : "false")
         << " allowCrossCategorySource=" << (allowCrossCategorySourceIn ? "true" : "false")
         << " sourceFolderWavCount=" << sourceFolderWavCountIn
+        << " aiTextureBaseSourceRaw=" << aiTextureBaseSourceRawIn
+        << " aiTextureBaseSourceResolvedCandidate=" << aiTextureBaseSourceResolvedCandidateIn
+        << " aiTextureBaseSourceExists=" << (aiTextureBaseSourceExistsIn ? "true" : "false")
+        << " aiTextureBaseSourceWavCount=" << aiTextureBaseSourceWavCountIn
         << " sourceRequiredForEngine=" << (needsSource ? "true" : "false")
         << " oscillatorEngineActive=" << (oscillatorEngineActive ? "true" : "false")
         << " wavZones=" << wavZones
@@ -1324,6 +1332,10 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("expectedSourceFolderName", expectedSourceFolderNameIn);
     j->setProperty("allowCrossCategorySource", allowCrossCategorySourceIn);
     j->setProperty("sourceFolderWavCount",   sourceFolderWavCountIn);
+    j->setProperty("aiTextureBaseSourceRaw", aiTextureBaseSourceRawIn);
+    j->setProperty("aiTextureBaseSourceResolvedCandidate", aiTextureBaseSourceResolvedCandidateIn);
+    j->setProperty("aiTextureBaseSourceExists", aiTextureBaseSourceExistsIn);
+    j->setProperty("aiTextureBaseSourceWavCount", aiTextureBaseSourceWavCountIn);
     j->setProperty("wavZones",               wavZones);
     j->setProperty("activeLayers",           activeLayers);
     j->setProperty("activePartials",         activePartials);
