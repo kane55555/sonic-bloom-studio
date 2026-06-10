@@ -273,6 +273,9 @@ static juce::File resolveAiTextureBaseSourceCandidate(const juce::String& rawPat
     const auto docsRoot = samplesRoot.getParentDirectory();
     const auto docsPath = docsRoot.getFullPathName().replaceCharacter('\\', '/');
     const auto samplesPath = samplesRoot.getFullPathName().replaceCharacter('\\', '/');
+    // AI Texture base multisamples live under the user preset tree:
+    //   <Documents>/DIDITAGAIN STUDIO/Samples/Presets/User/<...>
+    const auto presetsUserRoot = samplesRoot.getChildFile("Presets").getChildFile("User");
 
     auto expanded = src;
     expanded = expanded.replace("{DIDA_DOCS}", docsPath, true)
@@ -286,6 +289,36 @@ static juce::File resolveAiTextureBaseSourceCandidate(const juce::String& rawPat
         : (expanded.startsWithIgnoreCase("Samples/")
             ? samplesRoot.getChildFile(expanded.substring(8))
             : samplesRoot.getChildFile(expanded));
+
+    // STEP C resolution: required AI Texture multisample sources are resolved
+    // against <Samples>/Presets/User first, then the broader <Samples> root.
+    // When the primary candidate is not a real folder, retry the relative tail
+    // under Presets/User so paths like "Brass/Brass 1" or
+    // "{DIDA_DOCS}/Samples/Presets/User/Choir Ohhh" resolve correctly.
+    if (! candidate.isDirectory())
+    {
+        auto rel = expanded;
+        if (rel.startsWithIgnoreCase("Samples/Presets/User/"))
+            rel = rel.substring(juce::String("Samples/Presets/User/").length());
+        else if (rel.startsWithIgnoreCase("Samples/"))
+            rel = rel.substring(8);
+
+        const auto marker = juce::String("/Samples/Presets/User/");
+        const int idx = expanded.indexOfIgnoreCase(marker);
+        if (idx >= 0)
+            rel = expanded.substring(idx + marker.length());
+
+        rel = rel.trim();
+        while (rel.endsWithChar('/') && rel.length() > 1)
+            rel = rel.dropLastCharacters(1);
+
+        if (rel.isNotEmpty())
+        {
+            auto userCandidate = presetsUserRoot.getChildFile(rel);
+            if (userCandidate.isDirectory())
+                candidate = userCandidate;
+        }
+    }
 
     const auto exactRel = exactAiTextureBaseRelativePath(up);
     const auto srcNorm = src.replaceCharacter('\\', '/');
