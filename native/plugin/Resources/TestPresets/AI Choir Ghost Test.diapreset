@@ -20,7 +20,7 @@
   },
   "partials": [
     {
-      "enabled": true,
+      "enabled": false,
       "engineType": "analog",
       "levelDb": -6.0,
       "pan": 0.0,
@@ -45,10 +45,11 @@
       "amp": { "releaseMs": 500.0 },
       "engineParams": {
         "texturePath": "Samples/AITextures/choir_ghost.wav",
+        "textureType": "choir_ghost",
         "loop": true,
         "rootMidi": 60,
         "pitchTracking": false,
-        "levelDb": -18.0
+        "levelDb": -14.0
       }
     }
   ]

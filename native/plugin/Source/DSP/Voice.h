@@ -153,6 +153,11 @@ public:
         return pk;
     }
 
+    // Diagnostic-only: peak (linear) of the main multisample / PCM body of this
+    // voice since the last noteOn. Lets the reporter prove the multisample is the
+    // primary sound and measure the neural texture's relative contribution.
+    float getMainSamplePeakLinear() const noexcept { return mainSamplePeakLin_.load(); }
+
     // Diagnostic-only: static intrinsic peak (linear) of the loaded neural
     // texture buffer in this voice, available even when no note is sounding.
     float getNeuralTextureIntrinsicPeakLinear() const noexcept
@@ -459,6 +464,11 @@ private:
     // Per-layer peak metering — logged ~once per second per voice.
     float peakSamp = 0.0f, peakOscB = 0.0f, peakSub = 0.0f, peakNoise = 0.0f, peakOut = 0.0f;
     int   meterFrameCounter = 0;
+
+    // Diagnostic-only: main multisample/PCM body peak (linear), held since the
+    // last noteOn (NOT reset on the per-second meter cadence). Read off-thread
+    // by the preset-quality reporter for mainSamplePeakDb.
+    std::atomic<float> mainSamplePeakLin_ { 0.0f };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SynthVoice)
 

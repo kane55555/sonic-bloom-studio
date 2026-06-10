@@ -20,6 +20,21 @@
   },
   "partials": [
     {
+      "enabled": false,
+      "engineType": "analog",
+      "levelDb": -12.0,
+      "pan": 0.0,
+      "engineParams": {
+        "role": "support",
+        "osc": "saw",
+        "unison": 3,
+        "detuneCents": 8,
+        "filterCutoffHz": 4200,
+        "attackMs": 8,
+        "releaseMs": 180
+      }
+    },
+    {
       "enabled": true,
       "engineType": "neuralTextureCached",
       "followMainEnvelope": true,
@@ -30,10 +45,11 @@
       "amp": { "releaseMs": 250.0 },
       "engineParams": {
         "texturePath": "Samples/AITextures/brass_air.wav",
+        "textureType": "brass_air",
         "loop": true,
         "rootMidi": 60,
         "pitchTracking": false,
-        "levelDb": -18.0
+        "levelDb": -16.0
       }
     }
   ]

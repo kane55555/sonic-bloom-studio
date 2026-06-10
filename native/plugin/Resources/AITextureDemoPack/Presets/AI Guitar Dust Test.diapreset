@@ -4,7 +4,7 @@
   "author": "DIDITAGAIN STUDIO / ChatGPT",
   "category": "Guitar",
   "engineType": "hybrid",
-  "description": "Guitar preset with cached AI dust, fret noise, scrape, and tape movement underneath the main sample.",
+  "description": "Real guitar multisample as the main body, enhanced with a subtle cached AI dust/fret-noise texture underneath for movement.",
   "ai": {
     "enabled": true,
     "profileVersion": 1,
@@ -20,13 +20,13 @@
       "bodyWarmth": 0.35
     },
     "recommendedTexture": "guitar_dust",
-    "recommendedTextureAmount": 0.28
+    "recommendedTextureAmount": 0.12
   },
   "macros": {
     "tone": 0.56,
     "character": 0.62,
     "width": 0.58,
-    "texture": 0.28
+    "texture": 0.12
   },
   "ampEnvelope": {
     "attackMs": 12,
@@ -64,14 +64,14 @@
     }
   },
   "samples": {
-    "rootFolder": "{DIDA_DOCS}/Samples/Guitar",
-    "required": false,
+    "rootFolder": "Guitars/Guitar 1",
+    "required": true,
     "fallbackSynthIfMissing": true,
-    "note": "Replace with your real multisample folder. AI texture layer is self-contained."
+    "note": "Main sound body = real Guitar multisample. The AI texture only blends on top. If the folder is missing, the optional analog support partial below can be enabled as a fallback."
   },
   "partials": [
     {
-      "enabled": true,
+      "enabled": false,
       "engineType": "analog",
       "levelDb": 16.0,
       "pan": 0.0,
@@ -81,17 +81,20 @@
         "brightness": 0.48,
         "attackMs": 2,
         "decayMs": 380,
-        "releaseMs": 160
+        "releaseMs": 160,
+        "note": "Optional synthetic support — only enable if the multisample folder is missing or extra body is wanted."
       }
     },
     {
       "enabled": true,
       "engineType": "neuralTextureCached",
       "isNeuralTexture": true,
-      "levelDb": -21.0,
+      "levelDb": -20.0,
       "pan": 0.0,
       "pitchSemis": 0,
       "fineCents": 0,
+      "followMainEnvelope": true,
+      "eqRole": "neuralTexture",
       "engineParams": {
         "texturePath": "{DIDA_DOCS}/NeuralTextures/Demo/GuitarDust/dida_guitar_dust_C4.wav",
         "textureType": "guitar_dust",

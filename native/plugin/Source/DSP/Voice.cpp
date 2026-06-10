@@ -194,6 +194,7 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
     fxSendReleaseCounter = 0;
     fxSendActive = true;
     noteReleasedForFxSend = false;
+    mainSamplePeakLin_.store(0.0f);
     recalcGlideCoeff();
 
     loZone = hiZone = nullptr;
@@ -909,6 +910,10 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         if (absSub   > peakSub)   peakSub   = absSub;
         if (absNoise > peakNoise) peakNoise = absNoise;
         if (absOut   > peakOut)   peakOut   = absOut;
+        // Note-scoped main-sample peak for the preset-quality reporter (held
+        // until the next noteOn instead of the per-second meter reset).
+        if (absSamp > mainSamplePeakLin_.load())
+            mainSamplePeakLin_.store(absSamp);
         if (++meterFrameCounter >= (int) sampleRate)
         {
             auto db = [](float v) { return 20.0f * std::log10(juce::jmax(1.0e-9f, v)); };

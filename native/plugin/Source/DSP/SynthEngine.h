@@ -84,6 +84,18 @@ public:
         return pk;
     }
 
+    // Diagnostic-only: peak (linear) of the main multisample/PCM body across all
+    // voices since their last noteOn. Lets the reporter prove the multisample is
+    // the primary sound for AI-enhanced presets.
+    float getMainSamplePeakLinear() noexcept
+    {
+        float pk = 0.0f;
+        for (int i = 0; i < getNumVoices(); ++i)
+            if (auto* v = dynamic_cast<SynthVoice*>(getVoice(i)))
+                pk = juce::jmax(pk, v->getMainSamplePeakLinear());
+        return pk;
+    }
+
     float getSupportBodyPeakLinear() noexcept
     {
         float pk = 0.0f;

@@ -151,6 +151,13 @@ inline bool engineRequiresSource(const dida::userpreset::UserPreset& up)
         const auto x = e.trim().toLowerCase();
         return x.isEmpty() || x == "pcm" || x == "sample" || x == "multisample";
     };
+    // AI-enhanced multisample presets: the multisample folder IS the main body,
+    // so the source is required whenever the preset declares a required source
+    // path (even when the audible "engineType" is "hybrid"/texture-led). This is
+    // what makes sourceRequiredForEngine=true for AI Texture presets that sit on
+    // top of a real sampled instrument.
+    if (up.sourceRequired && up.source.path.isNotEmpty())
+        return true;
     if (up.partials.size() == 0) return needsPcm(up.engineType);
     if (up.engineType.equalsIgnoreCase("layered") || up.engineType.isEmpty())
     {
@@ -1108,6 +1115,13 @@ inline void report(DiditagainProcessor& proc,
     const juce::String supportBodyEnvelopeState = aiTexturePreset
         ? engine.getSupportBodyEnvelopeState() : juce::String("n/a");
 
+    // mainSamplePeakDb: peak of the main multisample/PCM body. For AI-enhanced
+    // multisample presets this proves the sampled instrument — not the texture
+    // or analog support — is the primary sound.
+    const float mainSamplePeakLin = engine.getMainSamplePeakLinear();
+    const float mainSamplePeakDb  = mainSamplePeakLin > 1.0e-6f
+        ? juce::Decibels::gainToDecibels(mainSamplePeakLin) : -120.0f;
+
     juce::String out;
     out << "[DIDITAGAIN preset-quality]"
         << " sessionId=" << sess.sessionId
@@ -1267,6 +1281,7 @@ inline void report(DiditagainProcessor& proc,
         << " suggestedGainAdjustmentDb=" << (notesPlaying ? juce::String(suggestedGainDb, 2) : juce::String("n/a"))
         << " aiTexturePreset=" << (aiTexturePreset ? "true" : "false")
         << " textureType=" << aiTextureTypeStr
+        << " mainSamplePeakDb=" << juce::String(mainSamplePeakDb, 2)
         << " neuralTexturePeakDb=" << juce::String(neuralTexturePeakDb, 2)
         << " neuralTextureGainDb=" << juce::String(neuralTextureGainDb, 2)
         << " neuralTextureContributionPercent=" << juce::String(neuralTextureContributionPercent, 1)
@@ -1464,6 +1479,7 @@ inline void report(DiditagainProcessor& proc,
     // AI Texture diagnostic section (Task 4).
     j->setProperty("aiTexturePreset",                aiTexturePreset);
     j->setProperty("textureType",                    aiTextureTypeStr);
+    j->setProperty("mainSamplePeakDb",               mainSamplePeakDb);
     j->setProperty("neuralTexturePeakDb",            neuralTexturePeakDb);
     j->setProperty("neuralTextureGainDb",            neuralTextureGainDb);
     j->setProperty("neuralTextureContributionPercent", neuralTextureContributionPercent);
@@ -1670,6 +1686,7 @@ inline void report(DiditagainProcessor& proc,
               << "suggestedGainAdjustmentDb: " << (notesPlaying ? juce::String(suggestedGainDb, 2) : juce::String("n/a")) << "\n"
               << "aiTexturePreset: "           << (aiTexturePreset ? "true" : "false") << "\n"
               << "textureType: "               << aiTextureTypeStr << "\n"
+              << "mainSamplePeakDb: "          << juce::String(mainSamplePeakDb, 2) << "\n"
               << "neuralTexturePeakDb: "       << juce::String(neuralTexturePeakDb, 2) << "\n"
               << "neuralTextureGainDb: "       << juce::String(neuralTextureGainDb, 2) << "\n"
               << "neuralTextureContributionPercent: " << juce::String(neuralTextureContributionPercent, 1) << "\n"
