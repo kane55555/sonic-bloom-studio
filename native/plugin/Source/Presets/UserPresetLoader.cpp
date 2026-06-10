@@ -967,8 +967,11 @@ bool isAiTexturePreset(const UserPreset& p) noexcept
 // everything else returns 0.
 float loadTimeGainTrimDb(const UserPreset& p)
 {
-    if (isChoirModePreset(p)) return choirNaturalGainTrimDb(p);
+    // AI Texture presets take priority over the choir path: a cached-texture
+    // choir preset (e.g. "AI Choir Ghost Test") must use the AI texture trim so
+    // its installed support body is not also cut by the natural-choir trim.
     if (isAiTexturePreset(p)) return aiTextureGainTrimDb(p);
+    if (isChoirModePreset(p)) return choirNaturalGainTrimDb(p);
     return 0.0f;
 }
 
