@@ -54,6 +54,7 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     addChildComponent(*importPanel);
     addChildComponent(*settingsPanel);
     addChildComponent(*accountPanel);
+    addChildComponent(*aiTexturePanel);
 
     presetBrowserPanel = std::make_unique<PresetBrowser>();
     addAndMakeVisible(*presetBrowserPanel);
