@@ -134,6 +134,12 @@ public:
         neuralTextureLiveGain = a * a; // shaped curve: finer control at low levels
     }
 
+    // AI Texture v0.2 — DEBUG audition solo. When true, only neuralTextureCached
+    // partials are audible: the main multisample, layer-2, fallback synth and all
+    // non-neural partials are muted for this voice. This is a transient debug
+    // override (never written to a preset) so it cannot permanently alter sound.
+    void setNeuralTextureSolo(bool s) noexcept { soloNeuralTexture = s; }
+
     // --- Crop / loop metadata (fractions of the buffer length, 0..1) ---
     void setCropRange(float start01, float end01) noexcept {
         cropStartFrac = juce::jlimit(0.0f, 1.0f, start01);
