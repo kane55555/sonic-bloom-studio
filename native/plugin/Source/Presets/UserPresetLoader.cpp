@@ -1642,7 +1642,14 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
                 }
                 else
                 {
-                    v.setPartial(i, std::move(eng), pb.enabled, pb.level, pb.pan,
+                    // Demo-pack support/body partials declare their level in dB
+                    // ("levelDb"). Honour it so the support body sits at the
+                    // intended level instead of full-scale; fall back to the
+                    // legacy linear "level" (default 1.0) when absent.
+                    float partialLevel = pb.level;
+                    if (pb.hasLevelDb)
+                        partialLevel = juce::Decibels::decibelsToGain(pb.levelDb);
+                    v.setPartial(i, std::move(eng), pb.enabled, partialLevel, pb.pan,
                                  pb.pitchSemis, pb.fineCents);
                 }
             }
