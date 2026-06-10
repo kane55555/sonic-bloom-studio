@@ -608,6 +608,10 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     const float unisonDetune = getF("unisonDetune");
     const float unisonSpread = getF("unisonSpread");
     const float vintageAmt   = juce::jlimit(0.0f, 1.0f, getF("vintageAmount"));
+    // AI Texture v0.1 — live "Texture Amount" override applied to neural
+    // texture partials only. Off or 0 fully mutes the cached texture.
+    const bool  aiTexEnabled = getF("aiTextureEnabled") > 0.5f;
+    const float aiTexAmount  = juce::jlimit(0.0f, 1.0f, getF("aiTextureAmount"));
 
     int voiceCardCounter = 0;
     synthEngine.forEachSynthVoice([&](SynthVoice& v)
