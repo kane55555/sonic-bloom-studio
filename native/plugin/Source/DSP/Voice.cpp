@@ -613,14 +613,14 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         {
             float zl, zr; readWithLoop(*loZone, loReadPos, loFinished, zl, zr);
             const float w = (hiZone ? (1.0f - zoneXfade) : 1.0f);
-            sampL += zl * w; sampR += zr * w;
+            if (! soloNeuralTexture) { sampL += zl * w; sampR += zr * w; }
             loReadPos += loStep;
             advanceLoop(*loZone, loReadPos, loFinished);
         }
         if (hiZone && ! hiFinished)
         {
             float zl, zr; readWithLoop(*hiZone, hiReadPos, hiFinished, zl, zr);
-            sampL += zl * zoneXfade; sampR += zr * zoneXfade;
+            if (! soloNeuralTexture) { sampL += zl * zoneXfade; sampR += zr * zoneXfade; }
             hiReadPos += hiStep;
             advanceLoop(*hiZone, hiReadPos, hiFinished);
         }
