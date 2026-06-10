@@ -850,6 +850,10 @@ void PresetManager::emitCurrentUserDiapresetQualityReport()
                                    requestedExpectedSourceFolderName,
                                    requestedAllowCrossCategorySource,
                                    requestedSourceFolderWavCount,
+                                    requestedAiTextureBaseSourceRaw,
+                                    requestedAiTextureBaseSourceResolvedCandidate,
+                                    requestedAiTextureBaseSourceExists,
+                                    requestedAiTextureBaseSourceWavCount,
                                    requestedExtraSourceWarnings);
 }
 
