@@ -84,6 +84,40 @@ public:
         return pk;
     }
 
+    float getSupportBodyPeakLinear() noexcept
+    {
+        float pk = 0.0f;
+        for (int i = 0; i < getNumVoices(); ++i)
+            if (auto* v = dynamic_cast<SynthVoice*>(getVoice(i)))
+                pk = juce::jmax(pk, v->getSupportBodyPeakLinear());
+        return pk;
+    }
+
+    float getSupportBodyGainDb() noexcept
+    {
+        float db = -120.0f;
+        for (int i = 0; i < getNumVoices(); ++i)
+            if (auto* v = dynamic_cast<SynthVoice*>(getVoice(i)))
+                db = juce::jmax(db, v->getSupportBodyGainDb());
+        return db;
+    }
+
+    bool isSupportBodyActive() noexcept
+    {
+        for (int i = 0; i < getNumVoices(); ++i)
+            if (auto* v = dynamic_cast<SynthVoice*>(getVoice(i)))
+                if (v->isSupportBodyActive()) return true;
+        return false;
+    }
+
+    bool hasSupportBodyVoiceStarted() noexcept
+    {
+        for (int i = 0; i < getNumVoices(); ++i)
+            if (auto* v = dynamic_cast<SynthVoice*>(getVoice(i)))
+                if (v->hasSupportBodyVoiceStarted()) return true;
+        return false;
+    }
+
     // Set the active multisample instrument by folder name (under Documents/
     // DIDITAGAIN STUDIO/Samples). Empty name = silence. Returns true on success.
     bool setInstrument(const juce::String& instrumentName);
