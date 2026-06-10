@@ -271,6 +271,14 @@ struct UserPreset
     juce::String              engineType;   // optional; default "" => pcm
     juce::Array<PartialBlock> partials;     // optional; up to 4
 
+    // AI Texture demo-pack schema additive: a preset may declare its main
+    // multisample via a "samples" block ({ rootFolder, required,
+    // fallbackSynthIfMissing }) instead of "sourceInstrument". When the source
+    // folder is absent and required==false, the preset still loads and plays
+    // its self-contained partials (e.g. the cached neural texture layer).
+    bool sourceRequired           = true;   // false => missing source is OK
+    bool fallbackSynthIfMissing   = false;  // hint: fall back gracefully
+
     // ------- AI Texture v0.1 (cached) metadata (v2 additive) -------
     // Optional. Describes an offline-analysed timbre profile plus the cached
     // neural texture provider. v0.1 only CONSUMES cached WAV textures referenced
