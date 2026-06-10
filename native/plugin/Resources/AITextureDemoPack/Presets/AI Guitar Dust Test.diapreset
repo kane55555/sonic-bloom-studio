@@ -29,7 +29,7 @@
     "texture": 0.12
   },
   "ampEnvelope": {
-    "gainDb": 24,
+    "gainDb": 12,
     "attackMs": 12,
     "decayMs": 180,
     "sustain": 0.82,
@@ -96,7 +96,7 @@
       "enabled": true,
       "engineType": "neuralTextureCached",
       "isNeuralTexture": true,
-      "levelDb": -16.0,
+      "levelDb": -20.0,
       "pan": 0.0,
       "pitchSemis": 0,
       "fineCents": 0,

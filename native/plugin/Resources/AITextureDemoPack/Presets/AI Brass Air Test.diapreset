@@ -29,7 +29,7 @@
     "texture": 0.2
   },
   "ampEnvelope": {
-    "gainDb": 15,
+    "gainDb": 3,
     "attackMs": 12,
     "decayMs": 180,
     "sustain": 0.82,

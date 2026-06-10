@@ -207,6 +207,13 @@ public:
         juce::String selectedZoneFile;
         bool         hasZone     = false;   // a real zone backs testMidiNote
         bool         usedNearest = false;   // had to fall back to nearest root
+        // ---- Selected-zone sample diagnostics (Choir zero-buffer probe) ----
+        juce::String selectedZoneFullPath;       // absolute path the zone decoded from
+        int          selectedZoneNumSamples  = 0;
+        int          selectedZoneNumChannels = 0;
+        double       selectedZoneSampleRate  = 0.0;
+        float        selectedZoneDecodedPeakDb = -120.0f; // in-memory decoded peak
+        double       selectedZoneReadPosition  = 0.0;     // note-on start read position
     };
 
     ReportZoneProbe probeReportZone(int preferredMidi = 60, int velocity = 100) const noexcept
@@ -225,6 +232,27 @@ public:
         r.firstZoneRoot = minRoot;
         r.lastZoneRoot  = maxRoot;
 
+        // Fills the selected-zone diagnostics from a concrete decoded zone so the
+        // quality report can prove whether the chosen sample actually carries
+        // signal (vs a silent/failed decode) before blaming the render path.
+        auto fillSelected = [&r](const dida::SampleZone& z)
+        {
+            r.selectedZoneRoot      = z.rootMidi;
+            r.selectedZoneFile      = z.fileName;
+            r.selectedZoneFullPath  = z.fullPath;
+            r.selectedZoneNumSamples  = z.buffer.getNumSamples();
+            r.selectedZoneNumChannels = z.buffer.getNumChannels();
+            r.selectedZoneSampleRate  = z.sourceSampleRate;
+            const float mag = z.buffer.getNumSamples() > 0
+                ? z.buffer.getMagnitude(0, z.buffer.getNumSamples()) : 0.0f;
+            r.selectedZoneDecodedPeakDb = mag > 1.0e-6f
+                ? juce::Decibels::gainToDecibels(mag) : -120.0f;
+            // Note-on read start mirrors SynthVoice::startPos (cropStart fraction
+            // defaults to 0): playback begins at the head of the decoded buffer.
+            r.selectedZoneReadPosition = 0.0;
+            r.hasZone = true;
+        };
+
         // 1) Prefer a zone whose hard key-range covers the preferred note,
         //    clamped into the actual zone span first.
         const int test = juce::jlimit(minRoot, maxRoot, preferredMidi);
@@ -232,15 +260,13 @@ public:
             if (test >= z.lowKey && test <= z.highKey
                 && velocity >= z.loVel && velocity <= z.hiVel)
             {
-                r.testMidiNote = test; r.selectedZoneRoot = z.rootMidi;
-                r.selectedZoneFile = z.fileName; r.hasZone = true;
+                r.testMidiNote = test; fillSelected(z);
                 return r;
             }
         for (const auto& z : zones)
             if (test >= z.lowKey && test <= z.highKey)
             {
-                r.testMidiNote = test; r.selectedZoneRoot = z.rootMidi;
-                r.selectedZoneFile = z.fileName; r.hasZone = true;
+                r.testMidiNote = test; fillSelected(z);
                 return r;
             }
 
@@ -254,9 +280,7 @@ public:
             if (d < bestDist) { bestDist = d; nearest = &z; }
         }
         r.testMidiNote = nearest->rootMidi;
-        r.selectedZoneRoot = nearest->rootMidi;
-        r.selectedZoneFile = nearest->fileName;
-        r.hasZone = true;
+        fillSelected(*nearest);
         r.usedNearest = true;
         return r;
     }

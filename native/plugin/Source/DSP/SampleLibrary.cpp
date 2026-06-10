@@ -308,6 +308,7 @@ namespace {
         zone.loVel    = 0;
         zone.hiVel    = juce::jlimit(1, 127, hiVel);
         zone.fileName = file.getFileName();
+        zone.fullPath = file.getFullPathName();
 
         zone.buffer.setSize(2, numSamples);
         zone.buffer.clear();
@@ -329,8 +330,39 @@ namespace {
                 return false;
         }
 
+        // CHOIR ZERO-BUFFER FIX: a stale / wrong AudioCropPanel sidecar
+        // (<file>.dida-crop.json) can bake a near-silent slice into the zone
+        // buffer even though the underlying WAV is perfectly healthy. That is
+        // exactly the "SAMPLE_READER_STARTED_BUT_ZERO_BUFFER" symptom on the
+        // Choir Ohhh body. When a crop WAS applied but the decoded region is
+        // effectively silent, fall back to reading the FULL file so a real
+        // multisample is never reduced to silence by a bad crop region.
+        const bool cropWasApplied = (startSample > 0) || (numSamples < totalSamples);
+        if (cropWasApplied && zone.buffer.getMagnitude(0, numSamples) <= 1.0e-6f)
+        {
+            const int fullNum = totalSamples;
+            zone.buffer.setSize(2, fullNum);
+            zone.buffer.clear();
+            if (srcChannels == 1)
+            {
+                juce::AudioBuffer<float> tmp(1, fullNum);
+                if (reader->read(&tmp, 0, fullNum, 0, true, false))
+                {
+                    zone.buffer.copyFrom(0, 0, tmp, 0, 0, fullNum);
+                    zone.buffer.copyFrom(1, 0, tmp, 0, 0, fullNum);
+                }
+            }
+            else
+            {
+                reader->read(&zone.buffer, 0, fullNum, 0, true, true);
+            }
+            juce::Logger::writeToLog("[DIDITAGAIN sample] crop region was silent; "
+                "reloaded full file: " + file.getFullPathName());
+        }
+
         return true;
     }
+
 
     void assignStandardKeyZone(SampleZone& zone) noexcept
     {

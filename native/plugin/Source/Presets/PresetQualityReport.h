@@ -815,6 +815,27 @@ inline void report(DiditagainProcessor& proc,
     const int   zoneDistanceSemitones = (zoneProbe.hasZone && zoneProbe.selectedZoneRoot >= 0)
                                         ? std::abs(zoneProbe.selectedZoneRoot - silenceTestNote)
                                         : -1;
+    // ---- Selected-zone sample diagnostics (Choir zero-buffer investigation) ----
+    // These prove whether the chosen multisample file actually exists and carries
+    // signal BEFORE the render path is blamed for a silent dry bus.
+    const juce::String selectedZoneAbsolutePath = zoneProbe.selectedZoneFullPath;
+    const juce::File   selectedZoneFileRef(selectedZoneAbsolutePath);
+    const bool   selectedZoneFileExists   = selectedZoneAbsolutePath.isNotEmpty()
+                                            && selectedZoneFileRef.existsAsFile();
+    const juce::int64 selectedZoneFileSizeBytes = selectedZoneFileExists
+                                            ? selectedZoneFileRef.getSize() : 0;
+    const juce::String selectedZoneAudioFormat = selectedZoneFileRef.getFileExtension()
+                                            .removeCharacters(".").toUpperCase();
+    const int    selectedZoneNumSamples   = zoneProbe.selectedZoneNumSamples;
+    const int    selectedZoneNumChannels  = zoneProbe.selectedZoneNumChannels;
+    const float  selectedZoneDecodedPeakDb = zoneProbe.selectedZoneDecodedPeakDb;
+    const double selectedZoneReadPosition = zoneProbe.selectedZoneReadPosition;
+    // A decoded peak pinned near the -120 floor means the file decoded to silence
+    // (or the decode failed) — the sample is the culprit, not the render path.
+    const bool   selectedZoneDecodedSilent = zoneProbe.hasZone
+                                            && selectedZoneDecodedPeakDb <= -119.0f;
+    if (selectedZoneDecodedSilent)
+        warnings.addIfNotAlreadyThere("SAMPLE_FILE_SILENT_OR_DECODE_FAILED");
     // CRITICAL CHECK 6 (Report 79): voice/zone start proxies for DRY_BUS_SILENT
     // diagnosis. Derived from the zone probe + preset layer state (no extra RT
     // hooks): a voice can start when a real zone backs the test note AND the main
@@ -843,6 +864,10 @@ inline void report(DiditagainProcessor& proc,
             // Voice bus produced nothing BEFORE the amp stage.
             if (mainLayerGainDb <= -40.0f)
                 drySilenceReason = "MAIN_LAYER_GAIN_TOO_LOW";
+            else if (sampleReaderStarted && selectedZoneDecodedSilent)
+                // The chosen file decoded to silence (e.g. a stale crop region):
+                // the sample is the culprit, not the downstream render path.
+                drySilenceReason = "SAMPLE_FILE_SILENT_OR_DECODE_FAILED";
             else if (sampleReaderStarted)
                 // A zone+file resolved and the reader started, yet the buffer is
                 // empty — precise stage instead of generic NO_VOICE_OUTPUT.
@@ -1233,6 +1258,14 @@ inline void report(DiditagainProcessor& proc,
         << " lastZoneRoot=" << lastZoneRoot
         << " selectedZoneRoot=" << selectedZoneRoot
         << " selectedZoneFile=" << (selectedZoneFile.isNotEmpty() ? selectedZoneFile : juce::String("none"))
+        << " selectedZoneAbsolutePath=" << (selectedZoneAbsolutePath.isNotEmpty() ? selectedZoneAbsolutePath : juce::String("none"))
+        << " selectedZoneFileExists=" << (selectedZoneFileExists ? "true" : "false")
+        << " selectedZoneFileSizeBytes=" << selectedZoneFileSizeBytes
+        << " selectedZoneAudioFormat=" << (selectedZoneAudioFormat.isNotEmpty() ? selectedZoneAudioFormat : juce::String("none"))
+        << " selectedZoneNumSamples=" << selectedZoneNumSamples
+        << " selectedZoneNumChannels=" << selectedZoneNumChannels
+        << " selectedZoneDecodedPeakDb=" << juce::String(selectedZoneDecodedPeakDb, 2)
+        << " selectedZoneReadPosition=" << juce::String(selectedZoneReadPosition, 1)
         << " zoneFallbackUsed=" << (zoneFallbackUsed ? "true" : "false")
         << " zoneDistanceSemitones=" << zoneDistanceSemitones
         << " activeZoneCount=" << zoneCount
@@ -1422,6 +1455,14 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("lastZoneRoot",           lastZoneRoot);
     j->setProperty("selectedZoneRoot",       selectedZoneRoot);
     j->setProperty("selectedZoneFile",       selectedZoneFile.isNotEmpty() ? selectedZoneFile : juce::String("none"));
+    j->setProperty("selectedZoneAbsolutePath", selectedZoneAbsolutePath.isNotEmpty() ? selectedZoneAbsolutePath : juce::String("none"));
+    j->setProperty("selectedZoneFileExists",  selectedZoneFileExists);
+    j->setProperty("selectedZoneFileSizeBytes", (double) selectedZoneFileSizeBytes);
+    j->setProperty("selectedZoneAudioFormat", selectedZoneAudioFormat.isNotEmpty() ? selectedZoneAudioFormat : juce::String("none"));
+    j->setProperty("selectedZoneNumSamples",  selectedZoneNumSamples);
+    j->setProperty("selectedZoneNumChannels", selectedZoneNumChannels);
+    j->setProperty("selectedZoneDecodedPeakDb", selectedZoneDecodedPeakDb);
+    j->setProperty("selectedZoneReadPosition", selectedZoneReadPosition);
     j->setProperty("zoneFallbackUsed",       zoneFallbackUsed);
     j->setProperty("zoneDistanceSemitones",  zoneDistanceSemitones);
     j->setProperty("activeZoneCount",        zoneCount);
@@ -1664,6 +1705,14 @@ inline void report(DiditagainProcessor& proc,
               << "lastZoneRoot: "              << lastZoneRoot << "\n"
               << "selectedZoneRoot: "          << selectedZoneRoot << "\n"
               << "selectedZoneFile: "          << (selectedZoneFile.isNotEmpty() ? selectedZoneFile : juce::String("none")) << "\n"
+              << "selectedZoneAbsolutePath: "  << (selectedZoneAbsolutePath.isNotEmpty() ? selectedZoneAbsolutePath : juce::String("none")) << "\n"
+              << "selectedZoneFileExists: "    << (selectedZoneFileExists ? "true" : "false") << "\n"
+              << "selectedZoneFileSizeBytes: " << selectedZoneFileSizeBytes << "\n"
+              << "selectedZoneAudioFormat: "   << (selectedZoneAudioFormat.isNotEmpty() ? selectedZoneAudioFormat : juce::String("none")) << "\n"
+              << "selectedZoneNumSamples: "    << selectedZoneNumSamples << "\n"
+              << "selectedZoneNumChannels: "   << selectedZoneNumChannels << "\n"
+              << "selectedZoneDecodedPeakDb: " << juce::String(selectedZoneDecodedPeakDb, 2) << "\n"
+              << "selectedZoneReadPosition: "  << juce::String(selectedZoneReadPosition, 1) << "\n"
               << "zoneFallbackUsed: "          << (zoneFallbackUsed ? "true" : "false") << "\n"
               << "zoneDistanceSemitones: "     << zoneDistanceSemitones << "\n"
               << "presetJsonReverbMix: "       << juce::String(presetJsonReverbMix, 3) << "\n"
