@@ -60,8 +60,10 @@ public:
         setupButton(removeButton, "Remove Texture");
         setupButton(openFolderButton, "Open Texture Folder");
         setupButton(freezeButton, "Freeze Texture to Preset");
+        setupButton(installPackButton, "Install Pack ZIP");
 
         importButton.onClick      = [this] { doImport(); };
+        installPackButton.onClick = [this] { doInstallPack(); };
         removeButton.onClick      = [this] { showResult(processor.getPresetManager().aiRemoveTexture()); };
         freezeButton.onClick      = [this] { showResult(processor.getPresetManager().aiFreezeTexture()); };
         openFolderButton.onClick  = [this]
