@@ -828,20 +828,14 @@ bool presetHasNeuralTexturePartial(const UserPreset& p) noexcept
     return false;
 }
 
-// Headroom cleanup (v0.2 quality pass): some AI Texture demo presets render hot
-// because their fallback-synth body sits near 0 dBFS. Apply a per-preset amp
-// trim so the FINAL output lands inside the category target window. Only AI
-// Texture presets reach this (gated by loadTimeGainTrimDb).
+// Enhancement-layer model: AI Texture presets now use a REAL multisample as the
+// main body (not a hot fallback synth), so the old per-preset headroom CUT is
+// obsolete and would fight the per-preset loudness calibration. Output loudness
+// is now calibrated directly in each preset's ampEnvelope.gainDb. Keep this hook
+// at 0 dB so the preset's own gain is routed verbatim to the amp stage.
 float aiTextureGainTrimDb(const UserPreset& p) noexcept
 {
-    const auto n = p.presetName.toLowerCase();
-    const auto c = p.category.toLowerCase();
-    // Guitar Dust originally reported LOW_HEADROOM (~-7.8) when its body sat near
-    // 0 dBFS. Now that the support is a controlled analog partial (-8 dB), a full
-    // -8 dB global cut pushed the whole preset into TOO_QUIET, so a lighter -3 dB
-    // headroom trim keeps it inside the -18..-8 dB window without going quiet.
-    if (n.contains("guitar dust") || (c.contains("guitar") && presetHasNeuralTexturePartial(p)))
-        return -3.0f;
+    juce::ignoreUnused(p);
     return 0.0f;
 }
 
