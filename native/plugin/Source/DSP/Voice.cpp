@@ -539,6 +539,9 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         {
             if (! (slot.enabled && slot.engine)) continue;
             if (slot.engine->type() == dida::engines::EngineType::Pcm) continue;
+            // AI Texture v0.2 — DEBUG solo: when soloing the neural texture, skip
+            // every non-neural partial so only the cached texture is audible.
+            if (soloNeuralTexture && ! slot.isNeuralTexture) continue;
             // AI Texture v0.1 — FX-send safety: when the live "Texture Amount"
             // is 0 or the panel toggle is off, neuralTextureLiveGain == 0. Skip
             // the neural render ENTIRELY so the cached texture contributes zero
@@ -610,14 +613,14 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         {
             float zl, zr; readWithLoop(*loZone, loReadPos, loFinished, zl, zr);
             const float w = (hiZone ? (1.0f - zoneXfade) : 1.0f);
-            sampL += zl * w; sampR += zr * w;
+            if (! soloNeuralTexture) { sampL += zl * w; sampR += zr * w; }
             loReadPos += loStep;
             advanceLoop(*loZone, loReadPos, loFinished);
         }
         if (hiZone && ! hiFinished)
         {
             float zl, zr; readWithLoop(*hiZone, hiReadPos, hiFinished, zl, zr);
-            sampL += zl * zoneXfade; sampR += zr * zoneXfade;
+            if (! soloNeuralTexture) { sampL += zl * zoneXfade; sampR += zr * zoneXfade; }
             hiReadPos += hiStep;
             advanceLoop(*hiZone, hiReadPos, hiFinished);
         }
@@ -634,7 +637,7 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         // Legacy synth fallback only for factory/pure-synth presets. Imported
         // hybrid presets disable this so a missing sample cannot masquerade as
         // the same cheap synth sound.
-        if (! hasSampleSource && fallbackSynthesisEnabled)
+        if (! hasSampleSource && fallbackSynthesisEnabled && ! soloNeuralTexture)
         {
             // Card pitch + slow drift add 0..few cents of vintage life.
             const double totalCents = (double) oscADetuneCents + (double) extraCentsNow();

@@ -29,7 +29,7 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     importPanel   = std::make_unique<ImportReviewPanel>();
     settingsPanel = std::make_unique<SettingsPanel>(processor.getAPVTS());
     accountPanel  = std::make_unique<AccountPanel>();
-    aiTexturePanel = std::make_unique<AiTexturePanel>(processor.getAPVTS());
+    aiTexturePanel = std::make_unique<AiTexturePanel>(processor);
 
     importPanel->presetManager = &processor.getPresetManager();
     importPanel->onRescan = [this]() {

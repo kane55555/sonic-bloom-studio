@@ -65,6 +65,31 @@ public:
     void saveCurrentPreset(const juce::String& name, const juce::String& category);
     void exportPreset(const juce::File& destination);
 
+    // ======= AI Texture Import + Freeze v0.2 (message thread only) =======
+    struct AiTextureOpResult { bool ok = false; juce::String status; juce::String message; };
+
+    // True when the active preset is an editable user .diapreset on disk.
+    bool aiHasEditablePreset() const noexcept
+    { return requestedPresetIsUserDiapreset && requestedPresetFilePath.isNotEmpty(); }
+
+    // Managed texture folder for the active preset:
+    //   <Documents>/DIDITAGAIN STUDIO/NeuralTextures/<Category>/<PresetName>/
+    juce::File aiNeuralTextureFolder() const;
+
+    // Current AI texture state: Disabled / Cached / Missing / External / Imported.
+    juce::String aiTextureStatus() const;
+
+    // Import a WAV: validate audio, copy into the managed folder, attach as a
+    // neuralTextureCached partial with a portable {DIDA_DOCS} path, save + reload.
+    AiTextureOpResult aiImportTextureWav(const juce::File& wav);
+
+    // Remove the neuralTextureCached partial (does NOT delete the WAV on disk).
+    AiTextureOpResult aiRemoveTexture();
+
+    // Freeze: confirm the attached texture lives in the managed folder, mark
+    // ai.textureMode=cached + ai.enabled=true, save + reload.
+    AiTextureOpResult aiFreezeTexture();
+
     int getNumPresets() const { return static_cast<int>(presets.size()); }
     int getCurrentPresetIndex() const { return currentIndex; }
     juce::String getPresetName(int index) const;
