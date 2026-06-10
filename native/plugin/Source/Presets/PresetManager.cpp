@@ -236,6 +236,74 @@ static bool folderHasAnyAudio(const juce::File& folder, bool recursive)
     return false;
 }
 
+static int countWavFiles(const juce::File& folder)
+{
+    return folder.isDirectory()
+        ? folder.findChildFiles(juce::File::findFiles, true, "*.wav").size()
+        : 0;
+}
+
+static juce::String exactAiTextureBaseRelativePath(const dida::userpreset::UserPreset& up)
+{
+    const auto name = up.presetName.toLowerCase();
+    const auto cat  = up.category.toLowerCase();
+    const auto raw  = up.source.path.replaceCharacter('\\', '/').toLowerCase();
+    if (name.contains("brass") || cat.contains("brass") || raw.contains("/brass") || raw.startsWith("brass"))
+        return "Brass/Brass 1";
+    if (name.contains("choir") || cat.contains("choir") || cat.contains("vox")
+        || raw.contains("/choir") || raw.startsWith("choir"))
+        return "ChoirsVox/Choir 1";
+    if (name.contains("guitar") || cat.contains("guitar") || raw.contains("/guitar") || raw.startsWith("guitar"))
+        return "Guitars/Guitar 1";
+    return {};
+}
+
+static juce::File resolveAiTextureBaseSourceCandidate(const juce::String& rawPath,
+                                                      const dida::userpreset::UserPreset& up)
+{
+    auto src = rawPath.replaceCharacter('\\', '/').trim();
+    while ((src.startsWithChar('"') && src.endsWithChar('"'))
+        || (src.startsWithChar('\'') && src.endsWithChar('\'')))
+        src = src.substring(1, src.length() - 1).trim();
+    while (src.endsWithChar('/') && src.length() > 1)
+        src = src.dropLastCharacters(1);
+    if (src.isEmpty()) return {};
+
+    const auto samplesRoot = dida::SampleLibrary::getSamplesRoot();
+    const auto docsRoot = samplesRoot.getParentDirectory();
+    const auto docsPath = docsRoot.getFullPathName().replaceCharacter('\\', '/');
+    const auto samplesPath = samplesRoot.getFullPathName().replaceCharacter('\\', '/');
+
+    auto expanded = src;
+    expanded = expanded.replace("{DIDA_DOCS}", docsPath, true)
+                       .replace("{DocsRoot}", docsPath, true)
+                       .replace("{Docs}", docsPath, true)
+                       .replace("{Documents}", docsPath, true)
+                       .replace("{Samples}", samplesPath, true);
+
+    auto candidate = juce::File::isAbsolutePath(expanded)
+        ? juce::File(expanded)
+        : (expanded.startsWithIgnoreCase("Samples/")
+            ? samplesRoot.getChildFile(expanded.substring(8))
+            : samplesRoot.getChildFile(expanded));
+
+    if (candidate.isDirectory())
+    {
+        const auto exactRel = exactAiTextureBaseRelativePath(up);
+        const auto norm = candidate.getFullPathName().replaceCharacter('\\', '/');
+        if (exactRel.isNotEmpty()
+            && (norm.endsWithIgnoreCase("/Samples/Brass")
+                || norm.endsWithIgnoreCase("/Samples/Choir")
+                || norm.endsWithIgnoreCase("/Samples/Choirs")
+                || norm.endsWithIgnoreCase("/Samples/ChoirsVox")
+                || norm.endsWithIgnoreCase("/Samples/Guitar")
+                || norm.endsWithIgnoreCase("/Samples/Guitars")))
+            candidate = samplesRoot.getChildFile(exactRel);
+    }
+
+    return candidate;
+}
+
 static bool pathLivesInCategory(const juce::File& folder, const juce::String& category)
 {
     if (! folder.isDirectory() || category.trim().isEmpty()) return false;
