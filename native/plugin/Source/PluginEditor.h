@@ -9,6 +9,7 @@
 #include "UI/ImportReviewPanel.h"
 #include "UI/SettingsPanel.h"
 #include "UI/AccountPanel.h"
+#include "UI/AiTexturePanel.h"
 #include "UI/PresetBrowser.h"
 #include "UI/AudioCropPanel.h"
 #include "DSP/SampleLibrary.h"
