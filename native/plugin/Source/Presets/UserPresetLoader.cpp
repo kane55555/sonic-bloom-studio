@@ -1563,10 +1563,12 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
                     nte->setEqRole(pb.eqRole.isNotEmpty() ? pb.eqRole : juce::String("neuralTexture"));
                     nte->setDebugName(p.presetName + "/p" + juce::String(i));
 
-                    // Gain safety: default quiet, hard cap at -9 dB. Use an
-                    // explicit levelDb if present, else amp.gainDb, else default.
+                    // Gain safety: default quiet, hard cap at -9 dB (enforced by
+                    // the engine). Priority: engineParams.levelDb, then the
+                    // demo-pack top-level partial levelDb, then amp.gainDb.
                     float levelDb = dida::engines::NeuralTextureEngine::kDefaultLevelDb;
                     if (ep.hasProperty("levelDb")) levelDb = (float) (double) ep.getProperty("levelDb", levelDb);
+                    else if (pb.hasLevelDb)        levelDb = pb.levelDb;
                     else if (pb.amp.gainDb != 0.0f) levelDb = pb.amp.gainDb;
                     nte->setLevelDb(levelDb);
 
