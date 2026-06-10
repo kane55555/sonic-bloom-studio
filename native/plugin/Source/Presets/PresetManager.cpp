@@ -2173,7 +2173,12 @@ void PresetManager::seedAiTextureDemoPackIfMissing()
         auto destFile = dir.getChildFile(name);
         if (destFile.existsAsFile())
             destFile.deleteFile();
-        written += writeBinaryResourceToFile(name, destFile) ? 1 : 0;
+        const bool installed = writeBinaryResourceToFile(name, destFile);
+        if (installed)
+        {
+            forceAiTextureDemoSourcePath(destFile);
+            ++written;
+        }
     }
 
     seededMarkerV6.replaceWithText("1");
