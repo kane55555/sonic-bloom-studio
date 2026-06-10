@@ -92,6 +92,14 @@ public:
     // Read OFF the audio thread by the preset-quality reporter. Default 0 for
     // engines that do not track it; the cached neural texture engine overrides it.
     virtual float getLastPeakLinear() const noexcept { return 0.0f; }
+
+    // Diagnostic-only: the static intrinsic peak (linear) of any cached buffer
+    // this engine plays back, available even when no note is sounding. Used by
+    // the preset-quality reporter to estimate the texture's contribution at
+    // report time (when the probe holds no note, getLastPeakLinear() reads 0).
+    // Default 0 for engines without a cached source; NeuralTextureEngine
+    // overrides it with the decoded texture's measured peak.
+    virtual float getStaticPeakLinear() const noexcept { return 0.0f; }
 };
 
 }} // namespace dida::engines
