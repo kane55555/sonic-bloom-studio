@@ -74,6 +74,21 @@ public:
     float getLastPeakLinear() const noexcept override { return lastPeak.load(); }
     float getStaticPeakLinear() const noexcept override { return voiceStarted.load() ? 1.0f : 0.0f; }
 
+    juce::String getEnvelopeStateName() const noexcept override
+    {
+        switch ((ADSREnvelope::Stage) envStage.load())
+        {
+            case ADSREnvelope::Stage::Attack:  return "attack";
+            case ADSREnvelope::Stage::Decay:   return "decay";
+            case ADSREnvelope::Stage::Sustain: return "sustain";
+            case ADSREnvelope::Stage::Release: return "release";
+            case ADSREnvelope::Stage::Idle:
+            default:                           return "idle";
+        }
+    }
+
+    bool hasRenderedBlockSinceNoteOn() const noexcept override { return renderedBlock.load(); }
+
     void renderAdd(float* outL, float* outR, int n, float pitchHz,
                    const ModSnapshot& mods) override
     {
