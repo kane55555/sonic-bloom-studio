@@ -864,6 +864,10 @@ inline void report(DiditagainProcessor& proc,
             // Voice bus produced nothing BEFORE the amp stage.
             if (mainLayerGainDb <= -40.0f)
                 drySilenceReason = "MAIN_LAYER_GAIN_TOO_LOW";
+            else if (sampleReaderStarted && selectedZoneDecodedSilent)
+                // The chosen file decoded to silence (e.g. a stale crop region):
+                // the sample is the culprit, not the downstream render path.
+                drySilenceReason = "SAMPLE_FILE_SILENT_OR_DECODE_FAILED";
             else if (sampleReaderStarted)
                 // A zone+file resolved and the reader started, yet the buffer is
                 // empty — precise stage instead of generic NO_VOICE_OUTPUT.
