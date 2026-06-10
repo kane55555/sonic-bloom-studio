@@ -103,6 +103,7 @@ private:
     std::atomic<bool>  hasTexture { false };
     std::atomic<bool>  missing    { false };
     std::atomic<float> lastPeak   { 0.0f };
+    std::atomic<float> texturePeakLin { 0.0f }; // static intrinsic peak of decoded texture
 
     // Playback state (audio thread only).
     double readPos = 0.0;
