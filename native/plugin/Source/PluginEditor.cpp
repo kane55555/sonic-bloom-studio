@@ -215,6 +215,7 @@ void DiditagainEditor::openMenu()
     m.addSeparator();
     m.addItem(2, "Advanced Sound Design");
     m.addItem(3, "Modulation");
+    m.addItem(8, "AI Texture (v0.1)");
     m.addItem(4, "MIDI / Performance");
     m.addItem(5, "Library / Settings");
     m.addItem(6, "Account");
