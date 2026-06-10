@@ -1958,8 +1958,16 @@ void PresetManager::seedAiTextureDemoPackIfMissing()
         "AI Choir Ghost Test.diapreset",
         "AI Guitar Dust Test.diapreset"
     };
+    // v3: the factory demo presets carry corrected gain staging, so refresh
+    // them in place. Only these three managed factory files are overwritten;
+    // user-created presets and textures are never touched.
     for (auto* name : presetFiles)
-        written += writeBinaryResourceToFile(name, dir.getChildFile(name)) ? 1 : 0;
+    {
+        auto destFile = dir.getChildFile(name);
+        if (destFile.existsAsFile())
+            destFile.deleteFile();
+        written += writeBinaryResourceToFile(name, destFile) ? 1 : 0;
+    }
 
     seededMarkerV2.replaceWithText("1");
 
