@@ -1607,6 +1607,13 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
             }
         }
 
+        // Hoisted ONCE so the choir-skip guard and the support-install branch
+        // below share a single, unambiguous AI-texture decision. AI Texture
+        // presets (cached neural texture, incl. choir_ghost) must ALWAYS keep
+        // their analog support/body partial regardless of choir natural-mode,
+        // sample-only filtering, nearest-fallback or zone-too-far conditions.
+        const bool aiTexturePresetForInstall = isAiTexturePreset(p);
+
         dp->getSynthEngine().forEachSynthVoice([&](SynthVoice& v)
         {
             v.clearPartials();
