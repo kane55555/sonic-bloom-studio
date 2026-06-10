@@ -302,6 +302,11 @@ inline void report(DiditagainProcessor& proc,
     juce::String aiRawTexturePath, aiResolvedTexturePath, aiTextureInstallRoot;
     bool aiTextureFileExists = false;
     const juce::String aiProviderValue = up.ai.provider;
+    // AI Texture diagnostic capture (read at outer scope by the diagnostic block).
+    const bool   aiTexturePreset      = dida::userpreset::isAiTexturePreset(up);
+    bool         aiHasNeuralPartial   = false;
+    juce::String aiTextureType;
+    float        aiTextureBaseLevelDb = -18.0f; // engine texture trim before live amount
     {
         // {DIDA_DOCS} install root for textures, shown verbatim in the report.
         auto docsRoot = dida::SampleLibrary::getSamplesRoot().getParentDirectory();
