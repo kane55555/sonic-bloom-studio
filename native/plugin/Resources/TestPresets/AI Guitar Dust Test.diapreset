@@ -21,6 +21,20 @@
   "partials": [
     {
       "enabled": true,
+      "engineType": "analog",
+      "levelDb": 16.0,
+      "pan": 0.0,
+      "engineParams": {
+        "role": "support",
+        "osc": "trianglePluck",
+        "brightness": 0.48,
+        "attackMs": 2,
+        "decayMs": 380,
+        "releaseMs": 160
+      }
+    },
+    {
+      "enabled": true,
       "engineType": "neuralTextureCached",
       "followMainEnvelope": true,
       "eqRole": "neuralTexture",

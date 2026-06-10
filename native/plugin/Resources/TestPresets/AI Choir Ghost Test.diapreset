@@ -21,6 +21,21 @@
   "partials": [
     {
       "enabled": true,
+      "engineType": "analog",
+      "levelDb": -6.0,
+      "pan": 0.0,
+      "engineParams": {
+        "role": "support",
+        "osc": "saw",
+        "unison": 5,
+        "detuneCents": 6,
+        "filterCutoffHz": 6800,
+        "attackMs": 120,
+        "releaseMs": 900
+      }
+    },
+    {
+      "enabled": true,
       "engineType": "neuralTextureCached",
       "followMainEnvelope": true,
       "eqRole": "neuralTexture",
