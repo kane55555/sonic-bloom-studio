@@ -637,7 +637,7 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         // Legacy synth fallback only for factory/pure-synth presets. Imported
         // hybrid presets disable this so a missing sample cannot masquerade as
         // the same cheap synth sound.
-        if (! hasSampleSource && fallbackSynthesisEnabled)
+        if (! hasSampleSource && fallbackSynthesisEnabled && ! soloNeuralTexture)
         {
             // Card pitch + slow drift add 0..few cents of vintage life.
             const double totalCents = (double) oscADetuneCents + (double) extraCentsNow();
