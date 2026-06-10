@@ -2075,6 +2075,50 @@ static bool writeBinaryResourceToFile(const juce::String& originalName,
     return false;
 }
 
+static juce::String aiTextureDemoSourcePathForFile(const juce::String& fileName)
+{
+    const auto n = fileName.toLowerCase();
+    if (n.contains("brass air"))
+        return "{DIDA_DOCS}/Samples/Presets/User/Brass/Brass 1";
+    if (n.contains("choir ghost"))
+        return "{DIDA_DOCS}/Samples/Presets/User/Choir Ohhh";
+    if (n.contains("guitar dust"))
+        return "{DIDA_DOCS}/Samples/Presets/User/Acoustic Guitars/Acoustic Guitar 1";
+    return {};
+}
+
+static void forceAiTextureDemoSourcePath(const juce::File& presetFile)
+{
+    const auto targetPath = aiTextureDemoSourcePathForFile(presetFile.getFileName());
+    if (targetPath.isEmpty() || ! presetFile.existsAsFile()) return;
+
+    auto json = juce::JSON::parse(presetFile);
+    auto* obj = json.getDynamicObject();
+    if (obj == nullptr) return;
+
+    auto src = obj->getProperty("sourceInstrument");
+    juce::DynamicObject::Ptr newSrc;
+    auto* srcObj = src.getDynamicObject();
+    if (srcObj == nullptr)
+    {
+        newSrc = new juce::DynamicObject();
+        srcObj = newSrc.get();
+    }
+    srcObj->setProperty("type", "multisampleFolder");
+    srcObj->setProperty("path", targetPath);
+    srcObj->setProperty("mappingMode", "nearest");
+    juce::Array<juce::var> roots;
+    roots.add("C");
+    srcObj->setProperty("rootNotePattern", roots);
+    if (newSrc != nullptr)
+        obj->setProperty("sourceInstrument", juce::var(newSrc.get()));
+
+    if (auto* samplesObj = obj->getProperty("samples").getDynamicObject())
+        samplesObj->setProperty("rootFolder", targetPath);
+
+    presetFile.replaceWithText(juce::JSON::toString(json, false));
+}
+
 //==============================================================================
 // One-time install of the bundled "AI Texture Demo Pack".
 //
