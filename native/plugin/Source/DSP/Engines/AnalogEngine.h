@@ -36,6 +36,8 @@ public:
         ampEnv.reset();
         lastPeak.store(0.0f);
         voiceStarted.store(false);
+        renderedBlock.store(false);
+        envStage.store((int) ADSREnvelope::Stage::Idle);
     }
 
     void noteOn(int /*midi*/, float vel) override
@@ -47,6 +49,10 @@ public:
         subPhase = d(rng);
         ampEnv.noteOn();
         voiceStarted.store(true);
+        // A fresh note has not produced a rendered block yet; the reporter waits
+        // for renderAdd() to flip this true before it trusts support-body meters.
+        renderedBlock.store(false);
+        envStage.store((int) ADSREnvelope::Stage::Attack);
     }
     void noteOff() override { ampEnv.noteOff(); }
 
