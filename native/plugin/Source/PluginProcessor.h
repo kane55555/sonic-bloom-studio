@@ -39,6 +39,11 @@ public:
     PresetManager& getPresetManager() { return presetManager; }
     LicenseClient& getLicenseClient() { return licenseClient; }
 
+    // AI Texture v0.2 — DEBUG audition solo. Transient: never written to a
+    // preset or project state, so it can never permanently alter a preset.
+    void setAiTextureSolo(bool s) noexcept { aiTextureSolo.store(s); }
+    bool getAiTextureSolo() const noexcept { return aiTextureSolo.load(); }
+
     // --- Debug introspection (used by PresetCycleTester) ---
     bool   getAppliedMonoMode() const noexcept   { return appliedMonoMode; }
     int    getAppliedPolyphony() const noexcept  { return appliedPolyphony; }
