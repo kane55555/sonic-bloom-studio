@@ -551,6 +551,11 @@ juce::File resolveSourcePath(const juce::String& rawPath)
         }
     }
 
+    // A directly-resolved file (e.g. a cached neural texture WAV) wins first.
+    for (auto& candidate : candidates)
+        if (candidate.existsAsFile())
+            return candidate;
+
     for (auto& candidate : candidates)
         if (folderHasWavs(candidate))
             return candidate;
