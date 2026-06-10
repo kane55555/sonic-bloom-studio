@@ -114,10 +114,11 @@ public:
         area.removeFromTop(8);
 
         const int bh = 30, gap = 6;
-        importButton.setBounds(area.removeFromTop(bh));     area.removeFromTop(gap);
-        freezeButton.setBounds(area.removeFromTop(bh));     area.removeFromTop(gap);
-        removeButton.setBounds(area.removeFromTop(bh));     area.removeFromTop(gap);
-        openFolderButton.setBounds(area.removeFromTop(bh)); area.removeFromTop(gap);
+        importButton.setBounds(area.removeFromTop(bh));      area.removeFromTop(gap);
+        installPackButton.setBounds(area.removeFromTop(bh));  area.removeFromTop(gap);
+        freezeButton.setBounds(area.removeFromTop(bh));       area.removeFromTop(gap);
+        removeButton.setBounds(area.removeFromTop(bh));       area.removeFromTop(gap);
+        openFolderButton.setBounds(area.removeFromTop(bh));   area.removeFromTop(gap);
 
         area.removeFromTop(8);
         statusLabel.setBounds(area.removeFromTop(22));
