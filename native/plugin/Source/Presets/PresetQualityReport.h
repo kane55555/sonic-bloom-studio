@@ -738,6 +738,8 @@ inline void report(DiditagainProcessor& proc,
     {
         warnings.addIfNotAlreadyThere("REPORT_PENDING_NO_CURRENT_RENDER");
         warnings.addIfNotAlreadyThere("METERS_PRE_PRESET_RENDER");
+        if (aiTexturePreset && currentPresetHasRendered && ! aiSupportBodyRendered)
+            warnings.addIfNotAlreadyThere("AI_TEXTURE_SUPPORT_BODY_NOT_RENDERED");
     }
 
     if (fx.wasMasterGainClamped())
