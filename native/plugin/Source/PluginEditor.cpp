@@ -29,6 +29,7 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     importPanel   = std::make_unique<ImportReviewPanel>();
     settingsPanel = std::make_unique<SettingsPanel>(processor.getAPVTS());
     accountPanel  = std::make_unique<AccountPanel>();
+    aiTexturePanel = std::make_unique<AiTexturePanel>(processor.getAPVTS());
 
     importPanel->presetManager = &processor.getPresetManager();
     importPanel->onRescan = [this]() {
@@ -53,6 +54,7 @@ DiditagainEditor::DiditagainEditor(DiditagainProcessor& p)
     addChildComponent(*importPanel);
     addChildComponent(*settingsPanel);
     addChildComponent(*accountPanel);
+    addChildComponent(*aiTexturePanel);
 
     presetBrowserPanel = std::make_unique<PresetBrowser>();
     addAndMakeVisible(*presetBrowserPanel);
@@ -213,6 +215,7 @@ void DiditagainEditor::openMenu()
     m.addSeparator();
     m.addItem(2, "Advanced Sound Design");
     m.addItem(3, "Modulation");
+    m.addItem(8, "AI Texture (v0.1)");
     m.addItem(4, "MIDI / Performance");
     m.addItem(5, "Library / Settings");
     m.addItem(6, "Account");
@@ -230,6 +233,7 @@ void DiditagainEditor::openMenu()
                 case 4: showOverlay(settingsPanel.get(), "MIDI / PERFORMANCE"); break;
                 case 5: showOverlay(settingsPanel.get(), "LIBRARY / SETTINGS"); break;
                 case 6: showOverlay(accountPanel.get(),  "ACCOUNT"); break;
+                case 8: showOverlay(aiTexturePanel.get(), "AI TEXTURE v0.1"); break;
                 default: break;
             }
         });

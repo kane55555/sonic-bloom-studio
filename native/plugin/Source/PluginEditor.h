@@ -9,6 +9,7 @@
 #include "UI/ImportReviewPanel.h"
 #include "UI/SettingsPanel.h"
 #include "UI/AccountPanel.h"
+#include "UI/AiTexturePanel.h"
 #include "UI/PresetBrowser.h"
 #include "UI/AudioCropPanel.h"
 #include "DSP/SampleLibrary.h"
@@ -57,6 +58,7 @@ private:
     std::unique_ptr<ImportReviewPanel> importPanel;
     std::unique_ptr<SettingsPanel>    settingsPanel;
     std::unique_ptr<AccountPanel>     accountPanel;
+    std::unique_ptr<AiTexturePanel>   aiTexturePanel;
     std::unique_ptr<AudioCropPanel>   audioCropPanel;
 
     // Modal overlay state

@@ -277,6 +277,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout DiditagainProcessor::createP
         juce::StringArray{"I", "II", "I+II"}, 0));
 
 
+    // AI Texture v0.1 — live, global control over the cached neural texture
+    // layer. These do not create textures; they only scale the neural texture
+    // partials a preset already loaded. enabled=false or amount=0 fully mutes
+    // the texture, leaving the main sample/synth untouched. Presets without a
+    // neural texture partial are unaffected (sound identical to before).
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{"aiTextureEnabled", 1}, "AI Texture", true));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"aiTextureAmount", 1}, "Texture Amount",
+        juce::NormalisableRange<float>(0.0f, 1.0f), 1.0f));
+
     // Global oversampling quality (anti-aliasing for the synthesis engines).
     // Off is bit-identical to the legacy render path; 2x/4x reduce oscillator
     // aliasing at the cost of CPU + a little latency.
@@ -597,6 +608,10 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
     const float unisonDetune = getF("unisonDetune");
     const float unisonSpread = getF("unisonSpread");
     const float vintageAmt   = juce::jlimit(0.0f, 1.0f, getF("vintageAmount"));
+    // AI Texture v0.1 — live "Texture Amount" override applied to neural
+    // texture partials only. Off or 0 fully mutes the cached texture.
+    const bool  aiTexEnabled = getF("aiTextureEnabled") > 0.5f;
+    const float aiTexAmount  = juce::jlimit(0.0f, 1.0f, getF("aiTextureAmount"));
 
     int voiceCardCounter = 0;
     synthEngine.forEachSynthVoice([&](SynthVoice& v)
@@ -605,6 +620,7 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         // voice has its own slight analog character (pitch, pan, drift, etc).
         v.setVoiceCardIndex(voiceCardCounter++);
         v.setVintageAmount(vintageAmt);
+        v.setNeuralTextureLiveGain(aiTexEnabled, aiTexAmount);
 
         v.setEngineMode(engineMode);
         v.setOscALevel(oscALevel);
