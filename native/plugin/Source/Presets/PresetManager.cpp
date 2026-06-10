@@ -344,19 +344,6 @@ static juce::File resolveAiTextureBaseSourceCandidate(const juce::String& rawPat
             || expandedNorm.endsWithIgnoreCase("/Samples/Guitars")))
         candidate = samplesRoot.getChildFile(exactRel);
 
-    if (candidate.isDirectory())
-    {
-        const auto norm = candidate.getFullPathName().replaceCharacter('\\', '/');
-        if (false && exactRel.isNotEmpty()
-            && (norm.endsWithIgnoreCase("/Samples/Brass")
-                || norm.endsWithIgnoreCase("/Samples/Choir")
-                || norm.endsWithIgnoreCase("/Samples/Choirs")
-                || norm.endsWithIgnoreCase("/Samples/ChoirsVox")
-                || norm.endsWithIgnoreCase("/Samples/Guitar")
-                || norm.endsWithIgnoreCase("/Samples/Guitars")))
-            candidate = samplesRoot.getChildFile(exactRel);
-    }
-
     return candidate;
 }
 
