@@ -291,6 +291,8 @@ inline void report(DiditagainProcessor& proc,
     //     preset load and never alter DSP. ---------------------------------
     {
         bool hasNeuralPartial = false;
+        bool textureFileResolved = false;
+        bool anyTextureMissing = false;
         for (const auto& pb : up.partials)
         {
             if (! pb.enabled) continue;
@@ -303,7 +305,9 @@ inline void report(DiditagainProcessor& proc,
             const juce::File texFile = texPath.isNotEmpty()
                 ? dida::userpreset::resolveSourcePath(texPath) : juce::File();
             if (texPath.isEmpty() || ! texFile.existsAsFile())
-                warnings.add("AI_TEXTURE_MISSING");                 // MODEL_OR_TEXTURE_MISSING
+                anyTextureMissing = true;
+            else
+                textureFileResolved = true;
 
             // Gain safety: a neural texture must stay quiet under the main sample.
             float lvlDb = ep.hasProperty("levelDb") ? (float) (double) ep.getProperty("levelDb", -18.0)
@@ -311,7 +315,22 @@ inline void report(DiditagainProcessor& proc,
             if (lvlDb > -9.0f) warnings.add("AI_TEXTURE_TOO_LOUD");
         }
 
+        // Live panel state (observation-only; mirrors the audio-thread mapping).
+        const bool  panelEnabled = paramValue(proc, "aiTextureEnabled") > 0.5f;
+        const float panelAmount  = juce::jlimit(0.0f, 1.0f, paramValue(proc, "aiTextureAmount"));
+
+        if (hasNeuralPartial) warnings.add("AI_TEXTURE_PARTIAL_PRESENT");
+        if (anyTextureMissing) warnings.add("AI_TEXTURE_MISSING_FILE");
         if (up.ai.enabled || hasNeuralPartial) warnings.add("AI_TEXTURE_ENABLED");
+
+        if (hasNeuralPartial && ! panelEnabled) warnings.add("AI_TEXTURE_MUTED_BY_PANEL");
+        if (hasNeuralPartial && panelAmount <= 0.0f) warnings.add("AI_TEXTURE_AMOUNT_ZERO");
+
+        // The cached texture is actually audible only when a partial is present,
+        // its file resolved, and the panel is not muting it.
+        if (hasNeuralPartial && textureFileResolved && panelEnabled && panelAmount > 0.0f)
+            warnings.add("AI_TEXTURE_RENDERING_CACHED");
+
         // textureMode must be the only mode the plugin can consume in v0.1.
         if (up.ai.present && ! up.ai.textureMode.equalsIgnoreCase("cached"))
             warnings.add("AI_TEXTURE_NOT_CACHED");
