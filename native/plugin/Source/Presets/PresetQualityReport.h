@@ -1369,6 +1369,11 @@ inline void report(DiditagainProcessor& proc,
         << " liveRenderCaptured=" << (liveRenderCaptured ? "true" : "false")
         << " calibrationCandidateCaptured=" << (calibrationCandidateCaptured ? "true" : "false")
         << " calibrationCandidateAgeBlocks=" << calibrationCandidateAgeBlocks
+        << " calibrationCandidateVoiceId=" << live.calibrationCandidateVoiceId
+        << " calibrationCandidateNoteAgeBlocks=" << live.calibrationCandidateNoteAgeBlocks
+        << " calibrationCandidateSource=" << live.calibrationCandidateSource
+        << " calibrationCandidateWasProbe=" << (live.calibrationCandidateWasProbe ? "true" : "false")
+        << " calibrationCandidateWasReaderReset=" << (live.calibrationCandidateWasReaderReset ? "true" : "false")
         << " calibrationCandidatePlayheadAfterRender=" << juce::String(live.sampleReaderPlayheadAfterRender, 1)
         << " calibrationCandidateEnvelopeGain=" << juce::String(live.ampEnvelopeCurrentGain, 4)
         << " calibrationCandidateEnvelopeState=" << live.ampEnvelopeStateName
@@ -1605,6 +1610,11 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("liveRenderCaptured",     liveRenderCaptured);
     j->setProperty("calibrationCandidateCaptured", calibrationCandidateCaptured);
     j->setProperty("calibrationCandidateAgeBlocks", calibrationCandidateAgeBlocks);
+    j->setProperty("calibrationCandidateVoiceId", live.calibrationCandidateVoiceId);
+    j->setProperty("calibrationCandidateNoteAgeBlocks", live.calibrationCandidateNoteAgeBlocks);
+    j->setProperty("calibrationCandidateSource", live.calibrationCandidateSource);
+    j->setProperty("calibrationCandidateWasProbe", live.calibrationCandidateWasProbe);
+    j->setProperty("calibrationCandidateWasReaderReset", live.calibrationCandidateWasReaderReset);
     j->setProperty("calibrationCandidatePlayheadAfterRender", live.sampleReaderPlayheadAfterRender);
     j->setProperty("calibrationCandidateEnvelopeGain", live.ampEnvelopeCurrentGain);
     j->setProperty("calibrationCandidateEnvelopeState", live.ampEnvelopeStateName);
