@@ -686,6 +686,8 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             ++telSamplesRead;
             loReadPos += loStep;
             advanceLoop(*loZone, loReadPos, loFinished);
+            telPlayheadAfter = loReadPos;   // pre-reset snapshot for telemetry
+            telAtEndAfter    = loFinished;
         }
 
         if (hiZone && ! hiFinished)
