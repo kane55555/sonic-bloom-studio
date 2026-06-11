@@ -852,8 +852,11 @@ inline void report(DiditagainProcessor& proc,
     //   * decoded healthy + liveBeforeEnvelope == -120  -> reader/crop/playhead
     //   * liveBeforeEnvelope healthy + afterEnvelope == -120 -> envelope
     //   * afterEnvelope healthy + dryVoicePreLayerPeakDb == -120 -> gain/layer bus
-    const auto live = engine.probeLiveRenderSnapshot();
+    const auto live = engine.probeCalibrationCandidateSnapshot(currentPresetLoadId);
     const bool liveRenderCaptured = live.valid;
+    const bool calibrationCandidateCaptured = live.valid;
+    const int calibrationCandidateAgeBlocks = calibrationCandidateCaptured
+        ? juce::jmax(0, blocksRenderedSincePresetLoad - live.blocksSincePresetLoad) : -1;
 
     // ---- Slow-attack guard (Choir/AI Texture zero-buffer false positive) ----
     // The live reader proved healthy BEFORE the amp VCA (non-zero samples and a
@@ -1350,6 +1353,12 @@ inline void report(DiditagainProcessor& proc,
         << " voiceStarted=" << (voiceStarted ? "true" : "false")
         << " sampleReaderStarted=" << (sampleReaderStarted ? "true" : "false")
         << " liveRenderCaptured=" << (liveRenderCaptured ? "true" : "false")
+        << " calibrationCandidateCaptured=" << (calibrationCandidateCaptured ? "true" : "false")
+        << " calibrationCandidateAgeBlocks=" << calibrationCandidateAgeBlocks
+        << " calibrationCandidatePlayheadAfterRender=" << juce::String(live.sampleReaderPlayheadAfterRender, 1)
+        << " calibrationCandidateEnvelopeGain=" << juce::String(live.ampEnvelopeCurrentGain, 4)
+        << " calibrationCandidateEnvelopeState=" << live.ampEnvelopeStateName
+        << " calibrationCandidatePeakAfterGainDb=" << juce::String(live.liveReaderBufferPeakDbAfterGain, 2)
         << " playedMidiNote=" << live.playedMidiNote
         << " playedVelocity=" << juce::String(live.playedVelocity, 3)
         << " liveSelectedZoneRoot=" << live.selectedZoneRoot
@@ -1580,6 +1589,12 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("voiceStarted",           voiceStarted);
     j->setProperty("sampleReaderStarted",    sampleReaderStarted);
     j->setProperty("liveRenderCaptured",     liveRenderCaptured);
+    j->setProperty("calibrationCandidateCaptured", calibrationCandidateCaptured);
+    j->setProperty("calibrationCandidateAgeBlocks", calibrationCandidateAgeBlocks);
+    j->setProperty("calibrationCandidatePlayheadAfterRender", live.sampleReaderPlayheadAfterRender);
+    j->setProperty("calibrationCandidateEnvelopeGain", live.ampEnvelopeCurrentGain);
+    j->setProperty("calibrationCandidateEnvelopeState", live.ampEnvelopeStateName);
+    j->setProperty("calibrationCandidatePeakAfterGainDb", live.liveReaderBufferPeakDbAfterGain);
     j->setProperty("playedMidiNote",         live.playedMidiNote);
     j->setProperty("playedVelocity",         live.playedVelocity);
     j->setProperty("liveSelectedZoneRoot",   live.selectedZoneRoot);
