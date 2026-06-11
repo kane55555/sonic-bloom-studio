@@ -558,6 +558,12 @@ private:
         std::atomic<unsigned long long> seq { 0 };
         std::atomic<int>   presetLoadId { 0 };
         std::atomic<int>   blocksSincePresetLoad { 0 };
+        std::atomic<int>   calibrationCandidateVoiceId { -1 };
+        std::atomic<int>   calibrationCandidateNoteLifetimeId { -1 };
+        std::atomic<int>   calibrationCandidateNoteAgeBlocks { -1 };
+        std::atomic<int>   calibrationCandidateSource { (int) CalibrationCandidateSource::reportProbe };
+        std::atomic<bool>  calibrationCandidateWasProbe { true };
+        std::atomic<bool>  calibrationCandidateWasReaderReset { true };
         std::atomic<int>   playedMidiNote { -1 };
         std::atomic<float> playedVelocity { 0.0f };
         std::atomic<int>   selectedZoneRoot { -1 };
@@ -595,6 +601,18 @@ private:
     LiveRenderAtomics calibrationTel_;
     std::atomic<int> liveRenderPresetLoadId_ { 0 };
     std::atomic<int> liveRenderBlocksSinceLoad_ { 0 };
+    std::atomic<int> liveRenderCandidateSource_ { (int) CalibrationCandidateSource::reportProbe };
+    std::atomic<bool> liveRenderCandidateWasProbe_ { true };
+    std::atomic<bool> liveRenderCandidateWasReaderReset_ { true };
+    int voiceId_ = -1;
+    int noteLifetimeId_ = 0;
+    int noteAgeBlocks_ = 0;
+
+    static int allocateVoiceId() noexcept
+    {
+        static std::atomic<int> nextVoiceId { 1 };
+        return nextVoiceId.fetch_add(1);
+    }
 
 
 
