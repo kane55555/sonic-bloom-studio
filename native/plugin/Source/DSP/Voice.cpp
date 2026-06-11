@@ -241,6 +241,8 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
     fxSendActive = true;
     noteReleasedForFxSend = false;
     mainSamplePeakLin_.store(0.0f);
+    liveTelBestGain_ = -1.0f;   // reset the report calibration candidate for this note
+
     recalcGlideCoeff();
 
     loZone = hiZone = nullptr;
