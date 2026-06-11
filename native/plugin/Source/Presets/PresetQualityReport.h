@@ -1444,7 +1444,7 @@ inline void report(DiditagainProcessor& proc,
         << " estimatedHeadroomDb=" << juce::String(headroomDb, 2)
         << " categoryTargetMinDb=" << juce::String(target.minDb, 2)
         << " categoryTargetMaxDb=" << juce::String(target.maxDb, 2)
-        << " suggestedGainAdjustmentDb=" << (notesPlaying ? juce::String(suggestedGainDb, 2) : juce::String("n/a"))
+        << " suggestedGainAdjustmentDb=" << (suggestedGainValid ? juce::String(suggestedGainDb, 2) : juce::String("n/a"))
         << " aiTexturePreset=" << (aiTexturePreset ? "true" : "false")
         << " textureType=" << aiTextureTypeStr
         << " mainSamplePeakDb=" << juce::String(mainSamplePeakDb, 2)
