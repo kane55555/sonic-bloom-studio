@@ -1611,6 +1611,7 @@ void applyToProcessor(const UserPreset& p, juce::AudioProcessor& proc)
         dp->getSynthEngine().forEachSynthVoice([&](SynthVoice& v)
         {
             v.clearPartials();
+            v.setProtectHeldNotePersistence(choirMode && aiTexturePresetForInstall);
             if (choirMode)
             {
                 // Choir mode clamps the main synth oscillators (unison/exciter/
