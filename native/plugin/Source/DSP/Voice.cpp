@@ -626,8 +626,22 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         }
     }
 
+    // ---- Live-render telemetry capture (diagnostic only; no DSP effect) ----
+    // Tracks the multisample body (lo zone) through reader -> envelope -> gain so
+    // the reporter can prove exactly where a decoded-but-healthy sample goes
+    // silent during live playback.
+    const dida::SampleZone* telZone = loZone;
+    const double telPlayheadBefore  = loReadPos;
+    const bool   telAtEndBefore     = loFinished;
+    float telReaderPeakLin   = 0.0f;   // pure reader output (pre oscALevel/envelope)
+    float telAfterEnvPeakLin = 0.0f;   // voice bus after amp envelope
+    float telAfterGainPeakLin = 0.0f;  // voice bus after final per-voice trim
+    int   telNonZeroCount    = 0;
+    int   telSamplesRead     = 0;
+
     for (int s = startSample; s < startSample + numSamples; ++s)
     {
+
 
         if (glideCoeff > 0.0f)
             currentMidiNote = targetMidiNote + (currentMidiNote - targetMidiNote) * glideCoeff;
