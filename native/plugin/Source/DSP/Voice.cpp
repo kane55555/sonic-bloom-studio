@@ -940,6 +940,11 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         const float velCurve = 0.3f + 0.7f * velocity;
         const float gain = amp * velCurve * vcaGainLin;
         l *= gain; r *= gain;
+        // Live telemetry: voice bus peak right after the amp envelope stage.
+        {
+            const float aeAbs = juce::jmax(std::fabs(l), std::fabs(r));
+            if (aeAbs > telAfterEnvPeakLin) telAfterEnvPeakLin = aeAbs;
+        }
         // Equal-power pan offset using card pan (-0.08..+0.08 at full vintage).
         // cardPan=0 → both sides ~0.707 (centre). Multiply by sqrt(2) to keep
         // unity gain in the centre position.
