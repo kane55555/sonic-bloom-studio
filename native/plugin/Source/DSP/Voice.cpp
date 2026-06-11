@@ -220,6 +220,7 @@ void SynthVoice::reset() noexcept
     loReadPos = hiReadPos = 0.0;
     loFinished = hiFinished = true;
     isActive = false;
+    heldMidiNote_ = -1;
     oscBPhase = subPhase = fmModPhase = sineFallbackPhase = 0.0;
     fmOp3Phase = fmOp4Phase = 0.0;
     fmFeedbackZ = 0.0f;
@@ -298,12 +299,24 @@ static void multisampleDebugLog(const juce::String& message)
 void SynthVoice::startNote(int midiNoteNumber, float vel,
                            juce::SynthesiserSound*, int)
 {
+    if (protectHeldNotePersistence
+        && isActive
+        && heldMidiNote_ == midiNoteNumber
+        && ampEnv.getStage() != ADSREnvelope::Stage::Idle
+        && ampEnv.getStage() != ADSREnvelope::Stage::Release)
+    {
+        targetMidiNote = static_cast<float>(midiNoteNumber);
+        velocity = juce::jlimit(0.0f, 1.0f, vel);
+        return;
+    }
+
     targetMidiNote = static_cast<float>(midiNoteNumber);
     if (! isActive || ampEnv.getStage() == ADSREnvelope::Stage::Idle)
         currentMidiNote = targetMidiNote;
 
     velocity = juce::jlimit(0.0f, 1.0f, vel);
     isActive = true;
+    heldMidiNote_ = midiNoteNumber;
     fxSendLevel = 1.0f;
     fxSendTarget = 1.0f;
     fxSendReleaseStep = 0.0f;
