@@ -877,8 +877,19 @@ inline void report(DiditagainProcessor& proc,
 
 
     juce::String drySilenceReason;
-    if (reportEligible && dryOutputDb <= -60.0f && up.main.enabled)
+    if (reportEligible && envelopeNotOpenYet && dryOutputDb <= -60.0f && up.main.enabled)
     {
+        // Choir/AI Texture slow-attack: the reader carries signal before the VCA
+        // but the amp envelope is still ramping, so the dry bus is momentarily
+        // quiet. This is timing, not a reader/zero-buffer fault — do NOT emit
+        // DRY_BUS_SILENT or SAMPLE_READER_STARTED_BUT_ZERO_BUFFER. Surface a
+        // benign marker and defer calibration until the envelope opens.
+        drySilenceReason = "ENVELOPE_NOT_OPEN_YET";
+        warnings.addIfNotAlreadyThere("CHOIR_ATTACK_TOO_EARLY");
+    }
+    else if (reportEligible && dryOutputDb <= -60.0f && up.main.enabled)
+    {
+
         // BUG 3 (Report 86): walk the REAL signal chain stage-by-stage and name
         // the exact stage that lost the signal. Never emit a generic
         // NO_VOICE_OUTPUT when a zone + sample reader + file are present.
