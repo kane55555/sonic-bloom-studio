@@ -1170,10 +1170,14 @@ inline void report(DiditagainProcessor& proc,
     // preset mid-attack. This is a wait, never a failure.
     if (envelopeNotOpenYet) calibrationSkipReason = "envelopeNotOpenYet";
     if (staleProbeSnapshot) calibrationSkipReason = "staleProbeSnapshot";
+    // Restarted/new-voice guard: the report is sampling voices that never age
+    // past the attack. Defer calibration until a voice survives long enough.
+    if (voiceLifetimeNotAdvancing) calibrationSkipReason = "voiceLifetimeNotAdvancing";
     const bool calibrationSafe = reportEligible
         && meterReflectsCurrentPreset
         && ! envelopeNotOpenYet
         && ! staleProbeSnapshot
+        && ! voiceLifetimeNotAdvancing
         && finalOutputDb > -120.0f
         && dryRawPeakDb > -120.0f
         && ! warnings.contains("DRY_BUS_SILENT")
