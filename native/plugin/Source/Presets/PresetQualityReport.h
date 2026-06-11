@@ -855,6 +855,27 @@ inline void report(DiditagainProcessor& proc,
     const auto live = engine.probeLiveRenderSnapshot();
     const bool liveRenderCaptured = live.valid;
 
+    // ---- Slow-attack guard (Choir/AI Texture zero-buffer false positive) ----
+    // The live reader proved healthy BEFORE the amp VCA (non-zero samples and a
+    // before-envelope peak above the -120 floor). A low AFTER-envelope / dry
+    // reading while the amp envelope is still ramping (e.g. a 100 ms Choir
+    // attack) is NOT a reader/crop/playhead failure — it is simply the envelope
+    // not being open yet. Detect that so the report never flags
+    // sampleReaderZeroBuffer and defers calibration until the VCA has opened.
+    const bool liveReaderHasSignal = liveRenderCaptured
+        && live.liveReaderBufferNonZeroSampleCount > 0
+        && live.liveReaderBufferPeakDbBeforeEnvelope > -120.0f;
+    const bool ampEnvelopeOpen =
+           live.ampEnvelopeCurrentGain >= 0.50f
+        || live.ampEnvelopeStateName == "Decay"
+        || live.ampEnvelopeStateName == "Sustain"
+        || live.ampEnvelopeStateName == "Release";
+    // Only AI Texture / Choir presets use the slow-attack deferral; other
+    // presets keep the existing strict silence attribution.
+    const bool envelopeNotOpenYet = (aiTexturePreset || choirMode)
+        && liveReaderHasSignal && ! ampEnvelopeOpen;
+
+
     juce::String drySilenceReason;
     if (reportEligible && dryOutputDb <= -60.0f && up.main.enabled)
     {
