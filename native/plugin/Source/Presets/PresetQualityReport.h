@@ -1206,6 +1206,8 @@ inline void report(DiditagainProcessor& proc,
             drySilenceReason = "ENVELOPE_NOT_OPEN_YET";
         if (calibrationSkipReason == "staleProbeSnapshot" && drySilenceReason.isEmpty())
             drySilenceReason = "STALE_PROBE_SNAPSHOT";
+        if (calibrationSkipReason == "voiceLifetimeNotAdvancing" && drySilenceReason.isEmpty())
+            drySilenceReason = "VOICE_LIFETIME_NOT_ADVANCING";
     }
     const bool suggestedGainValid = notesPlaying && loudnessJudgmentSafe;
 
