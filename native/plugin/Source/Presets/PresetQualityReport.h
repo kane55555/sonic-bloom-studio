@@ -1130,6 +1130,26 @@ inline void report(DiditagainProcessor& proc,
     if (calibrationSafe)
         calibrationSkipReason = "none";
 
+    // Loudness-judgment gate: when the calibration capture is not trustworthy
+    // (calibrationSafe == false) or the amp VCA has not opened yet
+    // (calibrationSkipReason == "envelopeNotOpenYet"), finalOutputPeakDb must
+    // NOT be judged. Suppress every loudness verdict (TOO_QUIET / TOO_HOT /
+    // LOW_HEADROOM) and the gain suggestion so a mid-attack or otherwise
+    // unsafe frame never produces a false tuning recommendation.
+    const bool loudnessJudgmentSafe = calibrationSafe
+        && calibrationSkipReason != "envelopeNotOpenYet";
+    if (! loudnessJudgmentSafe)
+    {
+        warnings.removeString("TOO_QUIET");
+        warnings.removeString("TOO_HOT");
+        warnings.removeString("LOW_HEADROOM");
+        suggestedGainDb = 0.0f;
+        if (calibrationSkipReason == "envelopeNotOpenYet" && drySilenceReason.isEmpty())
+            drySilenceReason = "ENVELOPE_NOT_OPEN_YET";
+    }
+    const bool suggestedGainValid = notesPlaying && loudnessJudgmentSafe;
+
+
     const juce::String rawPath = sourceInstrumentPathRaw.isNotEmpty()
                                ? sourceInstrumentPathRaw : up.source.path;
 
@@ -1424,7 +1444,7 @@ inline void report(DiditagainProcessor& proc,
         << " estimatedHeadroomDb=" << juce::String(headroomDb, 2)
         << " categoryTargetMinDb=" << juce::String(target.minDb, 2)
         << " categoryTargetMaxDb=" << juce::String(target.maxDb, 2)
-        << " suggestedGainAdjustmentDb=" << (notesPlaying ? juce::String(suggestedGainDb, 2) : juce::String("n/a"))
+        << " suggestedGainAdjustmentDb=" << (suggestedGainValid ? juce::String(suggestedGainDb, 2) : juce::String("n/a"))
         << " aiTexturePreset=" << (aiTexturePreset ? "true" : "false")
         << " textureType=" << aiTextureTypeStr
         << " mainSamplePeakDb=" << juce::String(mainSamplePeakDb, 2)
@@ -1663,7 +1683,7 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("estimatedHeadroomDb",    headroomDb);
     j->setProperty("categoryTargetMinDb",    target.minDb);
     j->setProperty("categoryTargetMaxDb",    target.maxDb);
-    if (notesPlaying)
+    if (suggestedGainValid)
         j->setProperty("suggestedGainAdjustmentDb", suggestedGainDb);
     else
         j->setProperty("suggestedGainAdjustmentDb", juce::var());
@@ -1919,7 +1939,7 @@ inline void report(DiditagainProcessor& proc,
               << "choirAnalogDriftDisabled: "    << (choirAnalogDriftDisabled ? "true" : "false") << "\n"
               << "categoryTargetMinDb: "       << juce::String(target.minDb, 2) << "\n"
               << "categoryTargetMaxDb: "       << juce::String(target.maxDb, 2) << "\n"
-              << "suggestedGainAdjustmentDb: " << (notesPlaying ? juce::String(suggestedGainDb, 2) : juce::String("n/a")) << "\n"
+              << "suggestedGainAdjustmentDb: " << (suggestedGainValid ? juce::String(suggestedGainDb, 2) : juce::String("n/a")) << "\n"
               << "aiTexturePreset: "           << (aiTexturePreset ? "true" : "false") << "\n"
               << "textureType: "               << aiTextureTypeStr << "\n"
               << "mainSamplePeakDb: "          << juce::String(mainSamplePeakDb, 2) << "\n"
