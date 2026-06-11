@@ -31,6 +31,12 @@ public:
     void renderBlockWithFx(juce::AudioBuffer<float>& buffer,
                            const juce::MidiBuffer& midi,
                            int startSample, int numSamples);
+    void setLiveRenderPresetContext(int loadId, int blocksSinceLoad) noexcept
+    {
+        for (int i = 0; i < getNumVoices(); ++i)
+            if (auto* v = dynamic_cast<SynthVoice*>(getVoice(i)))
+                v->setLiveRenderPresetContext(loadId, blocksSinceLoad);
+    }
 
     void resetForPresetChange();
     void chokeAllFxSends(float fadeMs) noexcept;
@@ -297,6 +303,22 @@ public:
             {
                 const auto s = v->getLiveRenderSnapshot();
                 if (s.valid && s.seq >= best.seq) best = s;
+            }
+        return best;
+    }
+
+    // Diagnostic-only: best calibration candidate for the current preset/loadId.
+    SynthVoice::LiveRenderSnapshot probeCalibrationCandidateSnapshot(int presetLoadId) const noexcept
+    {
+        SynthVoice::LiveRenderSnapshot best;
+        for (int i = 0; i < getNumVoices(); ++i)
+            if (auto* v = dynamic_cast<const SynthVoice*>(getVoice(i)))
+            {
+                const auto s = v->getCalibrationCandidateSnapshot();
+                if (s.valid && s.presetLoadId == presetLoadId
+                    && (s.sampleReaderPlayheadAfterRender > best.sampleReaderPlayheadAfterRender
+                        || s.ampEnvelopeCurrentGain > best.ampEnvelopeCurrentGain))
+                    best = s;
             }
         return best;
     }
