@@ -3,6 +3,10 @@
 
 static thread_local juce::AudioBuffer<float>* currentFxSendRenderBuffer = nullptr;
 
+// Monotonic block sequence so the reporter can pick the most-recently-rendered
+// voice's live telemetry. Diagnostic only.
+static std::atomic<unsigned long long> gLiveRenderSeq { 0 };
+
 void SynthVoice::beginFxSendRender(juce::AudioBuffer<float>* fxSendBuffer) noexcept
 {
     currentFxSendRenderBuffer = fxSendBuffer;
@@ -12,6 +16,48 @@ void SynthVoice::endFxSendRender() noexcept
 {
     currentFxSendRenderBuffer = nullptr;
 }
+
+SynthVoice::LiveRenderSnapshot SynthVoice::getLiveRenderSnapshot() const noexcept
+{
+    LiveRenderSnapshot s;
+    s.valid = liveTel_.valid.load();
+    s.seq   = liveTel_.seq.load();
+    s.playedMidiNote = liveTel_.playedMidiNote.load();
+    s.playedVelocity = liveTel_.playedVelocity.load();
+    s.selectedZoneRoot = liveTel_.selectedZoneRoot.load();
+    s.selectedZoneDistanceSemitones = liveTel_.selectedZoneDistanceSemitones.load();
+    s.sampleReaderSourceStartSample = liveTel_.sampleReaderSourceStartSample.load();
+    s.sampleReaderSourceLengthSamples = liveTel_.sampleReaderSourceLengthSamples.load();
+    s.sampleReaderPlayheadBeforeRender = liveTel_.sampleReaderPlayheadBeforeRender.load();
+    s.sampleReaderPlayheadAfterRender = liveTel_.sampleReaderPlayheadAfterRender.load();
+    s.sampleReaderRequestedNumSamples = liveTel_.sampleReaderRequestedNumSamples.load();
+    s.sampleReaderActualSamplesRead = liveTel_.sampleReaderActualSamplesRead.load();
+    s.sampleReaderLoopEnabled = liveTel_.sampleReaderLoopEnabled.load();
+    s.sampleReaderAtEndBeforeRender = liveTel_.sampleReaderAtEndBeforeRender.load();
+    s.sampleReaderAtEndAfterRender = liveTel_.sampleReaderAtEndAfterRender.load();
+    s.zoneStartSample = liveTel_.zoneStartSample.load();
+    s.zoneEndSample = liveTel_.zoneEndSample.load();
+    s.zoneCropStartSample = liveTel_.zoneCropStartSample.load();
+    s.zoneCropEndSample = liveTel_.zoneCropEndSample.load();
+    s.effectivePlaybackStartSample = liveTel_.effectivePlaybackStartSample.load();
+    s.effectivePlaybackEndSample = liveTel_.effectivePlaybackEndSample.load();
+    s.liveReaderBufferPeakDbBeforeEnvelope = liveTel_.liveReaderBufferPeakDbBeforeEnvelope.load();
+    s.liveReaderBufferPeakDbAfterEnvelope = liveTel_.liveReaderBufferPeakDbAfterEnvelope.load();
+    s.liveReaderBufferPeakDbAfterGain = liveTel_.liveReaderBufferPeakDbAfterGain.load();
+    s.liveReaderBufferNonZeroSampleCount = liveTel_.liveReaderBufferNonZeroSampleCount.load();
+    s.ampEnvelopeStage = liveTel_.ampEnvelopeStage.load();
+    s.ampEnvelopeStateName = ADSREnvelope::stageName((ADSREnvelope::Stage) s.ampEnvelopeStage);
+    s.ampEnvelopeCurrentGain = liveTel_.ampEnvelopeCurrentGain.load();
+    s.ampEnvelopeAttackMs = liveTel_.ampEnvelopeAttackMs.load();
+    s.ampEnvelopeDecayMs = liveTel_.ampEnvelopeDecayMs.load();
+    s.ampEnvelopeSustain = liveTel_.ampEnvelopeSustain.load();
+    s.ampEnvelopeReleaseMs = liveTel_.ampEnvelopeReleaseMs.load();
+    s.voiceGainDb = liveTel_.voiceGainDb.load();
+    s.layerGainDb = liveTel_.layerGainDb.load();
+    s.finalVoiceGainDb = liveTel_.finalVoiceGainDb.load();
+    return s;
+}
+
 
 
 SynthVoice::SynthVoice()
