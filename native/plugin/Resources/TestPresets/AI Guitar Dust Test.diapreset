@@ -8,7 +8,7 @@
     "mappingMode": "nearest",
     "rootNotePattern": ["C"]
   },
-  "amp": { "gainDb": 7.0, "pan": 0.0, "attackMs": 5.0, "decayMs": 250.0, "sustain": 0.8, "releaseMs": 400.0 },
+  "amp": { "gainDb": 2.0, "pan": 0.0, "attackMs": 5.0, "decayMs": 250.0, "sustain": 0.8, "releaseMs": 400.0 },
   "filter": { "enabled": true, "type": "lowpass", "cutoffHz": 17000.0, "resonance": 0.1, "drive": 0.0, "keytrack": 0.0 },
   "ai": {
     "enabled": true,
