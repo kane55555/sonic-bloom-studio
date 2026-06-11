@@ -1053,6 +1053,28 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         auto dbOf = [](float lin) {
             return lin > 1.0e-6f ? juce::Decibels::gainToDecibels(lin) : -120.0f;
         };
+
+        // AI Texture report calibration: prefer the best/OPEN block of the held
+        // note, not the first attack block. A block qualifies as a calibration
+        // candidate when the reader actually started AND carried signal before
+        // the VCA (matching the reporter's liveReaderHasSignal gate):
+        //   sampleReaderStarted (samples read) + non-zero samples + peak > -120.
+        // We always publish the first block of a note (so the snapshot is never
+        // empty), then only overwrite it when a later block is equal-or-more
+        // open (higher amp-envelope gain). This stops the first attack block
+        // from permanently pinning calibration to a near-silent reading.
+        const float gNow = ampEnv.getCurrentLevel();
+        const bool blockQualifies = (telSamplesRead > 0)
+                                  && (telNonZeroCount > 0)
+                                  && (dbOf(telReaderPeakLin) > -120.0f);
+        const bool firstPublishThisNote = (liveTelBestGain_ < 0.0f);
+        const bool publishThisBlock = firstPublishThisNote
+                                   || (blockQualifies && gNow >= liveTelBestGain_);
+        if (! publishThisBlock)
+            return;   // keep the existing best/open snapshot for this note
+        if (blockQualifies || firstPublishThisNote)
+            liveTelBestGain_ = juce::jmax(liveTelBestGain_, gNow);
+
         const int playedMidi = juce::jlimit(0, 127,
             (int) std::lround(targetMidiNote) + pitchOffsetSemis);
         const int zoneRoot = (telZone != nullptr) ? telZone->rootMidi : -1;
