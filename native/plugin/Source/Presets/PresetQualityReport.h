@@ -877,9 +877,19 @@ inline void report(DiditagainProcessor& proc,
     // presets keep the existing strict silence attribution.
     const bool envelopeNotOpenYet = (aiTexturePreset || choirMode)
         && liveReaderHasSignal && ! ampEnvelopeOpen;
+    const bool staleProbeSnapshot = (aiTexturePreset || choirMode)
+        && currentPresetHasRendered
+        && blocksRenderedSincePresetLoad > 32
+        && calibrationCandidateCaptured
+        && live.sampleReaderPlayheadAfterRender < 1000.0;
 
 
     juce::String drySilenceReason;
+    if (staleProbeSnapshot)
+    {
+        drySilenceReason = "STALE_PROBE_SNAPSHOT";
+    }
+    else
     if (reportEligible && envelopeNotOpenYet && dryOutputDb <= -60.0f && up.main.enabled)
     {
         // Choir/AI Texture slow-attack: the reader carries signal before the VCA
@@ -1120,9 +1130,11 @@ inline void report(DiditagainProcessor& proc,
     // has opened (gain >= 0.50, or Decay/Sustain/Release) instead of judging the
     // preset mid-attack. This is a wait, never a failure.
     if (envelopeNotOpenYet) calibrationSkipReason = "envelopeNotOpenYet";
+    if (staleProbeSnapshot) calibrationSkipReason = "staleProbeSnapshot";
     const bool calibrationSafe = reportEligible
         && meterReflectsCurrentPreset
         && ! envelopeNotOpenYet
+        && ! staleProbeSnapshot
         && finalOutputDb > -120.0f
         && dryRawPeakDb > -120.0f
         && ! warnings.contains("DRY_BUS_SILENT")
@@ -1149,6 +1161,8 @@ inline void report(DiditagainProcessor& proc,
         suggestedGainDb = 0.0f;
         if (calibrationSkipReason == "envelopeNotOpenYet" && drySilenceReason.isEmpty())
             drySilenceReason = "ENVELOPE_NOT_OPEN_YET";
+        if (calibrationSkipReason == "staleProbeSnapshot" && drySilenceReason.isEmpty())
+            drySilenceReason = "STALE_PROBE_SNAPSHOT";
     }
     const bool suggestedGainValid = notesPlaying && loudnessJudgmentSafe;
 
