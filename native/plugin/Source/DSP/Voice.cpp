@@ -7,6 +7,18 @@ static thread_local juce::AudioBuffer<float>* currentFxSendRenderBuffer = nullpt
 // voice's live telemetry. Diagnostic only.
 static std::atomic<unsigned long long> gLiveRenderSeq { 0 };
 
+static juce::String calibrationCandidateSourceName(SynthVoice::CalibrationCandidateSource source)
+{
+    switch (source)
+    {
+        case SynthVoice::CalibrationCandidateSource::activeVoiceRender: return "activeVoiceRender";
+        case SynthVoice::CalibrationCandidateSource::loadProbe:         return "loadProbe";
+        case SynthVoice::CalibrationCandidateSource::oneShotDiagnostic: return "oneShotDiagnostic";
+        case SynthVoice::CalibrationCandidateSource::reportProbe:
+        default:                                                       return "reportProbe";
+    }
+}
+
 void SynthVoice::beginFxSendRender(juce::AudioBuffer<float>* fxSendBuffer) noexcept
 {
     currentFxSendRenderBuffer = fxSendBuffer;
@@ -24,6 +36,12 @@ SynthVoice::LiveRenderSnapshot SynthVoice::getLiveRenderSnapshot() const noexcep
     s.seq   = liveTel_.seq.load();
     s.presetLoadId = liveTel_.presetLoadId.load();
     s.blocksSincePresetLoad = liveTel_.blocksSincePresetLoad.load();
+    s.calibrationCandidateVoiceId = liveTel_.calibrationCandidateVoiceId.load();
+    s.calibrationCandidateNoteLifetimeId = liveTel_.calibrationCandidateNoteLifetimeId.load();
+    s.calibrationCandidateNoteAgeBlocks = liveTel_.calibrationCandidateNoteAgeBlocks.load();
+    s.calibrationCandidateSource = calibrationCandidateSourceName((CalibrationCandidateSource) liveTel_.calibrationCandidateSource.load());
+    s.calibrationCandidateWasProbe = liveTel_.calibrationCandidateWasProbe.load();
+    s.calibrationCandidateWasReaderReset = liveTel_.calibrationCandidateWasReaderReset.load();
     s.playedMidiNote = liveTel_.playedMidiNote.load();
     s.playedVelocity = liveTel_.playedVelocity.load();
     s.selectedZoneRoot = liveTel_.selectedZoneRoot.load();
@@ -67,6 +85,12 @@ SynthVoice::LiveRenderSnapshot SynthVoice::getCalibrationCandidateSnapshot() con
     s.seq   = calibrationTel_.seq.load();
     s.presetLoadId = calibrationTel_.presetLoadId.load();
     s.blocksSincePresetLoad = calibrationTel_.blocksSincePresetLoad.load();
+    s.calibrationCandidateVoiceId = calibrationTel_.calibrationCandidateVoiceId.load();
+    s.calibrationCandidateNoteLifetimeId = calibrationTel_.calibrationCandidateNoteLifetimeId.load();
+    s.calibrationCandidateNoteAgeBlocks = calibrationTel_.calibrationCandidateNoteAgeBlocks.load();
+    s.calibrationCandidateSource = calibrationCandidateSourceName((CalibrationCandidateSource) calibrationTel_.calibrationCandidateSource.load());
+    s.calibrationCandidateWasProbe = calibrationTel_.calibrationCandidateWasProbe.load();
+    s.calibrationCandidateWasReaderReset = calibrationTel_.calibrationCandidateWasReaderReset.load();
     s.playedMidiNote = calibrationTel_.playedMidiNote.load();
     s.playedVelocity = calibrationTel_.playedVelocity.load();
     s.selectedZoneRoot = calibrationTel_.selectedZoneRoot.load();
