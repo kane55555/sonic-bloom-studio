@@ -858,6 +858,40 @@ inline void report(DiditagainProcessor& proc,
     const int calibrationCandidateAgeBlocks = calibrationCandidateCaptured
         ? juce::jmax(0, blocksRenderedSincePresetLoad - live.blocksSincePresetLoad) : -1;
 
+    // ---- Active-voice lifetime probe (Choir restarted-voice false positive) ----
+    // Proves whether any held voice has actually survived long enough for the
+    // attack to open, instead of the report sampling a freshly-created/restarted
+    // active voice. Diagnostic only — never alters DSP or audio.
+    const auto voiceLifetime = engine.probeActiveVoiceLifetime(currentPresetLoadId);
+    const int    activeVoiceCount                    = voiceLifetime.activeVoiceCount;
+    const int    oldestActiveVoiceAgeBlocks          = voiceLifetime.oldestAgeBlocks;
+    const double oldestActiveVoicePlayheadAfterRender = voiceLifetime.oldestPlayheadAfterRender;
+    const float  oldestActiveVoiceEnvelopeGain       = voiceLifetime.oldestEnvelopeGain;
+    const int    acceptedCalibrationVoiceAgeBlocks   = calibrationCandidateCaptured
+        ? live.calibrationCandidateNoteAgeBlocks : -1;
+
+    // Voice lifetime is not advancing: many blocks rendered since the preset
+    // loaded, voices exist, but the oldest active voice is still age<=1. That
+    // means we are repeatedly sampling restarted/new voices, not the held note.
+    const bool voiceLifetimeNotAdvancing = (aiTexturePreset || choirMode)
+        && currentPresetHasRendered
+        && blocksRenderedSincePresetLoad > 32
+        && activeVoiceCount > 0
+        && oldestActiveVoiceAgeBlocks <= 1;
+
+    // Why was no calibration candidate accepted? (eligibility = age>=10,
+    // playhead>=1000, gain>=0.50). Purely descriptive for the report.
+    juce::String rejectedCalibrationReason = "none";
+    if (! calibrationCandidateCaptured)
+    {
+        if (voiceLifetimeNotAdvancing)                        rejectedCalibrationReason = "voiceLifetimeNotAdvancing";
+        else if (activeVoiceCount == 0)                       rejectedCalibrationReason = "noActiveVoice";
+        else if (oldestActiveVoiceAgeBlocks < 10)            rejectedCalibrationReason = "noteAgeBelow10";
+        else if (oldestActiveVoicePlayheadAfterRender < 1000.0) rejectedCalibrationReason = "playheadBelow1000";
+        else if (oldestActiveVoiceEnvelopeGain < 0.50f)      rejectedCalibrationReason = "envelopeGainBelow0p50";
+        else                                                 rejectedCalibrationReason = "noQualifyingBlock";
+    }
+
     // ---- Slow-attack guard (Choir/AI Texture zero-buffer false positive) ----
     // The live reader proved healthy BEFORE the amp VCA (non-zero samples and a
     // before-envelope peak above the -120 floor). A low AFTER-envelope / dry
