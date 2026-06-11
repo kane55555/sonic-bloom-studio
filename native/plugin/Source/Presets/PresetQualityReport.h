@@ -1670,6 +1670,12 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("calibrationCandidateEnvelopeGain", live.ampEnvelopeCurrentGain);
     j->setProperty("calibrationCandidateEnvelopeState", live.ampEnvelopeStateName);
     j->setProperty("calibrationCandidatePeakAfterGainDb", live.liveReaderBufferPeakDbAfterGain);
+    j->setProperty("activeVoiceCount", activeVoiceCount);
+    j->setProperty("oldestActiveVoiceAgeBlocks", oldestActiveVoiceAgeBlocks);
+    j->setProperty("oldestActiveVoicePlayheadAfterRender", oldestActiveVoicePlayheadAfterRender);
+    j->setProperty("oldestActiveVoiceEnvelopeGain", oldestActiveVoiceEnvelopeGain);
+    j->setProperty("acceptedCalibrationVoiceAgeBlocks", acceptedCalibrationVoiceAgeBlocks);
+    j->setProperty("rejectedCalibrationReason", rejectedCalibrationReason);
     j->setProperty("playedMidiNote",         live.playedMidiNote);
     j->setProperty("playedVelocity",         live.playedVelocity);
     j->setProperty("liveSelectedZoneRoot",   live.selectedZoneRoot);
