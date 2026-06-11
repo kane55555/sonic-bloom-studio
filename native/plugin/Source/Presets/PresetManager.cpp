@@ -2171,7 +2171,7 @@ void PresetManager::seedAiTextureDemoPackIfMissing()
         }
     }
 
-    seededMarkerV9.replaceWithText("1");
+    seededMarkerV10.replaceWithText("1");
 
     didaPresetManagerLog("seeded AI Texture demo pack (v8) count=" + juce::String(written)
         + " presets=" + dir.getFullPathName()
