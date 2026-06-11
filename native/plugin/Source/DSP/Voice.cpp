@@ -675,9 +675,17 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             float zl, zr; readWithLoop(*loZone, loReadPos, loFinished, zl, zr);
             const float w = (hiZone ? (1.0f - zoneXfade) : 1.0f);
             if (! soloNeuralTexture) { sampL += zl * w; sampR += zr * w; }
+            // Live reader telemetry: capture the PURE reader output (pre level
+            // / pre envelope) so a silent dry bus can be attributed to the
+            // reader/crop/playhead vs downstream stages.
+            const float rawAbs = juce::jmax(std::fabs(zl), std::fabs(zr));
+            if (rawAbs > telReaderPeakLin) telReaderPeakLin = rawAbs;
+            if (rawAbs > 1.0e-7f) ++telNonZeroCount;
+            ++telSamplesRead;
             loReadPos += loStep;
             advanceLoop(*loZone, loReadPos, loFinished);
         }
+
         if (hiZone && ! hiFinished)
         {
             float zl, zr; readWithLoop(*hiZone, hiReadPos, hiFinished, zl, zr);
