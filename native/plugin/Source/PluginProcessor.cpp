@@ -801,7 +801,10 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         return false;
     }();
     synthEngine.setLiveRenderPresetContext(currentPresetLoadIdForReport,
-                                           blocksRenderedSincePresetLoad + 1);
+                                           blocksRenderedSincePresetLoad + 1,
+                                           SynthVoice::CalibrationCandidateSource::activeVoiceRender,
+                                           false,
+                                           false);
     synthEngine.renderBlockWithFx(buffer, midiMessages, 0, buffer.getNumSamples());
 
     if (currentPresetLoadIdForReport > 0)
