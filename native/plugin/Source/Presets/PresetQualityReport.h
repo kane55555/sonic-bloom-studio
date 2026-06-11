@@ -919,6 +919,11 @@ inline void report(DiditagainProcessor& proc,
 
 
     juce::String drySilenceReason;
+    if (voiceLifetimeNotAdvancing)
+    {
+        drySilenceReason = "VOICE_LIFETIME_NOT_ADVANCING";
+    }
+    else
     if (staleProbeSnapshot)
     {
         drySilenceReason = "STALE_PROBE_SNAPSHOT";
