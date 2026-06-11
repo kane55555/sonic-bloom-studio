@@ -1113,8 +1113,13 @@ inline void report(DiditagainProcessor& proc,
     else if (dryPreAmpPeakDb <= -100.0f && reportEligible) calibrationSkipReason = "silentVoice";
     else if (finalOutputDb <= -100.0f && reportEligible) calibrationSkipReason = "finalOutputSilent";
     else if (warnings.contains("AMP_GAIN_NOT_REFLECTED_IN_OUTPUT") || warnings.contains("GAIN_STAGE_ACCOUNTING_MISMATCH")) calibrationSkipReason = "gainAccountingMismatch";
+    // Choir/AI Texture slow attack: defer calibration capture until the amp VCA
+    // has opened (gain >= 0.50, or Decay/Sustain/Release) instead of judging the
+    // preset mid-attack. This is a wait, never a failure.
+    if (envelopeNotOpenYet) calibrationSkipReason = "envelopeNotOpenYet";
     const bool calibrationSafe = reportEligible
         && meterReflectsCurrentPreset
+        && ! envelopeNotOpenYet
         && finalOutputDb > -120.0f
         && dryRawPeakDb > -120.0f
         && ! warnings.contains("DRY_BUS_SILENT")
