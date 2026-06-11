@@ -23,6 +23,7 @@ SynthVoice::LiveRenderSnapshot SynthVoice::getLiveRenderSnapshot() const noexcep
     s.valid = liveTel_.valid.load();
     s.seq   = liveTel_.seq.load();
     s.presetLoadId = liveTel_.presetLoadId.load();
+    s.blocksSincePresetLoad = liveTel_.blocksSincePresetLoad.load();
     s.playedMidiNote = liveTel_.playedMidiNote.load();
     s.playedVelocity = liveTel_.playedVelocity.load();
     s.selectedZoneRoot = liveTel_.selectedZoneRoot.load();
@@ -65,6 +66,7 @@ SynthVoice::LiveRenderSnapshot SynthVoice::getCalibrationCandidateSnapshot() con
     s.valid = calibrationTel_.valid.load();
     s.seq   = calibrationTel_.seq.load();
     s.presetLoadId = calibrationTel_.presetLoadId.load();
+    s.blocksSincePresetLoad = calibrationTel_.blocksSincePresetLoad.load();
     s.playedMidiNote = calibrationTel_.playedMidiNote.load();
     s.playedVelocity = calibrationTel_.playedVelocity.load();
     s.selectedZoneRoot = calibrationTel_.selectedZoneRoot.load();
@@ -1102,6 +1104,7 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         // judge the best same-note block instead of a stale first attack block.
         const float gNow = ampEnv.getCurrentLevel();
         const int presetLoadId = liveRenderPresetLoadId_.load();
+        const int blocksSinceLoad = liveRenderBlocksSinceLoad_.load();
         const bool blockQualifies = (telSamplesRead > 0)
                                   && (telNonZeroCount > 0)
                                   && (dbOf(telReaderPeakLin) > -120.0f);
@@ -1119,6 +1122,7 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         {
             dest.seq.store(seq);
             dest.presetLoadId.store(presetLoadId);
+            dest.blocksSincePresetLoad.store(blocksSinceLoad);
             dest.playedMidiNote.store(playedMidi);
             dest.playedVelocity.store(velocity);
             dest.selectedZoneRoot.store(zoneRoot);
