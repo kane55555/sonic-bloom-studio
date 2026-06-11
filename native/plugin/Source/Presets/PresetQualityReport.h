@@ -1423,6 +1423,12 @@ inline void report(DiditagainProcessor& proc,
         << " calibrationCandidateEnvelopeGain=" << juce::String(live.ampEnvelopeCurrentGain, 4)
         << " calibrationCandidateEnvelopeState=" << live.ampEnvelopeStateName
         << " calibrationCandidatePeakAfterGainDb=" << juce::String(live.liveReaderBufferPeakDbAfterGain, 2)
+        << " activeVoiceCount=" << activeVoiceCount
+        << " oldestActiveVoiceAgeBlocks=" << oldestActiveVoiceAgeBlocks
+        << " oldestActiveVoicePlayheadAfterRender=" << juce::String(oldestActiveVoicePlayheadAfterRender, 1)
+        << " oldestActiveVoiceEnvelopeGain=" << juce::String(oldestActiveVoiceEnvelopeGain, 4)
+        << " acceptedCalibrationVoiceAgeBlocks=" << acceptedCalibrationVoiceAgeBlocks
+        << " rejectedCalibrationReason=" << rejectedCalibrationReason
         << " playedMidiNote=" << live.playedMidiNote
         << " playedVelocity=" << juce::String(live.playedVelocity, 3)
         << " liveSelectedZoneRoot=" << live.selectedZoneRoot
