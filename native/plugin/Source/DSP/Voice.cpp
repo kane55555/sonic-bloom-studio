@@ -22,6 +22,7 @@ SynthVoice::LiveRenderSnapshot SynthVoice::getLiveRenderSnapshot() const noexcep
     LiveRenderSnapshot s;
     s.valid = liveTel_.valid.load();
     s.seq   = liveTel_.seq.load();
+    s.presetLoadId = liveTel_.presetLoadId.load();
     s.playedMidiNote = liveTel_.playedMidiNote.load();
     s.playedVelocity = liveTel_.playedVelocity.load();
     s.selectedZoneRoot = liveTel_.selectedZoneRoot.load();
@@ -55,6 +56,48 @@ SynthVoice::LiveRenderSnapshot SynthVoice::getLiveRenderSnapshot() const noexcep
     s.voiceGainDb = liveTel_.voiceGainDb.load();
     s.layerGainDb = liveTel_.layerGainDb.load();
     s.finalVoiceGainDb = liveTel_.finalVoiceGainDb.load();
+    return s;
+}
+
+SynthVoice::LiveRenderSnapshot SynthVoice::getCalibrationCandidateSnapshot() const noexcept
+{
+    LiveRenderSnapshot s;
+    s.valid = calibrationTel_.valid.load();
+    s.seq   = calibrationTel_.seq.load();
+    s.presetLoadId = calibrationTel_.presetLoadId.load();
+    s.playedMidiNote = calibrationTel_.playedMidiNote.load();
+    s.playedVelocity = calibrationTel_.playedVelocity.load();
+    s.selectedZoneRoot = calibrationTel_.selectedZoneRoot.load();
+    s.selectedZoneDistanceSemitones = calibrationTel_.selectedZoneDistanceSemitones.load();
+    s.sampleReaderSourceStartSample = calibrationTel_.sampleReaderSourceStartSample.load();
+    s.sampleReaderSourceLengthSamples = calibrationTel_.sampleReaderSourceLengthSamples.load();
+    s.sampleReaderPlayheadBeforeRender = calibrationTel_.sampleReaderPlayheadBeforeRender.load();
+    s.sampleReaderPlayheadAfterRender = calibrationTel_.sampleReaderPlayheadAfterRender.load();
+    s.sampleReaderRequestedNumSamples = calibrationTel_.sampleReaderRequestedNumSamples.load();
+    s.sampleReaderActualSamplesRead = calibrationTel_.sampleReaderActualSamplesRead.load();
+    s.sampleReaderLoopEnabled = calibrationTel_.sampleReaderLoopEnabled.load();
+    s.sampleReaderAtEndBeforeRender = calibrationTel_.sampleReaderAtEndBeforeRender.load();
+    s.sampleReaderAtEndAfterRender = calibrationTel_.sampleReaderAtEndAfterRender.load();
+    s.zoneStartSample = calibrationTel_.zoneStartSample.load();
+    s.zoneEndSample = calibrationTel_.zoneEndSample.load();
+    s.zoneCropStartSample = calibrationTel_.zoneCropStartSample.load();
+    s.zoneCropEndSample = calibrationTel_.zoneCropEndSample.load();
+    s.effectivePlaybackStartSample = calibrationTel_.effectivePlaybackStartSample.load();
+    s.effectivePlaybackEndSample = calibrationTel_.effectivePlaybackEndSample.load();
+    s.liveReaderBufferPeakDbBeforeEnvelope = calibrationTel_.liveReaderBufferPeakDbBeforeEnvelope.load();
+    s.liveReaderBufferPeakDbAfterEnvelope = calibrationTel_.liveReaderBufferPeakDbAfterEnvelope.load();
+    s.liveReaderBufferPeakDbAfterGain = calibrationTel_.liveReaderBufferPeakDbAfterGain.load();
+    s.liveReaderBufferNonZeroSampleCount = calibrationTel_.liveReaderBufferNonZeroSampleCount.load();
+    s.ampEnvelopeStage = calibrationTel_.ampEnvelopeStage.load();
+    s.ampEnvelopeStateName = ADSREnvelope::stageName((ADSREnvelope::Stage) s.ampEnvelopeStage);
+    s.ampEnvelopeCurrentGain = calibrationTel_.ampEnvelopeCurrentGain.load();
+    s.ampEnvelopeAttackMs = calibrationTel_.ampEnvelopeAttackMs.load();
+    s.ampEnvelopeDecayMs = calibrationTel_.ampEnvelopeDecayMs.load();
+    s.ampEnvelopeSustain = calibrationTel_.ampEnvelopeSustain.load();
+    s.ampEnvelopeReleaseMs = calibrationTel_.ampEnvelopeReleaseMs.load();
+    s.voiceGainDb = calibrationTel_.voiceGainDb.load();
+    s.layerGainDb = calibrationTel_.layerGainDb.load();
+    s.finalVoiceGainDb = calibrationTel_.finalVoiceGainDb.load();
     return s;
 }
 
@@ -241,7 +284,7 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
     fxSendActive = true;
     noteReleasedForFxSend = false;
     mainSamplePeakLin_.store(0.0f);
-    liveTelBestGain_ = -1.0f;   // reset the report calibration candidate for this note
+    calibrationTel_.valid.store(false);   // reset the report calibration candidate for this note
 
     recalcGlideCoeff();
 
