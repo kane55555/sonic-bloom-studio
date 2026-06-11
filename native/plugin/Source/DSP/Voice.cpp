@@ -1045,4 +1045,60 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             clearCurrentNote(); reset(); break;
         }
     }
+
+    // ---- Publish live-render telemetry (diagnostic only) ----
+    {
+        auto dbOf = [](float lin) {
+            return lin > 1.0e-6f ? juce::Decibels::gainToDecibels(lin) : -120.0f;
+        };
+        const int playedMidi = juce::jlimit(0, 127,
+            (int) std::lround(targetMidiNote) + pitchOffsetSemis);
+        const int zoneRoot = (telZone != nullptr) ? telZone->rootMidi : -1;
+        const int zoneN    = (telZone != nullptr) ? telZone->buffer.getNumSamples() : 0;
+        const double cropStartSamp = (telZone != nullptr)
+            ? juce::jlimit(0.0, (double) juce::jmax(0, zoneN - 2), (double) cropStartFrac * zoneN) : 0.0;
+        const double cropEndSamp = (telZone != nullptr)
+            ? juce::jlimit(2.0, (double) juce::jmax(2, zoneN - 1), (double) cropEndFrac * zoneN) : 0.0;
+
+        liveTel_.seq.store(++gLiveRenderSeq);
+        liveTel_.playedMidiNote.store(playedMidi);
+        liveTel_.playedVelocity.store(velocity);
+        liveTel_.selectedZoneRoot.store(zoneRoot);
+        liveTel_.selectedZoneDistanceSemitones.store(zoneRoot >= 0 ? std::abs(playedMidi - zoneRoot) : -1);
+
+        liveTel_.sampleReaderSourceStartSample.store(cropStartSamp);
+        liveTel_.sampleReaderSourceLengthSamples.store(zoneN);
+        liveTel_.sampleReaderPlayheadBeforeRender.store(telPlayheadBefore);
+        liveTel_.sampleReaderPlayheadAfterRender.store(telPlayheadAfter);
+        liveTel_.sampleReaderRequestedNumSamples.store(numSamples);
+        liveTel_.sampleReaderActualSamplesRead.store(telSamplesRead);
+        liveTel_.sampleReaderLoopEnabled.store(sampleLooping && ! oneShotMode);
+        liveTel_.sampleReaderAtEndBeforeRender.store(telAtEndBefore);
+        liveTel_.sampleReaderAtEndAfterRender.store(telAtEndAfter);
+
+        liveTel_.zoneStartSample.store(0);
+        liveTel_.zoneEndSample.store(zoneN);
+        liveTel_.zoneCropStartSample.store((int) cropStartSamp);
+        liveTel_.zoneCropEndSample.store((int) cropEndSamp);
+        liveTel_.effectivePlaybackStartSample.store(cropStartSamp);
+        liveTel_.effectivePlaybackEndSample.store(cropEndSamp);
+
+        liveTel_.liveReaderBufferPeakDbBeforeEnvelope.store(dbOf(telReaderPeakLin));
+        liveTel_.liveReaderBufferPeakDbAfterEnvelope.store(dbOf(telAfterEnvPeakLin));
+        liveTel_.liveReaderBufferPeakDbAfterGain.store(dbOf(telAfterGainPeakLin));
+        liveTel_.liveReaderBufferNonZeroSampleCount.store(telNonZeroCount);
+
+        liveTel_.ampEnvelopeStage.store((int) ampEnv.getStage());
+        liveTel_.ampEnvelopeCurrentGain.store(ampEnv.getCurrentLevel());
+        liveTel_.ampEnvelopeAttackMs.store(ampEnv.getAttackSeconds() * 1000.0f);
+        liveTel_.ampEnvelopeDecayMs.store(ampEnv.getDecaySeconds() * 1000.0f);
+        liveTel_.ampEnvelopeSustain.store(ampEnv.getSustainLevel());
+        liveTel_.ampEnvelopeReleaseMs.store(ampEnv.getReleaseSeconds() * 1000.0f);
+
+        liveTel_.voiceGainDb.store(dbOf(vcaGainLin));
+        liveTel_.layerGainDb.store(dbOf(oscALevel));
+        liveTel_.finalVoiceGainDb.store(dbOf(0.5f * vcaGainLin * oscALevel));
+        liveTel_.valid.store(true);
+    }
 }
+
