@@ -313,7 +313,7 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
     noteReleasedForFxSend = false;
     mainSamplePeakLin_.store(0.0f);
     calibrationTel_.valid.store(false);   // reset the report calibration candidate for this note
-    ++noteLifetimeId_;
+    noteLifetimeId_ = allocateNoteLifetimeId();
     noteAgeBlocks_ = 0;
 
     recalcGlideCoeff();
