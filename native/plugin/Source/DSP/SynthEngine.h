@@ -318,9 +318,14 @@ public:
             if (auto* v = dynamic_cast<const SynthVoice*>(getVoice(i)))
             {
                 const auto s = v->getCalibrationCandidateSnapshot();
-                if (s.valid && s.presetLoadId == presetLoadId
-                    && (s.sampleReaderPlayheadAfterRender > best.sampleReaderPlayheadAfterRender
-                        || s.ampEnvelopeCurrentGain > best.ampEnvelopeCurrentGain))
+                if (v->isVoiceActive()
+                    && s.valid
+                    && s.presetLoadId == presetLoadId
+                    && s.calibrationCandidateSource == "activeVoiceRender"
+                    && ! s.calibrationCandidateWasProbe
+                    && ! s.calibrationCandidateWasReaderReset
+                    && s.liveReaderBufferNonZeroSampleCount > 0
+                    && s.sampleReaderPlayheadAfterRender > best.sampleReaderPlayheadAfterRender)
                     best = s;
             }
         return best;
