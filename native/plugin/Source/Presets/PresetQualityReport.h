@@ -911,10 +911,16 @@ inline void report(DiditagainProcessor& proc,
                 // The chosen file decoded to silence (e.g. a stale crop region):
                 // the sample is the culprit, not the downstream render path.
                 drySilenceReason = "SAMPLE_FILE_SILENT_OR_DECODE_FAILED";
+            else if (sampleReaderStarted && liveReaderHasSignal)
+                // The reader produced non-zero samples before the VCA: this is
+                // never a zero-buffer fault. The dip is the amp envelope still
+                // ramping, so name it explicitly instead of blaming the reader.
+                drySilenceReason = "ENVELOPE_NOT_OPEN_YET";
             else if (sampleReaderStarted)
                 // A zone+file resolved and the reader started, yet the buffer is
                 // empty — precise stage instead of generic NO_VOICE_OUTPUT.
                 drySilenceReason = "SAMPLE_READER_STARTED_BUT_ZERO_BUFFER";
+
             else
                 drySilenceReason = "VOICE_RENDERED_SILENT";
         }
