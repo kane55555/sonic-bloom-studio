@@ -158,6 +158,64 @@ public:
     // primary sound and measure the neural texture's relative contribution.
     float getMainSamplePeakLinear() const noexcept { return mainSamplePeakLin_.load(); }
 
+    // ===== Live-render diagnostics (Choir zero-buffer investigation) =========
+    // Captured once per render block on the audio thread and read off-thread by
+    // the preset-quality reporter. PURELY DIAGNOSTIC: never alters DSP. Proves
+    // exactly where a decoded-but-healthy sample disappears during live
+    // playback (reader/crop/playhead vs envelope vs gain/layer routing).
+    struct LiveRenderSnapshot
+    {
+        bool   valid = false;
+        unsigned long long seq = 0;     // monotonic block sequence (recency)
+
+        // Played note / zone selection.
+        int    playedMidiNote = -1;
+        float  playedVelocity = 0.0f;
+        int    selectedZoneRoot = -1;
+        int    selectedZoneDistanceSemitones = -1;
+
+        // Live sample-reader state for the multisample body (lo zone).
+        double sampleReaderSourceStartSample = 0.0;
+        int    sampleReaderSourceLengthSamples = 0;
+        double sampleReaderPlayheadBeforeRender = 0.0;
+        double sampleReaderPlayheadAfterRender = 0.0;
+        int    sampleReaderRequestedNumSamples = 0;
+        int    sampleReaderActualSamplesRead = 0;
+        bool   sampleReaderLoopEnabled = false;
+        bool   sampleReaderAtEndBeforeRender = false;
+        bool   sampleReaderAtEndAfterRender = false;
+
+        // Crop / start / end region (samples).
+        int    zoneStartSample = 0;
+        int    zoneEndSample = 0;
+        int    zoneCropStartSample = 0;
+        int    zoneCropEndSample = 0;
+        double effectivePlaybackStartSample = 0.0;
+        double effectivePlaybackEndSample = 0.0;
+
+        // Live buffer probes (dB / counts).
+        float  liveReaderBufferPeakDbBeforeEnvelope = -120.0f;
+        float  liveReaderBufferPeakDbAfterEnvelope = -120.0f;
+        float  liveReaderBufferPeakDbAfterGain = -120.0f;
+        int    liveReaderBufferNonZeroSampleCount = 0;
+
+        // Envelope / gain state.
+        int    ampEnvelopeStage = 0;            // 0=Idle..4=Release
+        juce::String ampEnvelopeStateName { "Idle" };
+        float  ampEnvelopeCurrentGain = 0.0f;
+        float  ampEnvelopeAttackMs = 0.0f;
+        float  ampEnvelopeDecayMs = 0.0f;
+        float  ampEnvelopeSustain = 0.0f;
+        float  ampEnvelopeReleaseMs = 0.0f;
+        float  voiceGainDb = -120.0f;           // per-voice VCA/card trim
+        float  layerGainDb = -120.0f;           // sample (oscA) layer level
+        float  finalVoiceGainDb = -120.0f;      // combined static voice path gain
+    };
+
+    LiveRenderSnapshot getLiveRenderSnapshot() const noexcept;
+
+
+
     // Diagnostic-only: static intrinsic peak (linear) of the loaded neural
     // texture buffer in this voice, available even when no note is sounding.
     float getNeuralTextureIntrinsicPeakLinear() const noexcept
