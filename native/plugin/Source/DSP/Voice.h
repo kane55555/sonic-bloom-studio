@@ -528,6 +528,50 @@ private:
     // by the preset-quality reporter for mainSamplePeakDb.
     std::atomic<float> mainSamplePeakLin_ { 0.0f };
 
+    // Live-render telemetry storage (written on the audio thread, read off-thread
+    // by the preset-quality reporter). Each field is atomic so the diagnostic
+    // read is race-free. Diagnostic only: never feeds DSP.
+    struct LiveRenderAtomics
+    {
+        std::atomic<bool>  valid { false };
+        std::atomic<unsigned long long> seq { 0 };
+        std::atomic<int>   playedMidiNote { -1 };
+        std::atomic<float> playedVelocity { 0.0f };
+        std::atomic<int>   selectedZoneRoot { -1 };
+        std::atomic<int>   selectedZoneDistanceSemitones { -1 };
+        std::atomic<double> sampleReaderSourceStartSample { 0.0 };
+        std::atomic<int>    sampleReaderSourceLengthSamples { 0 };
+        std::atomic<double> sampleReaderPlayheadBeforeRender { 0.0 };
+        std::atomic<double> sampleReaderPlayheadAfterRender { 0.0 };
+        std::atomic<int>    sampleReaderRequestedNumSamples { 0 };
+        std::atomic<int>    sampleReaderActualSamplesRead { 0 };
+        std::atomic<bool>   sampleReaderLoopEnabled { false };
+        std::atomic<bool>   sampleReaderAtEndBeforeRender { false };
+        std::atomic<bool>   sampleReaderAtEndAfterRender { false };
+        std::atomic<int>    zoneStartSample { 0 };
+        std::atomic<int>    zoneEndSample { 0 };
+        std::atomic<int>    zoneCropStartSample { 0 };
+        std::atomic<int>    zoneCropEndSample { 0 };
+        std::atomic<double> effectivePlaybackStartSample { 0.0 };
+        std::atomic<double> effectivePlaybackEndSample { 0.0 };
+        std::atomic<float>  liveReaderBufferPeakDbBeforeEnvelope { -120.0f };
+        std::atomic<float>  liveReaderBufferPeakDbAfterEnvelope { -120.0f };
+        std::atomic<float>  liveReaderBufferPeakDbAfterGain { -120.0f };
+        std::atomic<int>    liveReaderBufferNonZeroSampleCount { 0 };
+        std::atomic<int>    ampEnvelopeStage { 0 };
+        std::atomic<float>  ampEnvelopeCurrentGain { 0.0f };
+        std::atomic<float>  ampEnvelopeAttackMs { 0.0f };
+        std::atomic<float>  ampEnvelopeDecayMs { 0.0f };
+        std::atomic<float>  ampEnvelopeSustain { 0.0f };
+        std::atomic<float>  ampEnvelopeReleaseMs { 0.0f };
+        std::atomic<float>  voiceGainDb { -120.0f };
+        std::atomic<float>  layerGainDb { -120.0f };
+        std::atomic<float>  finalVoiceGainDb { -120.0f };
+    };
+    LiveRenderAtomics liveTel_;
+
+
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SynthVoice)
 
 };
