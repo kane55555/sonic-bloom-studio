@@ -331,6 +331,45 @@ public:
         return best;
     }
 
+    // Diagnostic-only: live lifetime summary across the currently active voices
+    // for this preset/loadId. Proves whether any held voice has actually
+    // survived long enough for the (e.g. 100 ms) attack to open, rather than the
+    // report sampling a freshly-created/restarted voice. Reads the per-block
+    // live snapshot (published every render block) so noteAge/playhead/gain
+    // reflect the most recent block of each voice. Never alters DSP.
+    struct ActiveVoiceLifetimeSummary
+    {
+        int    activeVoiceCount = 0;
+        int    oldestAgeBlocks = -1;
+        double oldestPlayheadAfterRender = 0.0;
+        float  oldestEnvelopeGain = 0.0f;
+        bool   anyEligibleVoice = false; // age>=10 && playhead>=1000 && gain>=0.50
+    };
+
+    ActiveVoiceLifetimeSummary probeActiveVoiceLifetime(int presetLoadId) const noexcept
+    {
+        ActiveVoiceLifetimeSummary out;
+        for (int i = 0; i < getNumVoices(); ++i)
+            if (auto* v = dynamic_cast<const SynthVoice*>(getVoice(i)))
+            {
+                if (! v->isVoiceActive()) continue;
+                const auto s = v->getLiveRenderSnapshot();
+                if (! s.valid || s.presetLoadId != presetLoadId) continue;
+                ++out.activeVoiceCount;
+                if (s.calibrationCandidateNoteAgeBlocks > out.oldestAgeBlocks)
+                {
+                    out.oldestAgeBlocks = s.calibrationCandidateNoteAgeBlocks;
+                    out.oldestPlayheadAfterRender = s.sampleReaderPlayheadAfterRender;
+                    out.oldestEnvelopeGain = s.ampEnvelopeCurrentGain;
+                }
+                if (s.calibrationCandidateNoteAgeBlocks >= 10
+                    && s.sampleReaderPlayheadAfterRender >= 1000.0
+                    && s.ampEnvelopeCurrentGain >= 0.50f)
+                    out.anyEligibleVoice = true;
+            }
+        return out;
+    }
+
 
 
 

@@ -1207,8 +1207,16 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         const bool activeVoiceRenderCandidate = candidateSource == CalibrationCandidateSource::activeVoiceRender
             && ! candidateWasProbe
             && ! candidateWasReaderReset;
+        // Voice-lifetime eligibility: only a voice that has actually survived
+        // long enough for the attack to open may seed a calibration candidate.
+        // This blocks freshly-created/restarted voices (noteAge<=1) from pinning
+        // the report to a near-silent attack block. Diagnostic gate only.
+        const bool candidateLifetimeEligible = currentNoteAgeBlocks >= 10
+            && telPlayheadAfter >= 1000.0
+            && gNow >= 0.50f;
         const bool betterCandidate = blockQualifies
             && activeVoiceRenderCandidate
+            && candidateLifetimeEligible
             && sameVoiceOrNoteLifetime
             && (! haveCandidateForThisLoad
                 || telPlayheadAfter > calibrationTel_.sampleReaderPlayheadAfterRender.load());

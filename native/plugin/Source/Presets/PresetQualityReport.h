@@ -858,6 +858,40 @@ inline void report(DiditagainProcessor& proc,
     const int calibrationCandidateAgeBlocks = calibrationCandidateCaptured
         ? juce::jmax(0, blocksRenderedSincePresetLoad - live.blocksSincePresetLoad) : -1;
 
+    // ---- Active-voice lifetime probe (Choir restarted-voice false positive) ----
+    // Proves whether any held voice has actually survived long enough for the
+    // attack to open, instead of the report sampling a freshly-created/restarted
+    // active voice. Diagnostic only — never alters DSP or audio.
+    const auto voiceLifetime = engine.probeActiveVoiceLifetime(currentPresetLoadId);
+    const int    activeVoiceCount                    = voiceLifetime.activeVoiceCount;
+    const int    oldestActiveVoiceAgeBlocks          = voiceLifetime.oldestAgeBlocks;
+    const double oldestActiveVoicePlayheadAfterRender = voiceLifetime.oldestPlayheadAfterRender;
+    const float  oldestActiveVoiceEnvelopeGain       = voiceLifetime.oldestEnvelopeGain;
+    const int    acceptedCalibrationVoiceAgeBlocks   = calibrationCandidateCaptured
+        ? live.calibrationCandidateNoteAgeBlocks : -1;
+
+    // Voice lifetime is not advancing: many blocks rendered since the preset
+    // loaded, voices exist, but the oldest active voice is still age<=1. That
+    // means we are repeatedly sampling restarted/new voices, not the held note.
+    const bool voiceLifetimeNotAdvancing = (aiTexturePreset || choirMode)
+        && currentPresetHasRendered
+        && blocksRenderedSincePresetLoad > 32
+        && activeVoiceCount > 0
+        && oldestActiveVoiceAgeBlocks <= 1;
+
+    // Why was no calibration candidate accepted? (eligibility = age>=10,
+    // playhead>=1000, gain>=0.50). Purely descriptive for the report.
+    juce::String rejectedCalibrationReason = "none";
+    if (! calibrationCandidateCaptured)
+    {
+        if (voiceLifetimeNotAdvancing)                        rejectedCalibrationReason = "voiceLifetimeNotAdvancing";
+        else if (activeVoiceCount == 0)                       rejectedCalibrationReason = "noActiveVoice";
+        else if (oldestActiveVoiceAgeBlocks < 10)            rejectedCalibrationReason = "noteAgeBelow10";
+        else if (oldestActiveVoicePlayheadAfterRender < 1000.0) rejectedCalibrationReason = "playheadBelow1000";
+        else if (oldestActiveVoiceEnvelopeGain < 0.50f)      rejectedCalibrationReason = "envelopeGainBelow0p50";
+        else                                                 rejectedCalibrationReason = "noQualifyingBlock";
+    }
+
     // ---- Slow-attack guard (Choir/AI Texture zero-buffer false positive) ----
     // The live reader proved healthy BEFORE the amp VCA (non-zero samples and a
     // before-envelope peak above the -120 floor). A low AFTER-envelope / dry
@@ -885,6 +919,11 @@ inline void report(DiditagainProcessor& proc,
 
 
     juce::String drySilenceReason;
+    if (voiceLifetimeNotAdvancing)
+    {
+        drySilenceReason = "VOICE_LIFETIME_NOT_ADVANCING";
+    }
+    else
     if (staleProbeSnapshot)
     {
         drySilenceReason = "STALE_PROBE_SNAPSHOT";
@@ -1131,10 +1170,14 @@ inline void report(DiditagainProcessor& proc,
     // preset mid-attack. This is a wait, never a failure.
     if (envelopeNotOpenYet) calibrationSkipReason = "envelopeNotOpenYet";
     if (staleProbeSnapshot) calibrationSkipReason = "staleProbeSnapshot";
+    // Restarted/new-voice guard: the report is sampling voices that never age
+    // past the attack. Defer calibration until a voice survives long enough.
+    if (voiceLifetimeNotAdvancing) calibrationSkipReason = "voiceLifetimeNotAdvancing";
     const bool calibrationSafe = reportEligible
         && meterReflectsCurrentPreset
         && ! envelopeNotOpenYet
         && ! staleProbeSnapshot
+        && ! voiceLifetimeNotAdvancing
         && finalOutputDb > -120.0f
         && dryRawPeakDb > -120.0f
         && ! warnings.contains("DRY_BUS_SILENT")
@@ -1163,6 +1206,8 @@ inline void report(DiditagainProcessor& proc,
             drySilenceReason = "ENVELOPE_NOT_OPEN_YET";
         if (calibrationSkipReason == "staleProbeSnapshot" && drySilenceReason.isEmpty())
             drySilenceReason = "STALE_PROBE_SNAPSHOT";
+        if (calibrationSkipReason == "voiceLifetimeNotAdvancing" && drySilenceReason.isEmpty())
+            drySilenceReason = "VOICE_LIFETIME_NOT_ADVANCING";
     }
     const bool suggestedGainValid = notesPlaying && loudnessJudgmentSafe;
 
@@ -1378,6 +1423,12 @@ inline void report(DiditagainProcessor& proc,
         << " calibrationCandidateEnvelopeGain=" << juce::String(live.ampEnvelopeCurrentGain, 4)
         << " calibrationCandidateEnvelopeState=" << live.ampEnvelopeStateName
         << " calibrationCandidatePeakAfterGainDb=" << juce::String(live.liveReaderBufferPeakDbAfterGain, 2)
+        << " activeVoiceCount=" << activeVoiceCount
+        << " oldestActiveVoiceAgeBlocks=" << oldestActiveVoiceAgeBlocks
+        << " oldestActiveVoicePlayheadAfterRender=" << juce::String(oldestActiveVoicePlayheadAfterRender, 1)
+        << " oldestActiveVoiceEnvelopeGain=" << juce::String(oldestActiveVoiceEnvelopeGain, 4)
+        << " acceptedCalibrationVoiceAgeBlocks=" << acceptedCalibrationVoiceAgeBlocks
+        << " rejectedCalibrationReason=" << rejectedCalibrationReason
         << " playedMidiNote=" << live.playedMidiNote
         << " playedVelocity=" << juce::String(live.playedVelocity, 3)
         << " liveSelectedZoneRoot=" << live.selectedZoneRoot
@@ -1619,6 +1670,12 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("calibrationCandidateEnvelopeGain", live.ampEnvelopeCurrentGain);
     j->setProperty("calibrationCandidateEnvelopeState", live.ampEnvelopeStateName);
     j->setProperty("calibrationCandidatePeakAfterGainDb", live.liveReaderBufferPeakDbAfterGain);
+    j->setProperty("activeVoiceCount", activeVoiceCount);
+    j->setProperty("oldestActiveVoiceAgeBlocks", oldestActiveVoiceAgeBlocks);
+    j->setProperty("oldestActiveVoicePlayheadAfterRender", oldestActiveVoicePlayheadAfterRender);
+    j->setProperty("oldestActiveVoiceEnvelopeGain", oldestActiveVoiceEnvelopeGain);
+    j->setProperty("acceptedCalibrationVoiceAgeBlocks", acceptedCalibrationVoiceAgeBlocks);
+    j->setProperty("rejectedCalibrationReason", rejectedCalibrationReason);
     j->setProperty("playedMidiNote",         live.playedMidiNote);
     j->setProperty("playedVelocity",         live.playedVelocity);
     j->setProperty("liveSelectedZoneRoot",   live.selectedZoneRoot);
@@ -1892,6 +1949,12 @@ inline void report(DiditagainProcessor& proc,
               << "calibrationCandidateEnvelopeGain: " << juce::String(live.ampEnvelopeCurrentGain, 4) << "\n"
               << "calibrationCandidateEnvelopeState: " << live.ampEnvelopeStateName << "\n"
               << "calibrationCandidatePeakAfterGainDb: " << juce::String(live.liveReaderBufferPeakDbAfterGain, 2) << "\n"
+              << "activeVoiceCount: "          << activeVoiceCount << "\n"
+              << "oldestActiveVoiceAgeBlocks: " << oldestActiveVoiceAgeBlocks << "\n"
+              << "oldestActiveVoicePlayheadAfterRender: " << juce::String(oldestActiveVoicePlayheadAfterRender, 1) << "\n"
+              << "oldestActiveVoiceEnvelopeGain: " << juce::String(oldestActiveVoiceEnvelopeGain, 4) << "\n"
+              << "acceptedCalibrationVoiceAgeBlocks: " << acceptedCalibrationVoiceAgeBlocks << "\n"
+              << "rejectedCalibrationReason: "  << rejectedCalibrationReason << "\n"
               << "playedMidiNote: "            << live.playedMidiNote << "\n"
               << "playedVelocity: "            << juce::String(live.playedVelocity, 3) << "\n"
               << "liveSelectedZoneRoot: "      << live.selectedZoneRoot << "\n"
