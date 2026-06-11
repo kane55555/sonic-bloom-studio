@@ -614,6 +614,12 @@ private:
         return nextVoiceId.fetch_add(1);
     }
 
+    static int allocateNoteLifetimeId() noexcept
+    {
+        static std::atomic<int> nextNoteLifetimeId { 1 };
+        return nextNoteLifetimeId.fetch_add(1);
+    }
+
 
 
 
