@@ -140,6 +140,11 @@ public:
     // override (never written to a preset) so it cannot permanently alter sound.
     void setNeuralTextureSolo(bool s) noexcept { soloNeuralTexture = s; }
 
+    // Choir/natural vocal presets must sustain a held note across render blocks.
+    // When enabled, duplicate same-note starts while the envelope is already open
+    // are treated as accidental held-note reassertions, not reader/env retriggers.
+    void setProtectHeldNotePersistence(bool shouldProtect) noexcept { protectHeldNotePersistence = shouldProtect; }
+
     // Diagnostic-only (off the audio thread): the most recent block peak (linear)
     // produced by any active neural texture partial in this voice. Used by the
     // preset-quality reporter for the AI Texture diagnostic section. Reads an
@@ -607,6 +612,8 @@ private:
     int voiceId_ = -1;
     int noteLifetimeId_ = 0;
     int noteAgeBlocks_ = 0;
+    int heldMidiNote_ = -1;
+    bool protectHeldNotePersistence = false;
 
     static int allocateVoiceId() noexcept
     {
