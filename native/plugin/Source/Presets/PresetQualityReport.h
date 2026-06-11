@@ -1683,7 +1683,7 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("estimatedHeadroomDb",    headroomDb);
     j->setProperty("categoryTargetMinDb",    target.minDb);
     j->setProperty("categoryTargetMaxDb",    target.maxDb);
-    if (notesPlaying)
+    if (suggestedGainValid)
         j->setProperty("suggestedGainAdjustmentDb", suggestedGainDb);
     else
         j->setProperty("suggestedGainAdjustmentDb", juce::var());
