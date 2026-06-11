@@ -855,9 +855,41 @@ inline void report(DiditagainProcessor& proc,
     const auto live = engine.probeLiveRenderSnapshot();
     const bool liveRenderCaptured = live.valid;
 
+    // ---- Slow-attack guard (Choir/AI Texture zero-buffer false positive) ----
+    // The live reader proved healthy BEFORE the amp VCA (non-zero samples and a
+    // before-envelope peak above the -120 floor). A low AFTER-envelope / dry
+    // reading while the amp envelope is still ramping (e.g. a 100 ms Choir
+    // attack) is NOT a reader/crop/playhead failure — it is simply the envelope
+    // not being open yet. Detect that so the report never flags
+    // sampleReaderZeroBuffer and defers calibration until the VCA has opened.
+    const bool liveReaderHasSignal = liveRenderCaptured
+        && live.liveReaderBufferNonZeroSampleCount > 0
+        && live.liveReaderBufferPeakDbBeforeEnvelope > -120.0f;
+    const bool ampEnvelopeOpen =
+           live.ampEnvelopeCurrentGain >= 0.50f
+        || live.ampEnvelopeStateName == "Decay"
+        || live.ampEnvelopeStateName == "Sustain"
+        || live.ampEnvelopeStateName == "Release";
+    // Only AI Texture / Choir presets use the slow-attack deferral; other
+    // presets keep the existing strict silence attribution.
+    const bool envelopeNotOpenYet = (aiTexturePreset || choirMode)
+        && liveReaderHasSignal && ! ampEnvelopeOpen;
+
+
     juce::String drySilenceReason;
-    if (reportEligible && dryOutputDb <= -60.0f && up.main.enabled)
+    if (reportEligible && envelopeNotOpenYet && dryOutputDb <= -60.0f && up.main.enabled)
     {
+        // Choir/AI Texture slow-attack: the reader carries signal before the VCA
+        // but the amp envelope is still ramping, so the dry bus is momentarily
+        // quiet. This is timing, not a reader/zero-buffer fault — do NOT emit
+        // DRY_BUS_SILENT or SAMPLE_READER_STARTED_BUT_ZERO_BUFFER. Surface a
+        // benign marker and defer calibration until the envelope opens.
+        drySilenceReason = "ENVELOPE_NOT_OPEN_YET";
+        warnings.addIfNotAlreadyThere("CHOIR_ATTACK_TOO_EARLY");
+    }
+    else if (reportEligible && dryOutputDb <= -60.0f && up.main.enabled)
+    {
+
         // BUG 3 (Report 86): walk the REAL signal chain stage-by-stage and name
         // the exact stage that lost the signal. Never emit a generic
         // NO_VOICE_OUTPUT when a zone + sample reader + file are present.
@@ -879,10 +911,16 @@ inline void report(DiditagainProcessor& proc,
                 // The chosen file decoded to silence (e.g. a stale crop region):
                 // the sample is the culprit, not the downstream render path.
                 drySilenceReason = "SAMPLE_FILE_SILENT_OR_DECODE_FAILED";
+            else if (sampleReaderStarted && liveReaderHasSignal)
+                // The reader produced non-zero samples before the VCA: this is
+                // never a zero-buffer fault. The dip is the amp envelope still
+                // ramping, so name it explicitly instead of blaming the reader.
+                drySilenceReason = "ENVELOPE_NOT_OPEN_YET";
             else if (sampleReaderStarted)
                 // A zone+file resolved and the reader started, yet the buffer is
                 // empty — precise stage instead of generic NO_VOICE_OUTPUT.
                 drySilenceReason = "SAMPLE_READER_STARTED_BUT_ZERO_BUFFER";
+
             else
                 drySilenceReason = "VOICE_RENDERED_SILENT";
         }
@@ -1075,8 +1113,13 @@ inline void report(DiditagainProcessor& proc,
     else if (dryPreAmpPeakDb <= -100.0f && reportEligible) calibrationSkipReason = "silentVoice";
     else if (finalOutputDb <= -100.0f && reportEligible) calibrationSkipReason = "finalOutputSilent";
     else if (warnings.contains("AMP_GAIN_NOT_REFLECTED_IN_OUTPUT") || warnings.contains("GAIN_STAGE_ACCOUNTING_MISMATCH")) calibrationSkipReason = "gainAccountingMismatch";
+    // Choir/AI Texture slow attack: defer calibration capture until the amp VCA
+    // has opened (gain >= 0.50, or Decay/Sustain/Release) instead of judging the
+    // preset mid-attack. This is a wait, never a failure.
+    if (envelopeNotOpenYet) calibrationSkipReason = "envelopeNotOpenYet";
     const bool calibrationSafe = reportEligible
         && meterReflectsCurrentPreset
+        && ! envelopeNotOpenYet
         && finalOutputDb > -120.0f
         && dryRawPeakDb > -120.0f
         && ! warnings.contains("DRY_BUS_SILENT")
