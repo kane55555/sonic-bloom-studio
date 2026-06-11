@@ -163,12 +163,19 @@ public:
     // the preset-quality reporter. PURELY DIAGNOSTIC: never alters DSP. Proves
     // exactly where a decoded-but-healthy sample disappears during live
     // playback (reader/crop/playhead vs envelope vs gain/layer routing).
+    enum class CalibrationCandidateSource { activeVoiceRender = 0, reportProbe = 1, loadProbe = 2, oneShotDiagnostic = 3 };
     struct LiveRenderSnapshot
     {
         bool   valid = false;
         unsigned long long seq = 0;     // monotonic block sequence (recency)
         int    presetLoadId = 0;        // preset/load generation that produced this block
         int    blocksSincePresetLoad = 0;
+        int    calibrationCandidateVoiceId = -1;
+        int    calibrationCandidateNoteLifetimeId = -1;
+        int    calibrationCandidateNoteAgeBlocks = -1;
+        juce::String calibrationCandidateSource { "reportProbe" };
+        bool   calibrationCandidateWasProbe = true;
+        bool   calibrationCandidateWasReaderReset = true;
 
         // Played note / zone selection.
         int    playedMidiNote = -1;
@@ -216,10 +223,16 @@ public:
 
     LiveRenderSnapshot getLiveRenderSnapshot() const noexcept;
     LiveRenderSnapshot getCalibrationCandidateSnapshot() const noexcept;
-    void setLiveRenderPresetContext(int loadId, int blocksSinceLoad) noexcept
+    void setLiveRenderPresetContext(int loadId, int blocksSinceLoad,
+                                    CalibrationCandidateSource source = CalibrationCandidateSource::reportProbe,
+                                    bool wasProbe = true,
+                                    bool wasReaderReset = true) noexcept
     {
         liveRenderPresetLoadId_.store(loadId);
         liveRenderBlocksSinceLoad_.store(blocksSinceLoad);
+        liveRenderCandidateSource_.store((int) source);
+        liveRenderCandidateWasProbe_.store(wasProbe);
+        liveRenderCandidateWasReaderReset_.store(wasReaderReset);
     }
 
 
