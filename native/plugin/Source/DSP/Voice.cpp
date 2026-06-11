@@ -971,6 +971,11 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         // chain's master gain + limiter.
         constexpr float kVoiceTrim = 0.5f;
         l *= kVoiceTrim; r *= kVoiceTrim;
+        // Live telemetry: voice bus peak after the final per-voice trim/gain.
+        {
+            const float agAbs = juce::jmax(std::fabs(l), std::fabs(r));
+            if (agAbs > telAfterGainPeakLin) telAfterGainPeakLin = agAbs;
+        }
 
         // ---- Per-layer peak metering (cheap abs/max). Throttled log at end. ----
         const float absSamp  = juce::jmax(std::fabs(sampL),  std::fabs(sampR));
