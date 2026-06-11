@@ -570,6 +570,15 @@ private:
     };
     LiveRenderAtomics liveTel_;
 
+    // AI Texture report calibration candidate. The published live snapshot must
+    // prefer the best/OPEN block of the held note (highest amp-envelope gain)
+    // rather than being permanently pinned to the first attack block. This
+    // tracks the best gain captured since the last noteOn so the publish step
+    // only overwrites the snapshot with an equal-or-better (more open) block.
+    // Diagnostic only: never feeds DSP. -1 means "no candidate yet this note".
+    float liveTelBestGain_ = -1.0f;
+
+
 
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SynthVoice)
