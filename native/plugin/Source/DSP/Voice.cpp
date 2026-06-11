@@ -638,6 +638,8 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
     float telAfterGainPeakLin = 0.0f;  // voice bus after final per-voice trim
     int   telNonZeroCount    = 0;
     int   telSamplesRead     = 0;
+    double telPlayheadAfter  = telPlayheadBefore;  // captured pre-reset on break
+    bool   telAtEndAfter     = telAtEndBefore;
 
     for (int s = startSample; s < startSample + numSamples; ++s)
     {
