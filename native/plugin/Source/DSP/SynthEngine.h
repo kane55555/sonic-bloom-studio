@@ -31,11 +31,14 @@ public:
     void renderBlockWithFx(juce::AudioBuffer<float>& buffer,
                            const juce::MidiBuffer& midi,
                            int startSample, int numSamples);
-    void setLiveRenderPresetContext(int loadId, int blocksSinceLoad) noexcept
+    void setLiveRenderPresetContext(int loadId, int blocksSinceLoad,
+                                    SynthVoice::CalibrationCandidateSource source = SynthVoice::CalibrationCandidateSource::reportProbe,
+                                    bool wasProbe = true,
+                                    bool wasReaderReset = true) noexcept
     {
         for (int i = 0; i < getNumVoices(); ++i)
             if (auto* v = dynamic_cast<SynthVoice*>(getVoice(i)))
-                v->setLiveRenderPresetContext(loadId, blocksSinceLoad);
+                v->setLiveRenderPresetContext(loadId, blocksSinceLoad, source, wasProbe, wasReaderReset);
     }
 
     void resetForPresetChange();
