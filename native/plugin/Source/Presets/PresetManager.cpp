@@ -2124,13 +2124,13 @@ void PresetManager::seedAiTextureDemoPackIfMissing()
     auto dir  = root.getChildFile("AI Texture");
     dir.createDirectory();
 
-    // v10 migration marker. v6 fixed the multisample source paths; v7 recalibrated
+    // v11 migration marker. v6 fixed the multisample source paths; v7 recalibrated
     // loudness; v8 re-balanced the output; v9 set AI Guitar Dust Test body gain to
-    // 0 dB. v10 re-tunes loudness into the target window: Brass +3 -> +2 dB and
-    // Guitar 0 -> +7 dB (cached texture stays subtle, <= -20 dB). Re-run once to
-    // overwrite the managed demo .diapreset files.
-    auto seededMarkerV10 = dir.getChildFile(".seeded_ai_texture_demo_v10");
-    if (seededMarkerV10.existsAsFile())
+    // 0 dB. v10 re-tuned loudness (Brass +3 -> +2 dB, Guitar 0 -> +7 dB). v11 sets
+    // AI Guitar Dust Test ampEnvelope gain +7 -> +2 dB. Re-run once to overwrite
+    // the managed demo .diapreset files.
+    auto seededMarkerV11 = dir.getChildFile(".seeded_ai_texture_demo_v11");
+    if (seededMarkerV11.existsAsFile())
         return;
 
 
