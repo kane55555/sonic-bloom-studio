@@ -844,6 +844,17 @@ inline void report(DiditagainProcessor& proc,
     const bool  mainLayerEnabled    = up.main.enabled;
     const bool  voiceStarted        = zoneProbe.hasZone && mainLayerEnabled;
     const bool  sampleReaderStarted = zoneProbe.hasZone && selectedZoneFile.isNotEmpty();
+
+    // ---- Live-render telemetry (Choir zero-buffer investigation) ----
+    // Captured from the actual live render block of the most-recently-played
+    // voice. This proves WHERE a decoded-but-healthy sample disappears during
+    // live playback:
+    //   * decoded healthy + liveBeforeEnvelope == -120  -> reader/crop/playhead
+    //   * liveBeforeEnvelope healthy + afterEnvelope == -120 -> envelope
+    //   * afterEnvelope healthy + dryVoicePreLayerPeakDb == -120 -> gain/layer bus
+    const auto live = engine.probeLiveRenderSnapshot();
+    const bool liveRenderCaptured = live.valid;
+
     juce::String drySilenceReason;
     if (reportEligible && dryOutputDb <= -60.0f && up.main.enabled)
     {
