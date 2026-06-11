@@ -1133,6 +1133,10 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         const float gNow = ampEnv.getCurrentLevel();
         const int presetLoadId = liveRenderPresetLoadId_.load();
         const int blocksSinceLoad = liveRenderBlocksSinceLoad_.load();
+        const auto candidateSource = (CalibrationCandidateSource) liveRenderCandidateSource_.load();
+        const bool candidateWasProbe = liveRenderCandidateWasProbe_.load();
+        const bool candidateWasReaderReset = liveRenderCandidateWasReaderReset_.load();
+        const int currentNoteAgeBlocks = noteAgeBlocks_ + 1;
         const bool blockQualifies = (telSamplesRead > 0)
                                   && (telNonZeroCount > 0)
                                   && (dbOf(telReaderPeakLin) > -120.0f);
@@ -1151,6 +1155,12 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             dest.seq.store(seq);
             dest.presetLoadId.store(presetLoadId);
             dest.blocksSincePresetLoad.store(blocksSinceLoad);
+            dest.calibrationCandidateVoiceId.store(voiceId_);
+            dest.calibrationCandidateNoteLifetimeId.store(noteLifetimeId_);
+            dest.calibrationCandidateNoteAgeBlocks.store(currentNoteAgeBlocks);
+            dest.calibrationCandidateSource.store((int) candidateSource);
+            dest.calibrationCandidateWasProbe.store(candidateWasProbe);
+            dest.calibrationCandidateWasReaderReset.store(candidateWasReaderReset);
             dest.playedMidiNote.store(playedMidi);
             dest.playedVelocity.store(velocity);
             dest.selectedZoneRoot.store(zoneRoot);
@@ -1191,12 +1201,21 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
 
         const bool haveCandidateForThisLoad = calibrationTel_.valid.load()
             && calibrationTel_.presetLoadId.load() == presetLoadId;
+        const bool sameVoiceOrNoteLifetime = ! haveCandidateForThisLoad
+            || calibrationTel_.calibrationCandidateVoiceId.load() == voiceId_
+            || calibrationTel_.calibrationCandidateNoteLifetimeId.load() == noteLifetimeId_;
+        const bool activeVoiceRenderCandidate = candidateSource == CalibrationCandidateSource::activeVoiceRender
+            && ! candidateWasProbe
+            && ! candidateWasReaderReset;
         const bool betterCandidate = blockQualifies
+            && activeVoiceRenderCandidate
+            && sameVoiceOrNoteLifetime
             && (! haveCandidateForThisLoad
-                || telPlayheadAfter > calibrationTel_.sampleReaderPlayheadAfterRender.load()
-                || gNow > calibrationTel_.ampEnvelopeCurrentGain.load());
+                || telPlayheadAfter > calibrationTel_.sampleReaderPlayheadAfterRender.load());
         if (betterCandidate)
             publish(calibrationTel_, seq);
+
+        noteAgeBlocks_ = currentNoteAgeBlocks;
     }
 }
 
