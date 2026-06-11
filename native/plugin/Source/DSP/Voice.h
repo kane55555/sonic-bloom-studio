@@ -163,12 +163,19 @@ public:
     // the preset-quality reporter. PURELY DIAGNOSTIC: never alters DSP. Proves
     // exactly where a decoded-but-healthy sample disappears during live
     // playback (reader/crop/playhead vs envelope vs gain/layer routing).
+    enum class CalibrationCandidateSource { activeVoiceRender = 0, reportProbe = 1, loadProbe = 2, oneShotDiagnostic = 3 };
     struct LiveRenderSnapshot
     {
         bool   valid = false;
         unsigned long long seq = 0;     // monotonic block sequence (recency)
         int    presetLoadId = 0;        // preset/load generation that produced this block
         int    blocksSincePresetLoad = 0;
+        int    calibrationCandidateVoiceId = -1;
+        int    calibrationCandidateNoteLifetimeId = -1;
+        int    calibrationCandidateNoteAgeBlocks = -1;
+        juce::String calibrationCandidateSource { "reportProbe" };
+        bool   calibrationCandidateWasProbe = true;
+        bool   calibrationCandidateWasReaderReset = true;
 
         // Played note / zone selection.
         int    playedMidiNote = -1;
@@ -216,10 +223,16 @@ public:
 
     LiveRenderSnapshot getLiveRenderSnapshot() const noexcept;
     LiveRenderSnapshot getCalibrationCandidateSnapshot() const noexcept;
-    void setLiveRenderPresetContext(int loadId, int blocksSinceLoad) noexcept
+    void setLiveRenderPresetContext(int loadId, int blocksSinceLoad,
+                                    CalibrationCandidateSource source = CalibrationCandidateSource::reportProbe,
+                                    bool wasProbe = true,
+                                    bool wasReaderReset = true) noexcept
     {
         liveRenderPresetLoadId_.store(loadId);
         liveRenderBlocksSinceLoad_.store(blocksSinceLoad);
+        liveRenderCandidateSource_.store((int) source);
+        liveRenderCandidateWasProbe_.store(wasProbe);
+        liveRenderCandidateWasReaderReset_.store(wasReaderReset);
     }
 
 
@@ -545,6 +558,12 @@ private:
         std::atomic<unsigned long long> seq { 0 };
         std::atomic<int>   presetLoadId { 0 };
         std::atomic<int>   blocksSincePresetLoad { 0 };
+        std::atomic<int>   calibrationCandidateVoiceId { -1 };
+        std::atomic<int>   calibrationCandidateNoteLifetimeId { -1 };
+        std::atomic<int>   calibrationCandidateNoteAgeBlocks { -1 };
+        std::atomic<int>   calibrationCandidateSource { (int) CalibrationCandidateSource::reportProbe };
+        std::atomic<bool>  calibrationCandidateWasProbe { true };
+        std::atomic<bool>  calibrationCandidateWasReaderReset { true };
         std::atomic<int>   playedMidiNote { -1 };
         std::atomic<float> playedVelocity { 0.0f };
         std::atomic<int>   selectedZoneRoot { -1 };
@@ -582,6 +601,24 @@ private:
     LiveRenderAtomics calibrationTel_;
     std::atomic<int> liveRenderPresetLoadId_ { 0 };
     std::atomic<int> liveRenderBlocksSinceLoad_ { 0 };
+    std::atomic<int> liveRenderCandidateSource_ { (int) CalibrationCandidateSource::reportProbe };
+    std::atomic<bool> liveRenderCandidateWasProbe_ { true };
+    std::atomic<bool> liveRenderCandidateWasReaderReset_ { true };
+    int voiceId_ = -1;
+    int noteLifetimeId_ = 0;
+    int noteAgeBlocks_ = 0;
+
+    static int allocateVoiceId() noexcept
+    {
+        static std::atomic<int> nextVoiceId { 1 };
+        return nextVoiceId.fetch_add(1);
+    }
+
+    static int allocateNoteLifetimeId() noexcept
+    {
+        static std::atomic<int> nextNoteLifetimeId { 1 };
+        return nextNoteLifetimeId.fetch_add(1);
+    }
 
 
 

@@ -31,11 +31,14 @@ public:
     void renderBlockWithFx(juce::AudioBuffer<float>& buffer,
                            const juce::MidiBuffer& midi,
                            int startSample, int numSamples);
-    void setLiveRenderPresetContext(int loadId, int blocksSinceLoad) noexcept
+    void setLiveRenderPresetContext(int loadId, int blocksSinceLoad,
+                                    SynthVoice::CalibrationCandidateSource source = SynthVoice::CalibrationCandidateSource::reportProbe,
+                                    bool wasProbe = true,
+                                    bool wasReaderReset = true) noexcept
     {
         for (int i = 0; i < getNumVoices(); ++i)
             if (auto* v = dynamic_cast<SynthVoice*>(getVoice(i)))
-                v->setLiveRenderPresetContext(loadId, blocksSinceLoad);
+                v->setLiveRenderPresetContext(loadId, blocksSinceLoad, source, wasProbe, wasReaderReset);
     }
 
     void resetForPresetChange();
@@ -315,9 +318,14 @@ public:
             if (auto* v = dynamic_cast<const SynthVoice*>(getVoice(i)))
             {
                 const auto s = v->getCalibrationCandidateSnapshot();
-                if (s.valid && s.presetLoadId == presetLoadId
-                    && (s.sampleReaderPlayheadAfterRender > best.sampleReaderPlayheadAfterRender
-                        || s.ampEnvelopeCurrentGain > best.ampEnvelopeCurrentGain))
+                if (v->isVoiceActive()
+                    && s.valid
+                    && s.presetLoadId == presetLoadId
+                    && s.calibrationCandidateSource == "activeVoiceRender"
+                    && ! s.calibrationCandidateWasProbe
+                    && ! s.calibrationCandidateWasReaderReset
+                    && s.liveReaderBufferNonZeroSampleCount > 0
+                    && s.sampleReaderPlayheadAfterRender > best.sampleReaderPlayheadAfterRender)
                     best = s;
             }
         return best;
