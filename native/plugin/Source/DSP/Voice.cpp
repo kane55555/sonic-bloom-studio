@@ -131,6 +131,8 @@ SynthVoice::LiveRenderSnapshot SynthVoice::getCalibrationCandidateSnapshot() con
 
 SynthVoice::SynthVoice()
 {
+    voiceId_ = allocateVoiceId();
+
     // Wire LegacyOscillatorStub callbacks into real voice state so the
     // OSC A / OSC B waveform, detune and pulse-width controls actually
     // affect the rendered sound.
@@ -311,6 +313,8 @@ void SynthVoice::startNote(int midiNoteNumber, float vel,
     noteReleasedForFxSend = false;
     mainSamplePeakLin_.store(0.0f);
     calibrationTel_.valid.store(false);   // reset the report calibration candidate for this note
+    ++noteLifetimeId_;
+    noteAgeBlocks_ = 0;
 
     recalcGlideCoeff();
 
