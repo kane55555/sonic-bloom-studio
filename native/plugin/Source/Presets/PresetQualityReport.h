@@ -1939,7 +1939,7 @@ inline void report(DiditagainProcessor& proc,
               << "choirAnalogDriftDisabled: "    << (choirAnalogDriftDisabled ? "true" : "false") << "\n"
               << "categoryTargetMinDb: "       << juce::String(target.minDb, 2) << "\n"
               << "categoryTargetMaxDb: "       << juce::String(target.maxDb, 2) << "\n"
-              << "suggestedGainAdjustmentDb: " << (notesPlaying ? juce::String(suggestedGainDb, 2) : juce::String("n/a")) << "\n"
+              << "suggestedGainAdjustmentDb: " << (suggestedGainValid ? juce::String(suggestedGainDb, 2) : juce::String("n/a")) << "\n"
               << "aiTexturePreset: "           << (aiTexturePreset ? "true" : "false") << "\n"
               << "textureType: "               << aiTextureTypeStr << "\n"
               << "mainSamplePeakDb: "          << juce::String(mainSamplePeakDb, 2) << "\n"
