@@ -167,6 +167,8 @@ public:
     {
         bool   valid = false;
         unsigned long long seq = 0;     // monotonic block sequence (recency)
+        int    presetLoadId = 0;        // preset/load generation that produced this block
+        int    blocksSincePresetLoad = 0;
 
         // Played note / zone selection.
         int    playedMidiNote = -1;
@@ -213,6 +215,12 @@ public:
     };
 
     LiveRenderSnapshot getLiveRenderSnapshot() const noexcept;
+    LiveRenderSnapshot getCalibrationCandidateSnapshot() const noexcept;
+    void setLiveRenderPresetContext(int loadId, int blocksSinceLoad) noexcept
+    {
+        liveRenderPresetLoadId_.store(loadId);
+        liveRenderBlocksSinceLoad_.store(blocksSinceLoad);
+    }
 
 
 
@@ -535,6 +543,8 @@ private:
     {
         std::atomic<bool>  valid { false };
         std::atomic<unsigned long long> seq { 0 };
+        std::atomic<int>   presetLoadId { 0 };
+        std::atomic<int>   blocksSincePresetLoad { 0 };
         std::atomic<int>   playedMidiNote { -1 };
         std::atomic<float> playedVelocity { 0.0f };
         std::atomic<int>   selectedZoneRoot { -1 };
@@ -569,14 +579,9 @@ private:
         std::atomic<float>  finalVoiceGainDb { -120.0f };
     };
     LiveRenderAtomics liveTel_;
-
-    // AI Texture report calibration candidate. The published live snapshot must
-    // prefer the best/OPEN block of the held note (highest amp-envelope gain)
-    // rather than being permanently pinned to the first attack block. This
-    // tracks the best gain captured since the last noteOn so the publish step
-    // only overwrites the snapshot with an equal-or-better (more open) block.
-    // Diagnostic only: never feeds DSP. -1 means "no candidate yet this note".
-    float liveTelBestGain_ = -1.0f;
+    LiveRenderAtomics calibrationTel_;
+    std::atomic<int> liveRenderPresetLoadId_ { 0 };
+    std::atomic<int> liveRenderBlocksSinceLoad_ { 0 };
 
 
 

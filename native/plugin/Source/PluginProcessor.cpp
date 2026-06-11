@@ -800,6 +800,8 @@ void DiditagainProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
                 return true;
         return false;
     }();
+    synthEngine.setLiveRenderPresetContext(currentPresetLoadIdForReport,
+                                           blocksRenderedSincePresetLoad + 1);
     synthEngine.renderBlockWithFx(buffer, midiMessages, 0, buffer.getNumSamples());
 
     if (currentPresetLoadIdForReport > 0)
