@@ -285,6 +285,25 @@ public:
         return r;
     }
 
+    // ---- Live-render telemetry probe (Choir zero-buffer investigation) ----
+    // Returns the most-recently-rendered voice's live diagnostic snapshot so the
+    // preset-quality reporter can attribute a silent dry bus to the exact stage
+    // (reader/crop/playhead vs envelope vs gain/layer routing). Diagnostic only.
+    SynthVoice::LiveRenderSnapshot probeLiveRenderSnapshot() const noexcept
+    {
+        SynthVoice::LiveRenderSnapshot best;
+        for (int i = 0; i < getNumVoices(); ++i)
+            if (auto* v = dynamic_cast<const SynthVoice*>(getVoice(i)))
+            {
+                const auto s = v->getLiveRenderSnapshot();
+                if (s.valid && s.seq >= best.seq) best = s;
+            }
+        return best;
+    }
+
+
+
+
 
     // Drops the cached instrument identity so the next setInstrument/
     // setSampleSource/setMultisampleSources/loadMultisamplePreset call is

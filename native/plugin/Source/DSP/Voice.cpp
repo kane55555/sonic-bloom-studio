@@ -3,6 +3,10 @@
 
 static thread_local juce::AudioBuffer<float>* currentFxSendRenderBuffer = nullptr;
 
+// Monotonic block sequence so the reporter can pick the most-recently-rendered
+// voice's live telemetry. Diagnostic only.
+static std::atomic<unsigned long long> gLiveRenderSeq { 0 };
+
 void SynthVoice::beginFxSendRender(juce::AudioBuffer<float>* fxSendBuffer) noexcept
 {
     currentFxSendRenderBuffer = fxSendBuffer;
@@ -12,6 +16,48 @@ void SynthVoice::endFxSendRender() noexcept
 {
     currentFxSendRenderBuffer = nullptr;
 }
+
+SynthVoice::LiveRenderSnapshot SynthVoice::getLiveRenderSnapshot() const noexcept
+{
+    LiveRenderSnapshot s;
+    s.valid = liveTel_.valid.load();
+    s.seq   = liveTel_.seq.load();
+    s.playedMidiNote = liveTel_.playedMidiNote.load();
+    s.playedVelocity = liveTel_.playedVelocity.load();
+    s.selectedZoneRoot = liveTel_.selectedZoneRoot.load();
+    s.selectedZoneDistanceSemitones = liveTel_.selectedZoneDistanceSemitones.load();
+    s.sampleReaderSourceStartSample = liveTel_.sampleReaderSourceStartSample.load();
+    s.sampleReaderSourceLengthSamples = liveTel_.sampleReaderSourceLengthSamples.load();
+    s.sampleReaderPlayheadBeforeRender = liveTel_.sampleReaderPlayheadBeforeRender.load();
+    s.sampleReaderPlayheadAfterRender = liveTel_.sampleReaderPlayheadAfterRender.load();
+    s.sampleReaderRequestedNumSamples = liveTel_.sampleReaderRequestedNumSamples.load();
+    s.sampleReaderActualSamplesRead = liveTel_.sampleReaderActualSamplesRead.load();
+    s.sampleReaderLoopEnabled = liveTel_.sampleReaderLoopEnabled.load();
+    s.sampleReaderAtEndBeforeRender = liveTel_.sampleReaderAtEndBeforeRender.load();
+    s.sampleReaderAtEndAfterRender = liveTel_.sampleReaderAtEndAfterRender.load();
+    s.zoneStartSample = liveTel_.zoneStartSample.load();
+    s.zoneEndSample = liveTel_.zoneEndSample.load();
+    s.zoneCropStartSample = liveTel_.zoneCropStartSample.load();
+    s.zoneCropEndSample = liveTel_.zoneCropEndSample.load();
+    s.effectivePlaybackStartSample = liveTel_.effectivePlaybackStartSample.load();
+    s.effectivePlaybackEndSample = liveTel_.effectivePlaybackEndSample.load();
+    s.liveReaderBufferPeakDbBeforeEnvelope = liveTel_.liveReaderBufferPeakDbBeforeEnvelope.load();
+    s.liveReaderBufferPeakDbAfterEnvelope = liveTel_.liveReaderBufferPeakDbAfterEnvelope.load();
+    s.liveReaderBufferPeakDbAfterGain = liveTel_.liveReaderBufferPeakDbAfterGain.load();
+    s.liveReaderBufferNonZeroSampleCount = liveTel_.liveReaderBufferNonZeroSampleCount.load();
+    s.ampEnvelopeStage = liveTel_.ampEnvelopeStage.load();
+    s.ampEnvelopeStateName = ADSREnvelope::stageName((ADSREnvelope::Stage) s.ampEnvelopeStage);
+    s.ampEnvelopeCurrentGain = liveTel_.ampEnvelopeCurrentGain.load();
+    s.ampEnvelopeAttackMs = liveTel_.ampEnvelopeAttackMs.load();
+    s.ampEnvelopeDecayMs = liveTel_.ampEnvelopeDecayMs.load();
+    s.ampEnvelopeSustain = liveTel_.ampEnvelopeSustain.load();
+    s.ampEnvelopeReleaseMs = liveTel_.ampEnvelopeReleaseMs.load();
+    s.voiceGainDb = liveTel_.voiceGainDb.load();
+    s.layerGainDb = liveTel_.layerGainDb.load();
+    s.finalVoiceGainDb = liveTel_.finalVoiceGainDb.load();
+    return s;
+}
+
 
 
 SynthVoice::SynthVoice()
@@ -580,8 +626,24 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         }
     }
 
+    // ---- Live-render telemetry capture (diagnostic only; no DSP effect) ----
+    // Tracks the multisample body (lo zone) through reader -> envelope -> gain so
+    // the reporter can prove exactly where a decoded-but-healthy sample goes
+    // silent during live playback.
+    const dida::SampleZone* telZone = loZone;
+    const double telPlayheadBefore  = loReadPos;
+    const bool   telAtEndBefore     = loFinished;
+    float telReaderPeakLin   = 0.0f;   // pure reader output (pre oscALevel/envelope)
+    float telAfterEnvPeakLin = 0.0f;   // voice bus after amp envelope
+    float telAfterGainPeakLin = 0.0f;  // voice bus after final per-voice trim
+    int   telNonZeroCount    = 0;
+    int   telSamplesRead     = 0;
+    double telPlayheadAfter  = telPlayheadBefore;  // captured pre-reset on break
+    bool   telAtEndAfter     = telAtEndBefore;
+
     for (int s = startSample; s < startSample + numSamples; ++s)
     {
+
 
         if (glideCoeff > 0.0f)
             currentMidiNote = targetMidiNote + (currentMidiNote - targetMidiNote) * glideCoeff;
@@ -615,9 +677,19 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             float zl, zr; readWithLoop(*loZone, loReadPos, loFinished, zl, zr);
             const float w = (hiZone ? (1.0f - zoneXfade) : 1.0f);
             if (! soloNeuralTexture) { sampL += zl * w; sampR += zr * w; }
+            // Live reader telemetry: capture the PURE reader output (pre level
+            // / pre envelope) so a silent dry bus can be attributed to the
+            // reader/crop/playhead vs downstream stages.
+            const float rawAbs = juce::jmax(std::fabs(zl), std::fabs(zr));
+            if (rawAbs > telReaderPeakLin) telReaderPeakLin = rawAbs;
+            if (rawAbs > 1.0e-7f) ++telNonZeroCount;
+            ++telSamplesRead;
             loReadPos += loStep;
             advanceLoop(*loZone, loReadPos, loFinished);
+            telPlayheadAfter = loReadPos;   // pre-reset snapshot for telemetry
+            telAtEndAfter    = loFinished;
         }
+
         if (hiZone && ! hiFinished)
         {
             float zl, zr; readWithLoop(*hiZone, hiReadPos, hiFinished, zl, zr);
@@ -872,6 +944,11 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         const float velCurve = 0.3f + 0.7f * velocity;
         const float gain = amp * velCurve * vcaGainLin;
         l *= gain; r *= gain;
+        // Live telemetry: voice bus peak right after the amp envelope stage.
+        {
+            const float aeAbs = juce::jmax(std::fabs(l), std::fabs(r));
+            if (aeAbs > telAfterEnvPeakLin) telAfterEnvPeakLin = aeAbs;
+        }
         // Equal-power pan offset using card pan (-0.08..+0.08 at full vintage).
         // cardPan=0 → both sides ~0.707 (centre). Multiply by sqrt(2) to keep
         // unity gain in the centre position.
@@ -898,6 +975,11 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         // chain's master gain + limiter.
         constexpr float kVoiceTrim = 0.5f;
         l *= kVoiceTrim; r *= kVoiceTrim;
+        // Live telemetry: voice bus peak after the final per-voice trim/gain.
+        {
+            const float agAbs = juce::jmax(std::fabs(l), std::fabs(r));
+            if (agAbs > telAfterGainPeakLin) telAfterGainPeakLin = agAbs;
+        }
 
         // ---- Per-layer peak metering (cheap abs/max). Throttled log at end. ----
         const float absSamp  = juce::jmax(std::fabs(sampL),  std::fabs(sampR));
@@ -963,4 +1045,60 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             clearCurrentNote(); reset(); break;
         }
     }
+
+    // ---- Publish live-render telemetry (diagnostic only) ----
+    {
+        auto dbOf = [](float lin) {
+            return lin > 1.0e-6f ? juce::Decibels::gainToDecibels(lin) : -120.0f;
+        };
+        const int playedMidi = juce::jlimit(0, 127,
+            (int) std::lround(targetMidiNote) + pitchOffsetSemis);
+        const int zoneRoot = (telZone != nullptr) ? telZone->rootMidi : -1;
+        const int zoneN    = (telZone != nullptr) ? telZone->buffer.getNumSamples() : 0;
+        const double cropStartSamp = (telZone != nullptr)
+            ? juce::jlimit(0.0, (double) juce::jmax(0, zoneN - 2), (double) cropStartFrac * zoneN) : 0.0;
+        const double cropEndSamp = (telZone != nullptr)
+            ? juce::jlimit(2.0, (double) juce::jmax(2, zoneN - 1), (double) cropEndFrac * zoneN) : 0.0;
+
+        liveTel_.seq.store(++gLiveRenderSeq);
+        liveTel_.playedMidiNote.store(playedMidi);
+        liveTel_.playedVelocity.store(velocity);
+        liveTel_.selectedZoneRoot.store(zoneRoot);
+        liveTel_.selectedZoneDistanceSemitones.store(zoneRoot >= 0 ? std::abs(playedMidi - zoneRoot) : -1);
+
+        liveTel_.sampleReaderSourceStartSample.store(cropStartSamp);
+        liveTel_.sampleReaderSourceLengthSamples.store(zoneN);
+        liveTel_.sampleReaderPlayheadBeforeRender.store(telPlayheadBefore);
+        liveTel_.sampleReaderPlayheadAfterRender.store(telPlayheadAfter);
+        liveTel_.sampleReaderRequestedNumSamples.store(numSamples);
+        liveTel_.sampleReaderActualSamplesRead.store(telSamplesRead);
+        liveTel_.sampleReaderLoopEnabled.store(sampleLooping && ! oneShotMode);
+        liveTel_.sampleReaderAtEndBeforeRender.store(telAtEndBefore);
+        liveTel_.sampleReaderAtEndAfterRender.store(telAtEndAfter);
+
+        liveTel_.zoneStartSample.store(0);
+        liveTel_.zoneEndSample.store(zoneN);
+        liveTel_.zoneCropStartSample.store((int) cropStartSamp);
+        liveTel_.zoneCropEndSample.store((int) cropEndSamp);
+        liveTel_.effectivePlaybackStartSample.store(cropStartSamp);
+        liveTel_.effectivePlaybackEndSample.store(cropEndSamp);
+
+        liveTel_.liveReaderBufferPeakDbBeforeEnvelope.store(dbOf(telReaderPeakLin));
+        liveTel_.liveReaderBufferPeakDbAfterEnvelope.store(dbOf(telAfterEnvPeakLin));
+        liveTel_.liveReaderBufferPeakDbAfterGain.store(dbOf(telAfterGainPeakLin));
+        liveTel_.liveReaderBufferNonZeroSampleCount.store(telNonZeroCount);
+
+        liveTel_.ampEnvelopeStage.store((int) ampEnv.getStage());
+        liveTel_.ampEnvelopeCurrentGain.store(ampEnv.getCurrentLevel());
+        liveTel_.ampEnvelopeAttackMs.store(ampEnv.getAttackSeconds() * 1000.0f);
+        liveTel_.ampEnvelopeDecayMs.store(ampEnv.getDecaySeconds() * 1000.0f);
+        liveTel_.ampEnvelopeSustain.store(ampEnv.getSustainLevel());
+        liveTel_.ampEnvelopeReleaseMs.store(ampEnv.getReleaseSeconds() * 1000.0f);
+
+        liveTel_.voiceGainDb.store(dbOf(vcaGainLin));
+        liveTel_.layerGainDb.store(dbOf(oscALevel));
+        liveTel_.finalVoiceGainDb.store(dbOf(0.5f * vcaGainLin * oscALevel));
+        liveTel_.valid.store(true);
+    }
 }
+

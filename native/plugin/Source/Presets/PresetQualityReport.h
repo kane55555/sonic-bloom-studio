@@ -844,6 +844,17 @@ inline void report(DiditagainProcessor& proc,
     const bool  mainLayerEnabled    = up.main.enabled;
     const bool  voiceStarted        = zoneProbe.hasZone && mainLayerEnabled;
     const bool  sampleReaderStarted = zoneProbe.hasZone && selectedZoneFile.isNotEmpty();
+
+    // ---- Live-render telemetry (Choir zero-buffer investigation) ----
+    // Captured from the actual live render block of the most-recently-played
+    // voice. This proves WHERE a decoded-but-healthy sample disappears during
+    // live playback:
+    //   * decoded healthy + liveBeforeEnvelope == -120  -> reader/crop/playhead
+    //   * liveBeforeEnvelope healthy + afterEnvelope == -120 -> envelope
+    //   * afterEnvelope healthy + dryVoicePreLayerPeakDb == -120 -> gain/layer bus
+    const auto live = engine.probeLiveRenderSnapshot();
+    const bool liveRenderCaptured = live.valid;
+
     juce::String drySilenceReason;
     if (reportEligible && dryOutputDb <= -60.0f && up.main.enabled)
     {
@@ -1275,6 +1286,39 @@ inline void report(DiditagainProcessor& proc,
         << " mainLayerEnabled=" << (mainLayerEnabled ? "true" : "false")
         << " voiceStarted=" << (voiceStarted ? "true" : "false")
         << " sampleReaderStarted=" << (sampleReaderStarted ? "true" : "false")
+        << " liveRenderCaptured=" << (liveRenderCaptured ? "true" : "false")
+        << " playedMidiNote=" << live.playedMidiNote
+        << " playedVelocity=" << juce::String(live.playedVelocity, 3)
+        << " liveSelectedZoneRoot=" << live.selectedZoneRoot
+        << " selectedZoneDistanceSemitones=" << live.selectedZoneDistanceSemitones
+        << " sampleReaderSourceStartSample=" << juce::String(live.sampleReaderSourceStartSample, 1)
+        << " sampleReaderSourceLengthSamples=" << live.sampleReaderSourceLengthSamples
+        << " sampleReaderPlayheadBeforeRender=" << juce::String(live.sampleReaderPlayheadBeforeRender, 1)
+        << " sampleReaderPlayheadAfterRender=" << juce::String(live.sampleReaderPlayheadAfterRender, 1)
+        << " sampleReaderRequestedNumSamples=" << live.sampleReaderRequestedNumSamples
+        << " sampleReaderActualSamplesRead=" << live.sampleReaderActualSamplesRead
+        << " sampleReaderLoopEnabled=" << (live.sampleReaderLoopEnabled ? "true" : "false")
+        << " sampleReaderAtEndBeforeRender=" << (live.sampleReaderAtEndBeforeRender ? "true" : "false")
+        << " sampleReaderAtEndAfterRender=" << (live.sampleReaderAtEndAfterRender ? "true" : "false")
+        << " zoneStartSample=" << live.zoneStartSample
+        << " zoneEndSample=" << live.zoneEndSample
+        << " zoneCropStartSample=" << live.zoneCropStartSample
+        << " zoneCropEndSample=" << live.zoneCropEndSample
+        << " effectivePlaybackStartSample=" << juce::String(live.effectivePlaybackStartSample, 1)
+        << " effectivePlaybackEndSample=" << juce::String(live.effectivePlaybackEndSample, 1)
+        << " liveReaderBufferPeakDbBeforeEnvelope=" << juce::String(live.liveReaderBufferPeakDbBeforeEnvelope, 2)
+        << " liveReaderBufferPeakDbAfterEnvelope=" << juce::String(live.liveReaderBufferPeakDbAfterEnvelope, 2)
+        << " liveReaderBufferPeakDbAfterGain=" << juce::String(live.liveReaderBufferPeakDbAfterGain, 2)
+        << " liveReaderBufferNonZeroSampleCount=" << live.liveReaderBufferNonZeroSampleCount
+        << " ampEnvelopeState=" << live.ampEnvelopeStateName
+        << " ampEnvelopeCurrentGain=" << juce::String(live.ampEnvelopeCurrentGain, 4)
+        << " ampEnvelopeAttackMs=" << juce::String(live.ampEnvelopeAttackMs, 1)
+        << " ampEnvelopeDecayMs=" << juce::String(live.ampEnvelopeDecayMs, 1)
+        << " ampEnvelopeSustain=" << juce::String(live.ampEnvelopeSustain, 3)
+        << " ampEnvelopeReleaseMs=" << juce::String(live.ampEnvelopeReleaseMs, 1)
+        << " voiceGainDb=" << juce::String(live.voiceGainDb, 2)
+        << " layerGainDb=" << juce::String(live.layerGainDb, 2)
+        << " finalVoiceGainDb=" << juce::String(live.finalVoiceGainDb, 2)
         << " presetJsonReverbMix=" << fmt(presetJsonReverbMix)
         << " appliedReverbMix=" << fmt(appliedReverbMix)
         << " presetJsonDelayMix=" << fmt(presetJsonDelayMix)
@@ -1472,6 +1516,39 @@ inline void report(DiditagainProcessor& proc,
     j->setProperty("mainLayerEnabled",       mainLayerEnabled);
     j->setProperty("voiceStarted",           voiceStarted);
     j->setProperty("sampleReaderStarted",    sampleReaderStarted);
+    j->setProperty("liveRenderCaptured",     liveRenderCaptured);
+    j->setProperty("playedMidiNote",         live.playedMidiNote);
+    j->setProperty("playedVelocity",         live.playedVelocity);
+    j->setProperty("liveSelectedZoneRoot",   live.selectedZoneRoot);
+    j->setProperty("selectedZoneDistanceSemitones", live.selectedZoneDistanceSemitones);
+    j->setProperty("sampleReaderSourceStartSample", live.sampleReaderSourceStartSample);
+    j->setProperty("sampleReaderSourceLengthSamples", live.sampleReaderSourceLengthSamples);
+    j->setProperty("sampleReaderPlayheadBeforeRender", live.sampleReaderPlayheadBeforeRender);
+    j->setProperty("sampleReaderPlayheadAfterRender", live.sampleReaderPlayheadAfterRender);
+    j->setProperty("sampleReaderRequestedNumSamples", live.sampleReaderRequestedNumSamples);
+    j->setProperty("sampleReaderActualSamplesRead", live.sampleReaderActualSamplesRead);
+    j->setProperty("sampleReaderLoopEnabled", live.sampleReaderLoopEnabled);
+    j->setProperty("sampleReaderAtEndBeforeRender", live.sampleReaderAtEndBeforeRender);
+    j->setProperty("sampleReaderAtEndAfterRender", live.sampleReaderAtEndAfterRender);
+    j->setProperty("zoneStartSample",        live.zoneStartSample);
+    j->setProperty("zoneEndSample",          live.zoneEndSample);
+    j->setProperty("zoneCropStartSample",    live.zoneCropStartSample);
+    j->setProperty("zoneCropEndSample",      live.zoneCropEndSample);
+    j->setProperty("effectivePlaybackStartSample", live.effectivePlaybackStartSample);
+    j->setProperty("effectivePlaybackEndSample", live.effectivePlaybackEndSample);
+    j->setProperty("liveReaderBufferPeakDbBeforeEnvelope", live.liveReaderBufferPeakDbBeforeEnvelope);
+    j->setProperty("liveReaderBufferPeakDbAfterEnvelope", live.liveReaderBufferPeakDbAfterEnvelope);
+    j->setProperty("liveReaderBufferPeakDbAfterGain", live.liveReaderBufferPeakDbAfterGain);
+    j->setProperty("liveReaderBufferNonZeroSampleCount", live.liveReaderBufferNonZeroSampleCount);
+    j->setProperty("ampEnvelopeState",       live.ampEnvelopeStateName);
+    j->setProperty("ampEnvelopeCurrentGain", live.ampEnvelopeCurrentGain);
+    j->setProperty("ampEnvelopeAttackMs",    live.ampEnvelopeAttackMs);
+    j->setProperty("ampEnvelopeDecayMs",     live.ampEnvelopeDecayMs);
+    j->setProperty("ampEnvelopeSustain",     live.ampEnvelopeSustain);
+    j->setProperty("ampEnvelopeReleaseMs",   live.ampEnvelopeReleaseMs);
+    j->setProperty("voiceGainDb",            live.voiceGainDb);
+    j->setProperty("layerGainDb",            live.layerGainDb);
+    j->setProperty("finalVoiceGainDb",       live.finalVoiceGainDb);
     j->setProperty("presetJsonReverbMix",    presetJsonReverbMix);
     j->setProperty("appliedReverbMix",       appliedReverbMix);
     j->setProperty("presetJsonDelayMix",     presetJsonDelayMix);
@@ -1701,6 +1778,39 @@ inline void report(DiditagainProcessor& proc,
               << "mainLayerEnabled: "          << (mainLayerEnabled ? "true" : "false") << "\n"
               << "voiceStarted: "              << (voiceStarted ? "true" : "false") << "\n"
               << "sampleReaderStarted: "       << (sampleReaderStarted ? "true" : "false") << "\n"
+              << "liveRenderCaptured: "        << (liveRenderCaptured ? "true" : "false") << "\n"
+              << "playedMidiNote: "            << live.playedMidiNote << "\n"
+              << "playedVelocity: "            << juce::String(live.playedVelocity, 3) << "\n"
+              << "liveSelectedZoneRoot: "      << live.selectedZoneRoot << "\n"
+              << "selectedZoneDistanceSemitones: " << live.selectedZoneDistanceSemitones << "\n"
+              << "sampleReaderSourceStartSample: " << juce::String(live.sampleReaderSourceStartSample, 1) << "\n"
+              << "sampleReaderSourceLengthSamples: " << live.sampleReaderSourceLengthSamples << "\n"
+              << "sampleReaderPlayheadBeforeRender: " << juce::String(live.sampleReaderPlayheadBeforeRender, 1) << "\n"
+              << "sampleReaderPlayheadAfterRender: " << juce::String(live.sampleReaderPlayheadAfterRender, 1) << "\n"
+              << "sampleReaderRequestedNumSamples: " << live.sampleReaderRequestedNumSamples << "\n"
+              << "sampleReaderActualSamplesRead: " << live.sampleReaderActualSamplesRead << "\n"
+              << "sampleReaderLoopEnabled: "    << (live.sampleReaderLoopEnabled ? "true" : "false") << "\n"
+              << "sampleReaderAtEndBeforeRender: " << (live.sampleReaderAtEndBeforeRender ? "true" : "false") << "\n"
+              << "sampleReaderAtEndAfterRender: " << (live.sampleReaderAtEndAfterRender ? "true" : "false") << "\n"
+              << "zoneStartSample: "           << live.zoneStartSample << "\n"
+              << "zoneEndSample: "             << live.zoneEndSample << "\n"
+              << "zoneCropStartSample: "       << live.zoneCropStartSample << "\n"
+              << "zoneCropEndSample: "         << live.zoneCropEndSample << "\n"
+              << "effectivePlaybackStartSample: " << juce::String(live.effectivePlaybackStartSample, 1) << "\n"
+              << "effectivePlaybackEndSample: " << juce::String(live.effectivePlaybackEndSample, 1) << "\n"
+              << "liveReaderBufferPeakDbBeforeEnvelope: " << juce::String(live.liveReaderBufferPeakDbBeforeEnvelope, 2) << "\n"
+              << "liveReaderBufferPeakDbAfterEnvelope: " << juce::String(live.liveReaderBufferPeakDbAfterEnvelope, 2) << "\n"
+              << "liveReaderBufferPeakDbAfterGain: " << juce::String(live.liveReaderBufferPeakDbAfterGain, 2) << "\n"
+              << "liveReaderBufferNonZeroSampleCount: " << live.liveReaderBufferNonZeroSampleCount << "\n"
+              << "ampEnvelopeState: "          << live.ampEnvelopeStateName << "\n"
+              << "ampEnvelopeCurrentGain: "    << juce::String(live.ampEnvelopeCurrentGain, 4) << "\n"
+              << "ampEnvelopeAttackMs: "       << juce::String(live.ampEnvelopeAttackMs, 1) << "\n"
+              << "ampEnvelopeDecayMs: "        << juce::String(live.ampEnvelopeDecayMs, 1) << "\n"
+              << "ampEnvelopeSustain: "        << juce::String(live.ampEnvelopeSustain, 3) << "\n"
+              << "ampEnvelopeReleaseMs: "      << juce::String(live.ampEnvelopeReleaseMs, 1) << "\n"
+              << "voiceGainDb: "              << juce::String(live.voiceGainDb, 2) << "\n"
+              << "layerGainDb: "              << juce::String(live.layerGainDb, 2) << "\n"
+              << "finalVoiceGainDb: "         << juce::String(live.finalVoiceGainDb, 2) << "\n"
               << "firstZoneRoot: "             << firstZoneRoot << "\n"
               << "lastZoneRoot: "              << lastZoneRoot << "\n"
               << "selectedZoneRoot: "          << selectedZoneRoot << "\n"

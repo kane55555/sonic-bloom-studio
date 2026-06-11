@@ -103,6 +103,28 @@ public:
     bool isActive() const { return stage != Stage::Idle; }
     Stage getStage() const { return stage; }
 
+    // ---- Diagnostic-only getters (used by the preset-quality reporter). ----
+    // These never alter DSP; they expose the live envelope state/times so the
+    // report can prove whether a silent voice is caused by the amp envelope.
+    float getCurrentLevel()   const { return currentLevel; }
+    float getAttackSeconds()  const { return attackTime;   }
+    float getDecaySeconds()   const { return decayTime;    }
+    float getSustainLevel()   const { return sustainLevel; }
+    float getReleaseSeconds() const { return releaseTime;  }
+
+    static const char* stageName(Stage s)
+    {
+        switch (s)
+        {
+            case Stage::Idle:    return "Idle";
+            case Stage::Attack:  return "Attack";
+            case Stage::Decay:   return "Decay";
+            case Stage::Sustain: return "Sustain";
+            case Stage::Release: return "Release";
+        }
+        return "Idle";
+    }
+
 private:
     void recalculate()
     {
